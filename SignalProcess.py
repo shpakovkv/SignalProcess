@@ -18,8 +18,7 @@ def get_file_list_by_ext(path, ext, sort=False):
                  if os.path.isfile(os.path.join(path, x)) and x.upper().endswith(ext.upper())]
     if sort:
         file_list.sort()
-    return  file_list
-
+    return file_list
 
 
 def group_files_by_count(file_list, files_in_group=4):
@@ -367,6 +366,24 @@ def compare_2_files(first_file_name, second_file_name, lines=10):
         return False
 
 
+def compare_files_in_folder(path):
+    file_list = get_file_list_by_ext(path, ext=".CSV", sort=True)
+    print("Current PATH = " + path)
+    for idx in range(len(file_list) - 1):
+        if compare_2_files(file_list[idx], file_list[idx + 1]):
+            print(os.path.basename(file_list[idx]) + " == " + os.path.basename(file_list[idx + 1]))
+    print()
+
+
+def compare_files_in_subfolders(path):
+    if os.path.isdir(path):
+        path = os.path.abspath(path)
+        for subpath in get_subdir_list(path):
+            compare_files_in_folder(subpath)
+    else:
+        print("Path " + path + "\n does not exist!")
+
+
 def add_to_log(s, print_to_console=True):
     if print_to_console:
         print(s, end="")
@@ -388,7 +405,7 @@ def get_max_min_from_file_cols(file_list,       # list of fullpaths of target fi
         min_data[item] = 0
         max_data[item] = 0
     if not col_corr:
-        for item in col_list:
+        for _ in col_list:
             col_corr.append(1)
     for file_i in range(len(file_list)):
         log += add_to_log("FILE \"" + file_list[file_i] + "\"\n", verbose_mode)
@@ -411,10 +428,10 @@ def get_max_min_from_file_cols(file_list,       # list of fullpaths of target fi
     log += add_to_log("OVERALL STATS (from " + str(len(file_list)) + " files)\n", verbose_mode)
     for col_i in range(len(col_list)):
         col = col_list[col_i]
-        log += add_to_log ("Column [" + str(col) + "] (x" + str(col_corr[col_i]) + ")\t MAX = " + str(max_data[col])
-                           + "\t MAX_corr = " + str(max_data[col] * col_corr[col_i])
-                           + "\t MIN = " + str(min_data[col])
-                           + "\t MIN_corr = " + str(min_data[col] * col_corr[col_i]) + "\n", verbose_mode)
+        log += add_to_log("Column [" + str(col) + "] (x" + str(col_corr[col_i]) + ")\t MAX = " + str(max_data[col])
+                          + "\t MAX_corr = " + str(max_data[col] * col_corr[col_i])
+                          + "\t MIN = " + str(min_data[col])
+                          + "\t MIN_corr = " + str(min_data[col] * col_corr[col_i]) + "\n", verbose_mode)
     log += add_to_log("\n", verbose_mode)
     return log
 
@@ -462,7 +479,6 @@ if __name__ == "__main__":
     corr_cols_dpo7054 = [1.216, 0.991, 1.000, 0.994]    # correction multiplyer for each column (for max-min log)
     log_filename_dpo7054 = 'max_min_dpo7054.log'    # max-min filename postfix (containing dir name will be the prefix)
 
-
     # ==================================================================================================
     # ----------     TDS2024C     ----------------------------------------------------------------------
     # =======================================
@@ -476,7 +492,6 @@ if __name__ == "__main__":
     corr_cols_tds2024 = [1.261, 1.094, 1.222, 1.590]    # correction multiplyer for each column (for max-min log)
     log_filename_tds2024 = 'max_min_tds2024c.log'   # max-min filename postfix (containing dir name will be the prefix)
 
-
     # ==================================================================================================
     # ----------     HMO3004     -----------------------------------------------------------------------
     # =======================================
@@ -485,15 +500,14 @@ if __name__ == "__main__":
 
     files_in_group_hmo3004 = 1                          # number of files of the HMO3004 (default 1)
     read_hmo3004 = False                                # read files and convert to csv
-    max_min_log_hmo3004 = True                          # read converted csv and find max and min for all files
+    max_min_log_hmo3004 = False                         # read converted csv and find max and min for all files
     log_cols_hmo3004 = [1, 3, 5, 7]                     # search max and min only for this columns (zero-based indexes)
     corr_cols_hmo3004 = [0.272, 0.951, 1.138, 1.592]    # correction multiplyer for each column (for max-min log)
     log_filename_hmo3004 = 'max_min_hmo3004.log'    # max-min filename postfix (containing dir name will be the prefix)
 
-
-    #==================================================================================================
-    #----------     LeCroy     ------------------------------------------------------------------------
-    #=======================================
+    # ==================================================================================================
+    # ----------     LeCroy     ------------------------------------------------------------------------
+    # =======================================
     dir_lecroy = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/LeCroy"
     save_lecroy_to_path = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/LeCroy_CSV"
 
@@ -528,7 +542,7 @@ if __name__ == "__main__":
         else:
             print("Path " + save_dpo7054_to_path + "\n does not exist!")
 
-    #====================================================================================
+    # ====================================================================================
     # READ CSV from Tektronix TDS2024C
     if read_tds2024:
         if os.path.isdir(dir_tds2024):
@@ -550,7 +564,7 @@ if __name__ == "__main__":
         else:
             print("Path " + save_tds2024_to_path + "\n does not exist!")
 
-    #=====================================================================================
+    # =====================================================================================
     # READ CSV from Rohde&Schwarz HMO 3004
     if read_hmo3004:
         if os.path.isdir(dir_hmo3004):
@@ -572,7 +586,7 @@ if __name__ == "__main__":
         else:
             print("Path " + save_hmo3004_to_path + "\n does not exist!")
 
-    #=====================================================================================
+    # =====================================================================================
     # READ TXT from LeCroy
     if read_LeCroy:
         if os.path.isdir(dir_lecroy):
@@ -595,8 +609,12 @@ if __name__ == "__main__":
         else:
             print("Path " + save_lecroy_to_path + "\n does not exist!")
 
-    #=======================================================================================
-
+    # =======================================================================================
+    # FIND DUPLACATES
+    compare_files_in_subfolders(save_dpo7054_to_path)
+    compare_files_in_subfolders(save_tds2024_to_path)
+    compare_files_in_subfolders(save_hmo3004_to_path)
+    compare_files_in_subfolders(save_lecroy_to_path)
     # import matplotlib.pyplot as mplt
     # data = np.genfromtxt('F0009CH1.CSV', delimiter=",", skip_header=18, usecols=tuple())
     # mplt.plot(data[:,0], data[:,1])
