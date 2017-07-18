@@ -473,6 +473,25 @@ def get_max_min_from_dir(dir_path,        # target folder
         file.write(log)
     return log
 
+
+def col_and_param_number_check(data, param_list):
+    if data.shape[1] > len(param_list):
+        raise IndexError("The number of columns exceeds the number of parameters.")
+    elif data.shape[1] < len(param_list):
+        raise IndexError("The number of parameters exceeds the number of columns.")
+    return True
+
+
+def multiplier_and_delay(data, multiplier, delay):
+    if col_and_param_number_check(data, multiplier) and col_and_param_number_check(data, delay):
+        row_number = data.shape[0]
+        col_number = data.shape[1]
+        for col_idx in range(col_number):
+            for row_idx in range(row_number):
+                data[row_idx][col_idx] = multiplier[col_idx] * data[row_idx][col_idx] - delay[col_idx]
+        return data
+
+
 # ================================================================================================
 # --------------   MAIN    ----------------------------------------
 # ======================================================
