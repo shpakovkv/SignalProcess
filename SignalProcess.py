@@ -27,6 +27,8 @@ def group_files_by_count(file_list, files_in_group=4):
     # files in group mus have equal prefix, equal number and different postfix
     # example: "erg_001_Ch1.wfm", "erg_001_Ch2.wfm", "erg_001_Ch3.wfm", "erg_001_Ch4.wfm"
     groups_list = []
+    if len(file_list) % files_in_group != 0:
+        raise IndexError("Not enough files in file_list. Or wrong value of variable files_in_group.")
     for i in range(0, len(file_list), files_in_group):
         new_group = []
         for j in range(files_in_group):  # makes new group of files
@@ -43,6 +45,9 @@ def group_files_lecroy(file_list, files_in_group=4):
     #
     # files in group mus have equal postfix, equal number and different prefix ("C1_", "C2_", "C3_" or "C4_")
     # example: "C1_LeCroy_0001.txt", "C2_LeCroy_0001.txt", "C3_LeCroy_0001.txt", "C4_LeCroy_0001.txt"
+    if len(file_list) % files_in_group != 0:
+        raise IndexError("Not enough files in file_list. Or wrong value of variable files_in_group.")
+
     groups_list = []
     shoots_count = int(len(file_list) / files_in_group)
     for i in range(0, shoots_count):
@@ -64,9 +69,11 @@ def get_name_from_group_of_files(group, ch_postfix_len=8, ch_prefix_len=0):
     #
     # OUTPUT:   name of the shoot
 
-    pattern = r'[^/]+$'
-    name = re.search(pattern, group[0])
-    return name.group(0)[ch_prefix_len:-ch_postfix_len]
+    path = os.path.abspath(group[0])
+    name = os.path.basename(path)
+    if ch_postfix_len > 0:
+        return name[ch_prefix_len:-ch_postfix_len]
+    return name[ch_prefix_len:]
 
 
 def combine_wfm_to_csv(dir_path,
@@ -307,18 +314,21 @@ def add_new_dir_to_path(old_leaf_dir, new_parent_dir):
     return os.path.join(new_parent_dir, dir_name)    # new leaf dir
 
 
-def add_zeros_to_filename(name, count):
+def add_zeros_to_filename(full_path, count):
     # adds zeros to number in filename
     # Example: f("shoot22.csv", 4) => "shoot0022.csv"
 
-    num = re.search(r'\d+', name).group(0)
-    match = re.match(r'\D+', name)
+    name = os.path.basename(full_path)
+    folder_path = os.path.dirname(full_path)
+
+    num = re.search(r'd+', name).group(0)
+    match = re.match(r'^D+', name)
     if match:
         prefix = match.group(0)
     else:
         prefix = ""
 
-    match = re.search(r'\D+$', name)
+    match = re.search(r'D+$', name)
     if match:
         postfix = match.group(0)
     else:
@@ -326,7 +336,9 @@ def add_zeros_to_filename(name, count):
 
     while len(num) < count:
         num = "0" + num
-    return prefix + num + postfix
+    name = prefix + num + postfix
+
+    return os.path.join(folder_path, name)
 
 
 def read_csv_group(group_of_files,
@@ -366,8 +378,8 @@ def compare_2_files(first_file_name, second_file_name, lines=10):
         return False
 
 
-def compare_files_in_folder(path):
-    file_list = get_file_list_by_ext(path, ext=".CSV", sort=True)
+def compare_files_in_folder(path, ext=".CSV"):
+    file_list = get_file_list_by_ext(path, ext=ext, sort=True)
     print("Current PATH = " + path)
     for idx in range(len(file_list) - 1):
         if compare_2_files(file_list[idx], file_list[idx + 1]):
@@ -375,11 +387,11 @@ def compare_files_in_folder(path):
     print()
 
 
-def compare_files_in_subfolders(path):
+def compare_files_in_subfolders(path, ext=".CSV"):
     if os.path.isdir(path):
         path = os.path.abspath(path)
         for subpath in get_subdir_list(path):
-            compare_files_in_folder(subpath)
+            compare_files_in_folder(subpath, ext=ext)
     else:
         print("Path " + path + "\n does not exist!")
 
@@ -436,7 +448,7 @@ def get_max_min_from_file_cols(file_list,       # list of fullpaths of target fi
     return log
 
 
-def get_max_min_from_dir(dir_path,        # list of fullpaths of target files
+def get_max_min_from_dir(dir_path,        # target folder
                          col_list,        # list of zero-based indexes of column to be processed
                          col_corr=list(),     # list of correction multiplayer for each col in the col_list
                          ext='.CSV',      # target files extension
