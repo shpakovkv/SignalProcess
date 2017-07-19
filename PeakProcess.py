@@ -16,8 +16,8 @@ def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True)
     # Если нет, то ВЫВОДИТ False и индекс последнего проверенного элемента
 
 
-    idx = start                       # zero-based index
-    if window == 0:                 # window default value
+    idx = start          # zero-based index
+    if window == 0:      # window default value
         window = x[-1] - x[start]
 
     while (idx >= 0) and (idx < len(y)) and (abs(x[idx] - x[start]) <= window):
@@ -209,5 +209,109 @@ def find_voltage_front(x, y, level=-0.2, is_positive=False):
     return None, None
 
 
-def group_peaks():
-    pass
+def group_peaks(data, window):
+    # Groups the peaks from different X-Ray detectors
+    # each group corresponds to one single act of X-Ray emission
+    #
+    # data - list with N elements, each element represents one curve
+    # curve - list witn M elements, each element represents one peak
+    # peak - list with 2 float numbers: [time, value]
+    #
+    # data[curve_idx][peak_idx][0/1]
+    #
+    # window - peaks coincide when their X values are within...
+    # ... +/-window interval from average X (time) position of peak ()
+    # "Average" because X (time) value of a peak may differ from curve to curve
+
+    peak_time = []                  # 1D array with average X (time) data of peak group
+    for peak in data[0]:
+        peak_time.append(peak[0])
+
+    dt = abs(window)                            # changes variable name for shortness
+    curves_count = len(data)                    # number of waveforms
+    num_peak_in_gr = [1] * len(peak_time)       # 1D array with numbers of peaks in each group
+
+    peak_map = [[True] * len(peak_time)]            # (peak_map[curve_idx][group_idx] == True) means "there IS a peak"
+    for curve in range(1, curves_count):          # False value means...
+        peak_map.append([False] * len(peak_time))   # ..."this curve have not peak at this time position"
+
+    peak_data = [[]]
+    for peak in data[0]:
+        peak_data[0].append(peak[:])
+    # peak_data = [data[0]]                           # initial data structure with only curve[0] peaks
+    for curve in range(1, curves_count):
+        peak_data.append([None] * len(peak_time))
+
+    if curves_count <= 1:                           # if less than 2 elements = no comparison
+        return peak_data, peak_map
+
+    # ---------- making groups of peaks ------------------------------
+    # makes groups of peaks
+    # two peaks make group when they are close enought ('X' of a peak is within +/- dt interval from 'X' of the group)
+    # with adding new peak to a group, the 'X' parameter of the group changes to (X1 + X2 + ... + Xn)/n
+    # where n - number of peaks in group
+    #
+    # for all waveforms exept first
+    for wf in range(1, curves_count):
+                # wf == 'waveform index'
+        gr = 0  # gr == 'group index', zero-based index of current group
+        pk = 0  # pk == 'peak index', zero-based index of current peak (in peak list of current waveform)
+
+        while pk < len(data[wf]):                         # for all peaks in input curve's peaks data
+            # ===============================================================================================
+            # ADD PEAK TO GROUP
+            # check if curve[i]'s peak[j] is in +/-dt interval from peaks of group[gr]
+            # print "Checking Group[" + str(gr) + "]"
+            if abs(peak_time[gr] - data[wf][pk][0]) <= dt:
+                # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "group match"
+                peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] + data[wf][pk][0])
+                                 / (num_peak_in_gr[gr] + 1))        # recalculate average X-position of group
+                num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1         # update count of peaks in current group
+                peak_map[wf][gr] = True                         # update peak_map
+                peak_data[wf][gr] = list(data[wf][pk])          # add peak to output peak data array
+                pk += 1                                         # go to the next peak
+
+            # ===============================================================================================
+            # INSERT NEW GROUP
+            # check if X-position of current peak of curve[wf] is to the left of current group by more than dt
+            elif data[wf][pk][0] < peak_time[gr] - dt:
+                # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "left insert"
+                peak_time.insert(gr, data[wf][pk][0])       # insert new group of peaks into the groups table
+                num_peak_in_gr.insert(gr, 1)                # update the number of peaks in current group
+                peak_map[wf].insert(gr, True)               # insert row to current wf column of peak map table
+                peak_data[wf].insert(gr, list(data[wf][pk]))   # insert row to current wf column of peak data table
+                for curve_i in range(curves_count):
+                    if curve_i != wf:
+                        peak_map[curve_i].insert(gr, False) # new row to other columns of peak map table
+                        peak_data[curve_i].insert(gr, None) # new row to other columns of peak data table
+                pk += 1                                     # go to the next peak of current curve
+
+            # ===============================================================================================
+            # APPEND NEW GROUP
+            # check if X-position of current peak of curve[wf] is to the right of current group by more than dt
+            # and current group is the latest in the groups table
+            elif (data[wf][pk][0] > peak_time[gr] + dt) and (gr >= len(peak_time) - 1):
+                # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "insert at the end"
+                peak_time.append(data[wf][pk][0])           # add new group at the end of the group table
+                num_peak_in_gr.append(1)                    # update count of peaks and groups
+                peak_map[wf].append(True)                   # add row to current wf column of peak map table
+                peak_data[wf].append(list(data[wf][pk]))           # add row to current wf column of peak data table
+                for curve_i in range(curves_count):
+                    if curve_i != wf:
+                        peak_map[curve_i].append(False) # add row to other columns of peak map table
+                        peak_data[curve_i].append(None) # add row to other columns of peak data table
+                pk += 1                                 # go to the next peak...
+                gr += 1                                 # ... and the next group
+
+            # ===============================================================================================
+            # APPEND NEW GROUP
+            # if we are here then the X-position of current peak of curve[curve_i]
+            # is to the right of current group by more than dt
+            # so go to the next group
+            if gr < len(peak_time) - 1:
+                gr += 1
+    # END OF GROUPING
+    # =======================================================================================================
+    # print peak_time
+    # print num_peak_in_gr
+    return peak_data, peak_map
