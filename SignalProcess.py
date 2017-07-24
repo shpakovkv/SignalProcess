@@ -358,8 +358,6 @@ def read_csv_group(group_of_files,
 def compare_2_files(first_file_name, second_file_name, lines=10):
     # compare a number of first lines of two files
     # return True if lines matches exactly
-    # compare a number of first lines of two files
-    # return True if lines matches exactly
     with open(first_file_name, 'r') as file:
         with open(second_file_name, 'r') as file2:
             for idx in range(lines):
@@ -480,6 +478,31 @@ def multiplier_and_delay(data, multiplier, delay):
             for row_idx in range(row_number):
                 data[row_idx][col_idx] = multiplier[col_idx] * data[row_idx][col_idx] - delay[col_idx]
         return data
+
+
+def save_ndarray_csv(data, filename, delimiter=",", precision=18):
+    # Saves 2-dimensional numpy.ndarray as .csv file
+    # Replaces 'nan' values with ''
+    # precision - a number of units after comma
+
+    # check precision value
+    if not isinstance(precision, int):
+        raise ValueError("Precision must be integer")
+    if precision > 18:
+        precision = 18
+    value_format = '%0.' + str(precision) + 'e'
+
+    # check filename value
+    if len(filename) < 4 or filename[-4:].upper() != ".CSV":
+        filename += ".csv"
+
+    with open(filename, 'w') as file:
+        lines = []
+        for row in range(data.shape[0]):
+            s = delimiter.join([value_format % data[row, col] for col in range(data.shape[1])]) + "\n"
+            s = re.sub(r'nan', '', s)
+            lines.append(s)
+        file.writelines(lines)
 
 
 # ================================================================================================
