@@ -358,24 +358,14 @@ def read_csv_group(group_of_files,
 def compare_2_files(first_file_name, second_file_name, lines=10):
     # compare a number of first lines of two files
     # return True if lines matches exactly
-    file_1_head = []
-    file_2_head = []
+    # compare a number of first lines of two files
+    # return True if lines matches exactly
     with open(first_file_name, 'r') as file:
-        for i in range(lines):
-            file_1_head.append(file.readline())
-
-    with open(second_file_name, 'r') as file2:
-        for i in range(lines):
-            file_2_head.append(file2.readline())
-    lines_match_count = 0
-    for i in range(lines):
-        if file_1_head[i] == file_2_head[i]:
-            # print(file_1_head[i] + " == " + file_2_head[i])
-            lines_match_count += 1
-    if lines_match_count == 10:
-        return True
-    else:
-        return False
+        with open(second_file_name, 'r') as file2:
+            for idx in range(lines):
+                if file.readline() != file2.readline():
+                    return False
+            return True
 
 
 def compare_files_in_folder(path, ext=".CSV"):
@@ -500,7 +490,7 @@ if __name__ == "__main__":
     # ==================================================================================================
     # ----------     DPO7054     -----------------------------------------------------------------------
     # =======================================
-    dir_dpo7054 = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/DPO7054/"
+    dir_dpo7054 = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/DPO7054/2017 05 13"
     save_dpo7054_to_path = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/DPO7054_CSV/"
 
     files_in_group_dpo7054 = 4                          # number of files of the DPO7054 (default 4)
