@@ -217,7 +217,9 @@ def group_peaks(data, window):
     # curve - list witn M elements, each element represents one peak
     # peak - list with 2 float numbers: [time, value]
     #
-    # data[curve_idx][peak_idx][0/1]
+    # data[curve_idx][peak_idx][0] = X-value of peak with peak_idx index of curve with curve_idx index
+    # data[curve_idx][peak_idx][1] = Y-value of peak with peak_idx index of curve with curve_idx index
+    # where curve_idx and peak_idx - zero-based index of curve and peak
     #
     # window - peaks coincide when their X values are within...
     # ... +/-window interval from average X (time) position of peak ()
