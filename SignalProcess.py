@@ -98,9 +98,7 @@ def combine_wfm_to_csv(dir_path,
     # save_with_ext     - The data will be saved to a file with specified extension
 
     # CHECK PATH
-    if not save_to:
-        save_to = dir_path  # default value
-    elif not os.path.isdir(save_to):
+    if save_to and not os.path.isdir(save_to):
         os.makedirs(save_to)
 
     if not silent_mode:
@@ -118,13 +116,14 @@ def combine_wfm_to_csv(dir_path,
         # READ WFM
         data = wfm.read_wfm_group(group)
 
-        # SAVE CSV
-        file_name = get_name_from_group_of_files(group, ch_postfix_len)
-        file_name += save_with_ext
-        # file_full_name = save_to + file_name
-        np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-        if not silent_mode:
-            print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
+        if save_to:
+            # SAVE CSV
+            file_name = get_name_from_group_of_files(group, ch_postfix_len)
+            file_name += save_with_ext
+            # file_full_name = save_to + file_name
+            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
+            if not silent_mode:
+                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
 
     if not silent_mode:
         print()
@@ -154,9 +153,7 @@ def combine_tds2024c_csv(dir_path,
     # save_with_ext     - The data will be saved to a file with specified extension
 
     # CHECK PATH
-    if not save_to:
-        save_to = dir_path  # default value
-    elif not os.path.isdir(save_to):
+    if save_to and not os.path.isdir(save_to):
         os.makedirs(save_to)
 
     if not silent_mode:
@@ -165,6 +162,7 @@ def combine_tds2024c_csv(dir_path,
     # GET LIST OF FILES---------------------------------------------
     file_list = get_file_list_by_ext(dir_path, target_ext)
     file_list.sort()
+    data = None
 
     # GROUP FILES for DPO7054 --------------------------------------
     groups_list = group_files_by_count(file_list, files_in_group)
@@ -174,20 +172,22 @@ def combine_tds2024c_csv(dir_path,
         # READ SINGLE CSVs
         data = read_csv_group(group, skip_header=skip_header, usecols=usecols)
 
-        # SAVE 'ALL-IN' CSV
-        file_name = get_name_from_group_of_files(group, ch_postfix_len)
-        file_name += save_with_ext
-        # file_full_name = save_to + file_name
-        np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-        if not silent_mode:
-            print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
+        if save_to:
+            # SAVE 'ALL-IN' CSV
+            file_name = get_name_from_group_of_files(group, ch_postfix_len)
+            file_name += save_with_ext
+            # file_full_name = save_to + file_name
+            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
+            if not silent_mode:
+                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
 
     if not silent_mode:
         print()
+    return data
 
 
 def combine_hmo3004_csv(dir_path,
-                        save_to=None,
+                        save_to=None,           # save to filename (don't save if None)
                         files_in_group=1,
                         ch_postfix_len=4,
                         skip_header=1,
@@ -210,9 +210,7 @@ def combine_hmo3004_csv(dir_path,
     # save_with_ext     - The data will be saved to a file with specified extension
 
     # CHECK PATH
-    if not save_to:
-        save_to = dir_path  # default value
-    elif not os.path.isdir(save_to):
+    if save_to and not os.path.isdir(save_to):
         os.makedirs(save_to)
 
     if not silent_mode:
@@ -221,6 +219,7 @@ def combine_hmo3004_csv(dir_path,
     # GET LIST OF FILES---------------------------------------------
     file_list = get_file_list_by_ext(dir_path, target_ext)
     file_list.sort()
+    data = None
 
     # GROUP FILES for DPO7054 --------------------------------------
     groups_list = group_files_by_count(file_list, files_in_group)
@@ -236,20 +235,22 @@ def combine_hmo3004_csv(dir_path,
                      old_format_data[:, 0], old_format_data[:, 3],
                      old_format_data[:, 0], old_format_data[:, 4]]
 
-        # SAVE 'ALL-IN' CSV
-        file_name = get_name_from_group_of_files(group, ch_postfix_len)
-        file_name = add_zeros_to_filename(file_name, 4)
-        file_name += save_with_ext
-        # file_full_name = save_to + file_name
-        np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-        if not silent_mode:
-            print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
+        if save_to:
+            # SAVE 'ALL-IN' CSV
+            file_name = get_name_from_group_of_files(group, ch_postfix_len)
+            file_name = add_zeros_to_filename(file_name, 4)
+            file_name += save_with_ext
+            # file_full_name = save_to + file_name
+            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
+            if not silent_mode:
+                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
     if not silent_mode:
         print()
+    return data
 
 
 def combine_lecroy_csv(dir_path,
-                       save_to=None,
+                       save_to=None,           # save to filename (don't save if None)
                        files_in_group=4,
                        ch_postfix_len=4,
                        ch_prefix_len=3,
@@ -274,9 +275,7 @@ def combine_lecroy_csv(dir_path,
     # save_with_ext     - The data will be saved to a file with specified extension
 
     # CHECK PATH
-    if not save_to:
-        save_to = dir_path  # default value
-    elif not os.path.isdir(save_to):
+    if save_to and not os.path.isdir(save_to):
         os.makedirs(save_to)
 
     if not silent_mode:
@@ -285,6 +284,7 @@ def combine_lecroy_csv(dir_path,
     # GET LIST OF FILES---------------------------------------------
     file_list = get_file_list_by_ext(dir_path, target_ext)
     file_list.sort()
+    data = None
 
     # GROUP FILES for LeCroy --------------------------------------
     groups_list = group_files_lecroy(file_list, files_in_group)
@@ -294,15 +294,17 @@ def combine_lecroy_csv(dir_path,
         # READ SINGLE CSVs
         data = read_csv_group(group, skip_header=skip_header, usecols=usecols)
 
-        # SAVE CSV
-        file_name = get_name_from_group_of_files(group, ch_postfix_len, ch_prefix_len=ch_prefix_len)
-        file_name += save_with_ext
-        # file_full_name = save_to + file_name
-        np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-        if not silent_mode:
-            print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
+        if save_to:
+            # SAVE CSV
+            file_name = get_name_from_group_of_files(group, ch_postfix_len, ch_prefix_len=ch_prefix_len)
+            file_name += save_with_ext
+            # file_full_name = save_to + file_name
+            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
+            if not silent_mode:
+                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
     if not silent_mode:
         print()
+    return data
 
 
 def add_new_dir_to_path(old_leaf_dir, new_parent_dir):
@@ -480,7 +482,7 @@ def multiplier_and_delay(data, multiplier, delay):
         return data
 
 
-def save_ndarray_csv(data, filename, delimiter=",", precision=18):
+def save_ndarray_csv(filename, data, delimiter=",", precision=18):
     # Saves 2-dimensional numpy.ndarray as .csv file
     # Replaces 'nan' values with ''
     # precision - a number of units after comma
