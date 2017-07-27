@@ -65,11 +65,11 @@ class SignalsData:
     def get_array(self):
         # return all curves data as united 2D array
         # short curve arrays are supplemented with required amount of rows (filled with 'nan')
-        return align_and_append_arr(*[curve.data for curve in self.curves])
+        return align_and_append_ndarray(*[curve.data for curve in self.curves])
 
 
 
-def align_and_append_arr(*args):
+def align_and_append_ndarray(*args):
     # returns 2D numpy.ndarray containing all input 2D numpy.ndarrays
     # if input arrays have different number of rows, fills missing values with 'nan'
 
@@ -132,17 +132,26 @@ if __name__ == '__main__':
 
     # GET FOLDERs PATHs
     path_dict = dict()
-    path_dict["DPO7054"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG" +
-                            "/2017 05 13 ERG Output final/DPO7054")
+    path_list = list()
+    osc_list = ["DPO7054", "HMO3004", "TDS2024C", "LeCroy"]
 
-    path_dict["HMO3004"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/" +
-                            "2017 05 13 ERG Output final/HMO3004")
+    # path_dict["DPO7054"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG" +
+    #                         "/2017 05 13 ERG Output final/DPO7054")
+    # path_dict["HMO3004"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/" +
+    #                         "2017 05 13 ERG Output final/HMO3004")
+    #
+    # path_dict["TDS2024C"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/" +
+    #                          "2017 05 13 ERG Output final/TDS2024C")
+    #
+    # path_dict["LeCroy"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/" +
+    #                        "2017 05 13 ERG Output final/LeCroy")
 
-    path_dict["TDS2024C"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/" +
-                             "2017 05 13 ERG Output final/TDS2024C")
+    path_dict["DPO7054"] = "G:\\WORK\\2017 05 13-19 ERG\\2017 05 13 ERG Input united\\2017 05 13 DPO7054 united_CSV"
+    path_dict["HMO3004"] = "G:\\WORK\\2017 05 13-19 ERG\\2017 05 13 ERG Input united\\2017 05 13 HMO3004 united_CSV"
+    path_dict["TDS2024C"] = "G:\\WORK\\2017 05 13-19 ERG\\2017 05 13 ERG Input united\\2017 05 13 TDS2024C united_CSV"
+    path_dict["LeCroy"] = "G:\\WORK\\2017 05 13-19 ERG\\2017 05 13 ERG Input united\\2017 05 13 LeCroy united_CSV"
 
-    path_dict["LeCroy"] = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/" +
-                           "2017 05 13 ERG Output final/LeCroy")
+    save_to_folder = "G:\\WORK\\2017 05 13-19 ERG\\2017 05 13 ERG Output final"
 
     file_dict = dict()
     multiplier = dict()
@@ -163,35 +172,50 @@ if __name__ == '__main__':
     multiplier["LeCroy"] = [1e9, 0.697, 1e9, 4.554, 1e9, 0.25]
     delay["LeCroy"] = [80.3, 0, 367.1, 0, 0, 0]
 
+    voltage_pair_idx = 12    # zero-based index of voltage pair (time-value columns)
+
     # GET FILE GROUPS
+    for key in path_dict:   # unsorted order
+        file_dict[key] = sp.get_file_list_by_ext(path_dict[key], ".CSV", sort=False)
+
+    shoots_count = len(file_dict["DPO7054"])
     for key in path_dict:
-        file_dict[key] = sp.get_file_list_by_ext(path_dict[key], ".csv", sort=False)
+        if shoot_number != len(file_dict[key]):
+            raise IndexError("The number of .csv files in osc-directories must be the same.")
 
     # READ CSV
-    number = 9      # zero-based index of shoot
-    data = SignalsData()
-    for osc in file_dict:
-        print "reading " + file_dict[osc][number]
-        temp = np.genfromtxt(file_dict[osc][number], delimiter=",")         # read data
-        temp = sp.multiplier_and_delay(temp, multiplier[osc], delay[osc])   # corr data
-        data.append(temp)                                                   # add data to array
-    table = data.get_array()
-    print table.shape
-    print(table[len(table) - 1,:])
+    for number in range(shoots_count):      # zero-based index of shoot
+        data = SignalsData()
+        for osc in osc_list:    # sorted order
+            print "reading " + file_dict[osc][number]
+            temp = np.genfromtxt(file_dict[osc][number], delimiter=",")         # read data
+            temp = sp.multiplier_and_delay_arr(temp, multiplier[osc], delay[osc])   # corr data
+            data.append(temp)                                                   # add data to array
+        delta_time, voltage_level = pp.find_voltage_front(data.curves[voltage_pair_idx].get_x(),
+                                                          data.curves[voltage_pair_idx].get_y,
+                                                          level=0.2, is_positive=False)
+        if delta_time:
+            data = pp.timeline_corr(data, delta_time)
+        table = data.get_array()
+        print "Table shape = (" + str(table.shape[0]) + ", " + str(table.shape[1]) + ")"
+        # print table[len(table) - 1,:]
 
-    # for idx in range(0, data.count, 1):
-    #     plt.plot(data.curves[idx].get_x(), data.curves[idx].get_y())
-    #     print("Curve #0" + str(idx + 1))
-    #     plt.show()
+        # for idx in range(0, data.count, 1):
+        #     plt.plot(data.curves[idx].get_x(), data.curves[idx].get_y())
+        #     print("Curve #0" + str(idx + 1))
+        #     plt.show()
 
-    # for idx in range(0, table.shape[1], 2):
-    #     plt.plot(table[:, idx], table[:, idx + 1])
-    #     print("Curve #0" + str(idx // 2 + 1))
-    #     plt.show()
+        # for idx in range(0, table.shape[1], 2):
+        #     plt.plot(table[:, idx], table[:, idx + 1])
+        #     print("Curve #0" + str(idx // 2 + 1))
+        #     plt.show()
 
-    print "Saving file..."
-    sp.save_ndarray_csv("final_0035.csv", table)
-    print "Done!"
+        file_name = "ERG_" + sp.get_name_from_group_of_files([file_dict["DPO7054"][number]], 4, 3) + ".csv"
+        print "Saving file \"" + file_name + "\" ..."
+        save_to = os.path.join(save_to_folder, file_name)
+        sp.save_ndarray_csv(save_to, table)
+        print "Done!"
+        print
 
     # MULTIPLIER & DELAY
 

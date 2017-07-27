@@ -6,6 +6,67 @@ import numpy as np
 import wfm_reader_lite as wfm
 
 
+class SingleCurve:
+    def __init__(self, in_x, in_y):
+        # INPUT DATA CHECK
+        x = in_x
+        y = in_y
+        if not isinstance(x, np.ndarray) or not isinstance(y, np.ndarray):
+            raise TypeError("Input time and value arrays must be instances of numpy.ndarray class.")
+        if len(x) != len(y):
+            raise IndexError("Input time and value arrays must have same length.")
+        self.points = len(x)
+
+        if np.ndim(x) == 1:                     # check if X array has 2 dimensions
+            x = np.expand_dims(in_x, axis=1)    # add dimension to the array
+        if np.ndim(y) == 1:                     # check if Y array has 2 dimensions
+            y = np.expand_dims(in_y, axis=1)    # add dimension to the array
+
+        if x.shape[1] != 1 or y.shape[1] != 1:  # check if X and Y arrays have 1 column
+            raise ValueError("Input time and value arrays must have 1 column and any number of rows.")
+
+        # CONVERT TO NDARRAY
+        self.data = np.append(x, y, axis=1)
+
+    def get_x(self):
+        return self.data[:, 0]
+
+    def get_y(self):
+        return self.data[:, 1]
+
+
+class SignalsData:
+    def __init__(self, input_data=None):
+        # EMPTY INSTANCE
+        self.count = 0      # number of curves
+        self.curves = []    # list of curves data (SingleCurve instances)
+
+        # FILL WITH VALUES
+        if input_data:
+            self.append(input_data)
+
+    def check_input(self, data):
+        # CHECK INPUT DATA
+        if np.ndim(data) != 2:
+            raise ValueError("Input array must have 2 dimensions.")
+        if data.shape[1] % 2 != 0:
+            raise IndexError("Input array must have even number of columns.")
+
+    def append(self, input_data):
+        # appends new SingleCurves to the self.curves list
+
+        data = np.array(input_data, dtype=float, order='F') # convert input data to numpy.ndarray
+        self.check_input(data)                              # check inputs
+        self.count += data.shape[1] // 2                    # update the number of curves
+        for curve_idx in range(0, data.shape[1], 2):
+            self.curves.append(SingleCurve(data[:,curve_idx], data[:, curve_idx + 1]))  # add new SingleCurve
+
+    def get_array(self):
+        # return all curves data as united 2D array
+        # short curve arrays are supplemented with required amount of rows (filled with 'nan')
+        return align_and_append_ndarray(*[curve.data for curve in self.curves])
+
+
 def get_subdir_list(path):
     # return list of subdirectories
     return [os.path.join(path, x) for x in os.listdir(path) if os.path.isdir(os.path.join(path, x))]
@@ -464,21 +525,40 @@ def get_max_min_from_dir(dir_path,        # target folder
     return log
 
 
-def col_and_param_number_check(data, param_list):
-    if data.shape[1] > len(param_list):
-        raise IndexError("The number of columns exceeds the number of parameters.")
-    elif data.shape[1] < len(param_list):
-        raise IndexError("The number of parameters exceeds the number of columns.")
+def col_and_param_number_check(data, *arg):
+    for param_list in arg:
+        if isinstance(data, np.ndarray):
+            cols = data.shape[1]
+        elif isinstance(data, SignalsData):
+            cols = data.count
+        else:
+            raise TypeError("Can not check columns count. Data must be an instance of numpy.ndarray or SignalsData")
+
+        if cols > len(param_list):
+            raise IndexError("The number of columns exceeds the number of parameters.")
+        elif cols < len(param_list):
+            raise IndexError("The number of parameters exceeds the number of columns.")
     return True
 
 
-def multiplier_and_delay(data, multiplier, delay):
-    if col_and_param_number_check(data, multiplier) and col_and_param_number_check(data, delay):
+def multiplier_and_delay_arr(data,          # 2D numpy.ndarray
+                             multiplier,
+                             delay):
+    if col_and_param_number_check(data, multiplier, delay):
         row_number = data.shape[0]
         col_number = data.shape[1]
         for col_idx in range(col_number):
             for row_idx in range(row_number):
                 data[row_idx][col_idx] = multiplier[col_idx] * data[row_idx][col_idx] - delay[col_idx]
+        return data
+
+
+def multiplier_and_delay_obj(data,          # SignalsData obj
+                             multiplier,
+                             delay):
+    if col_and_param_number_check(data, multiplier, delay):
+        for curve_idx in range(data.count):
+            multiplier_and_delay_arr(data.curves[curve_idx], multiplier, delay)
         return data
 
 
@@ -506,6 +586,28 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
             lines.append(s)
         file.writelines(lines)
 
+def align_and_append_ndarray(*args):
+    # returns 2D numpy.ndarray containing all input 2D numpy.ndarrays
+    # if input arrays have different number of rows, fills missing values with 'nan'
+
+    # CHECK TYPE & LENGTH
+    for arr in args:
+        if not isinstance(arr, np.ndarray):
+            raise TypeError("Input arrays must be instances of numpy.ndarray class.")
+        if np.ndim(arr) != 2:
+            raise ValueError("Input arrays must have 2 dimensions.")
+
+    # ALIGN & APPEND
+    max_len = max([arr.shape[0] for arr in args])  # output array's rows number == max rows number
+    data = np.empty(shape=(max_len, 0), dtype=float, order='F')  # empty 2-dim array
+    for arr in args:
+        miss_rows = max_len - arr.shape[0]  # number of missing rows
+        cols = arr.shape[1]
+        nan_arr = np.empty(shape=(miss_rows, arr.shape[1]), dtype=float, order='F')  # array with missing rows...
+        nan_arr *= np.nan  # ...filled with 'nan'
+        aligned_arr = np.append(arr, nan_arr, axis=0)  # fill missing row with nans
+        data = np.append(data, aligned_arr, axis=1)  # append arr to data
+    return data
 
 # ================================================================================================
 # --------------   MAIN    ----------------------------------------

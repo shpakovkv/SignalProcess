@@ -3,6 +3,7 @@
 from matplotlib import pyplot
 import scipy.signal as signal
 
+
 def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
     # функци€ провер€ет, выход€т ли значение по оси Y за величину уровн€ level
     # провер€ютс€ элементы от x(start) до x(start) +/- window
@@ -198,6 +199,7 @@ def smooth_voltage(x, y):
     y_smoothed = signal.savgol_filter(y, window_len, poly_order)
     return y_smoothed
 
+
 def find_voltage_front(x, y, level=-0.2, is_positive=False):
     # Find x (time) of voltage front on specific level
     # Default: Negative polarity, -0.2 MV level
@@ -207,6 +209,11 @@ def find_voltage_front(x, y, level=-0.2, is_positive=False):
     if front_checked:
         return x[idx], y[idx]
     return None, None
+
+
+def timeline_corr(data, value):
+    for curve in data.curves:
+        pass
 
 
 def group_peaks(data, window):
