@@ -48,13 +48,13 @@ class SignalsData:
 
     def append(self, input_data, curve_labels=None):
         # appends new SingleCurves to the self.curves list
-        data = np.array(input_data, dtype=float, order='F') # convert input data to numpy.ndarray
-        self.check_input(data)                              # check inputs
+        data = np.array(input_data, dtype=float, order='F')  # convert input data to numpy.ndarray
+        self.check_input(data)                               # check inputs
         for curve_idx in range(0, data.shape[1], 2):
-            self.curves.append(SingleCurve(data[:,curve_idx], data[:, curve_idx + 1]))  # adds new SingleCurve
-            self.count += 1                                                             # updates the number of curves
+            self.curves.append(SingleCurve(data[:, curve_idx], data[:, curve_idx + 1]))  # adds new SingleCurve
+            self.count += 1                                                              # updates the number of curves
             if curve_labels:
-                self.labels[curve_labels[curve_idx]] = self.count - 1                   # adds label-index pair to dict
+                self.labels[curve_labels[curve_idx]] = self.count - 1                 # adds label-index pair to dict
             else:
                 self.labels[str(self.count - 1)] = self.count - 1                     # adds 'index'-index pair to dict
 
@@ -545,8 +545,8 @@ def get_max_min_from_dir(dir_path,        # target folder
         dir_name = os.path.split(dir_path)[1]
 
     log_file_path = os.path.join(dir_path, dir_name + ' ' + log_file_name)
-    with open(log_file_path, "w") as file:
-        file.write(log)
+    with open(log_file_path, "w") as fid:
+        fid.write(log)
     return log
 
 
@@ -566,40 +566,54 @@ def col_and_param_number_check(data, *arg):
     return True
 
 
-def multiplier_and_delay_arr(data,          # 2D numpy.ndarray
-                             multiplier,
-                             delay):
-    if col_and_param_number_check(data, multiplier, delay):
+def multiplier_and_delay(data,          # an instance of SignalsData class OR 2D numpy.ndarray
+                         multiplier,    # list of multipliers for each columns in data.curves
+                         delay):        # list of delays (subtrahend) for each columns in data.curves
+    if isinstance(data, np.ndarray):
         row_number = data.shape[0]
         col_number = data.shape[1]
-        for col_idx in range(col_number):
-            for row_idx in range(row_number):
-                data[row_idx][col_idx] = multiplier[col_idx] * data[row_idx][col_idx] - delay[col_idx]
-        return data
 
+        if not multiplier:
+            multiplier = [1 for _ in range(col_number)]
+        if not delay:
+            delay = [0 for _ in range(col_number)]
 
-def multiplier_and_delay_obj(data,          # SignalsData obj
-                             multiplier,
-                             delay):
-    if col_and_param_number_check(data, multiplier, delay):
+        if col_and_param_number_check(data, multiplier, delay):
+            for col_idx in range(col_number):
+                for row_idx in range(row_number):
+                    data[row_idx][col_idx] = data[row_idx][col_idx] * multiplier[col_idx] - delay[col_idx]
+            return data
+    elif isinstance(data, SignalsData):
+        if not multiplier:
+            multiplier = [1 for _ in range(data.count * 2)]
+        if not delay:
+            delay = [0 for _ in range(data.count * 2)]
+
+        if len(multiplier) != data.count * 2:
+            raise IndexError("List of multipliers must contain values for each time and value columns in data.curves.")
         for curve_idx in range(data.count):
-            multiplier_and_delay_arr(data.curves[curve_idx], multiplier, delay)
+            col_idx = curve_idx * 2             # index of time-column of current curve
+            data.curves[curve_idx].data = multiplier_and_delay(data.curves[curve_idx].data,
+                                                               multiplier[col_idx:col_idx + 2],
+                                                               delay[col_idx:col_idx + 2])
         return data
 
 
-def smooth_voltage(x, y):
+def smooth_voltage(x,                   # time array
+                   y,                   # value array
+                   x_multiplier=1e9):   # Multiplier for translating x dimension to seconds (1e9 for x in nanoseconds)
     import scipy.signal as signal
     poly_order = 3       # 3 is optimal polyorder value for speed and accuracy
-    window_len = 101    # value 101 is optimal for 1 ns resolution of voltage waveform
-                        # for 25 kV charging voltage of ERG installation
+    window_len = 101    # value 101 is optimal for 1 ns (1e9 multiplier) resolution of voltage waveform
+    #                     for 25 kV charging voltage of ERG installation
 
     # window_len correction
-    time_step = x[1] - x[0]
-    window_len = int(window_len / time_step)
+    time_step = (x[1] - x[0]) * 1e9 / x_multiplier      # calc time_step and converts to nanoseconds
+    window_len = int(window_len / time_step)            # calc savgol filter window
     if window_len % 2 == 0:
-        window_len += 1
+        window_len += 1                                 # window must be even number
     if window_len < 5:
-        window_len = 5
+        window_len = 5                                  # minimun value check
 
     # smooth
     y_smoothed = signal.savgol_filter(y, window_len, poly_order)
@@ -625,13 +639,13 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
     if folder_path and not os.path.isdir(folder_path):
         os.makedirs(folder_path)
 
-    with open(filename, 'w') as file:
+    with open(filename, 'w') as fid:
         lines = []
         for row in range(data.shape[0]):
             s = delimiter.join([value_format % data[row, col] for col in range(data.shape[1])]) + "\n"
             s = re.sub(r'nan', '', s)
             lines.append(s)
-        file.writelines(lines)
+        fid.writelines(lines)
 
 def align_and_append_ndarray(*args):
     # returns 2D numpy.ndarray containing all input 2D numpy.ndarrays

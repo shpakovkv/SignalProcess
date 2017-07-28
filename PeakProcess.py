@@ -15,7 +15,6 @@ def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True)
     # Если да, то ВЫВОДИТ True и индекс первого элемента массива выходящего за 'level'
     # Если нет, то ВЫВОДИТ False и индекс последнего проверенного элемента
 
-
     idx = start          # zero-based index
     if window == 0:      # window default value
         window = x[-1] - x[start]
@@ -87,9 +86,6 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
     # ==========================================================================
     # print('Starting peaks search...')
 
-    max_y = 0
-    max_idx = 0
-
     i = 1
     while i < len(y):
         # Событие превышение уровня
@@ -99,7 +95,6 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
             max_y = y[i]
             max_idx = i
 
-            is_noise = False
             # перебираем все точки внутри diffwindow или до конца данных
             while i <= len(y) and x[i] - x[max_idx] <= diffwindow:
                 if y[i] > max_y:
@@ -111,7 +106,7 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
             # перебираем точки слева от пика в пределах diffwindow
             # если находим точку повыше - то это "взбрык" на фронте спада
             # а не настоящий пик
-            [is_noise, j] = level_excess_check(x,
+            [is_noise, _] = level_excess_check(x,
                                                y,
                                                max_y,
                                                start=max_idx,
@@ -141,7 +136,7 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
                     i = j
                 else:
                     # проверка на наводку в другую сторону от max_idx
-                    [is_noise, j] = level_excess_check(x,
+                    [is_noise, _] = level_excess_check(x,
                                                        y,
                                                        -level * noise_attenuation,
                                                        start=max_idx,
@@ -181,7 +176,10 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
     return [peak_x, peak_y]
 
 
-def find_voltage_front(x, y, level=-0.2, is_positive=False):
+def find_voltage_front(x,
+                       y,
+                       level=-0.2,
+                       is_positive=False):
     # Find x (time) of voltage front on specific level
     # Default: Negative polarity, -0.2 MV level
 
@@ -267,9 +265,9 @@ def group_peaks(data, window):
                 peak_data[wf].insert(gr, list(data[wf][pk]))   # insert row to current wf column of peak data table
                 for curve_i in range(curves_count):
                     if curve_i != wf:
-                        peak_map[curve_i].insert(gr, False) # new row to other columns of peak map table
-                        peak_data[curve_i].insert(gr, None) # new row to other columns of peak data table
-                pk += 1                                     # go to the next peak of current curve
+                        peak_map[curve_i].insert(gr, False)  # new row to other columns of peak map table
+                        peak_data[curve_i].insert(gr, None)  # new row to other columns of peak data table
+                pk += 1                                      # go to the next peak of current curve
 
             # ===============================================================================================
             # APPEND NEW GROUP
@@ -283,10 +281,10 @@ def group_peaks(data, window):
                 peak_data[wf].append(list(data[wf][pk]))           # add row to current wf column of peak data table
                 for curve_i in range(curves_count):
                     if curve_i != wf:
-                        peak_map[curve_i].append(False) # add row to other columns of peak map table
-                        peak_data[curve_i].append(None) # add row to other columns of peak data table
-                pk += 1                                 # go to the next peak...
-                gr += 1                                 # ... and the next group
+                        peak_map[curve_i].append(False)  # add row to other columns of peak map table
+                        peak_data[curve_i].append(None)  # add row to other columns of peak data table
+                pk += 1                                  # go to the next peak...
+                gr += 1                                  # ... and the next group
 
             # ===============================================================================================
             # APPEND NEW GROUP
