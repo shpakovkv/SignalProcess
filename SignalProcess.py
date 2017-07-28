@@ -36,35 +36,60 @@ class SingleCurve:
 
 
 class SignalsData:
-    def __init__(self, input_data=None):
+    def __init__(self, input_data=None, curve_labels=None):
         # EMPTY INSTANCE
-        self.count = 0      # number of curves
-        self.curves = []    # list of curves data (SingleCurve instances)
+        self.count = 0          # number of curves
+        self.curves = []        # list of curves data (SingleCurve instances)
+        self.labels = dict()    # dict with curve labels as keys and curve indexes as values
 
         # FILL WITH VALUES
         if input_data:
-            self.append(input_data)
+            self.append(input_data, curve_labels)
 
-    def check_input(self, data):
-        # CHECK INPUT DATA
-        if np.ndim(data) != 2:
-            raise ValueError("Input array must have 2 dimensions.")
-        if data.shape[1] % 2 != 0:
-            raise IndexError("Input array must have even number of columns.")
-
-    def append(self, input_data):
+    def append(self, input_data, curve_labels=None):
         # appends new SingleCurves to the self.curves list
-
         data = np.array(input_data, dtype=float, order='F') # convert input data to numpy.ndarray
         self.check_input(data)                              # check inputs
-        self.count += data.shape[1] // 2                    # update the number of curves
         for curve_idx in range(0, data.shape[1], 2):
-            self.curves.append(SingleCurve(data[:,curve_idx], data[:, curve_idx + 1]))  # add new SingleCurve
+            self.curves.append(SingleCurve(data[:,curve_idx], data[:, curve_idx + 1]))  # adds new SingleCurve
+            self.count += 1                                                             # updates the number of curves
+            if curve_labels:
+                self.labels[curve_labels[curve_idx]] = self.count - 1                   # adds label-index pair to dict
+            else:
+                self.labels[str(self.count - 1)] = self.count - 1                     # adds 'index'-index pair to dict
+
+    def check_input(self, data, curve_labels=None):
+        # CHECK INPUT DATA
+        if np.ndim(data) != 2:                              # number of dimension of the input array check
+            raise ValueError("Input array must have 2 dimensions.")
+        if data.shape[1] % 2 != 0:                          # number of columns of the input array check
+            raise IndexError("Input array must have even number of columns.")
+        if curve_labels:
+            if not isinstance(curve_labels, list):          # labels array type checck
+                raise TypeError("Variable curve_labels must be an instance of the list class.")
+            if data.shape[1] // 2 != len(curve_labels):     # number of labels check
+                raise IndexError("Number of curves (pair of time-value columns) in data "
+                                 "and number of labels must be the same.")
+            for label in curve_labels:                      # label duplicate check
+                if label in self.labels:
+                    raise ValueError("Label \"" + label + "\" is already exist.")
 
     def get_array(self):
         # return all curves data as united 2D array
         # short curve arrays are supplemented with required amount of rows (filled with 'nan')
         return align_and_append_ndarray(*[curve.data for curve in self.curves])
+
+    def by_label(self, label):   # returns SingleCurve by name
+        return self.curves[self.labels[label]]
+
+    def get_label(self, idx):    # return label of the SingelCurve by index
+        for key, value in self.labels.items():
+            if value == idx:
+                return key
+
+    def get_idx(self, label):    # returns index of the SingelCurve by label
+        if label in self.labels:
+            return self.labels[label]
 
 
 def get_subdir_list(path):
@@ -577,6 +602,9 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
     # check filename value
     if len(filename) < 4 or filename[-4:].upper() != ".CSV":
         filename += ".csv"
+    folder_path = os.path.dirname(filename)
+    if folder_path and not os.path.isdir(folder_path):
+        os.makedirs(folder_path)
 
     with open(filename, 'w') as file:
         lines = []
@@ -598,15 +626,14 @@ def align_and_append_ndarray(*args):
             raise ValueError("Input arrays must have 2 dimensions.")
 
     # ALIGN & APPEND
-    max_len = max([arr.shape[0] for arr in args])  # output array's rows number == max rows number
-    data = np.empty(shape=(max_len, 0), dtype=float, order='F')  # empty 2-dim array
+    max_rows = max([arr.shape[0] for arr in args])                   # output array's rows number == max rows number
+    data = np.empty(shape=(max_rows, 0), dtype=float, order='F')     # empty 2-dim array
     for arr in args:
-        miss_rows = max_len - arr.shape[0]  # number of missing rows
-        cols = arr.shape[1]
-        nan_arr = np.empty(shape=(miss_rows, arr.shape[1]), dtype=float, order='F')  # array with missing rows...
-        nan_arr *= np.nan  # ...filled with 'nan'
-        aligned_arr = np.append(arr, nan_arr, axis=0)  # fill missing row with nans
-        data = np.append(data, aligned_arr, axis=1)  # append arr to data
+        miss_rows = max_rows - arr.shape[0]                                         # number of missing rows
+        nan_arr = np.empty(shape=(miss_rows, arr.shape[1]), dtype=float, order='F') # array with missing rows...
+        nan_arr *= np.nan                                                           # ...filled with 'nan'
+        aligned_arr = np.append(arr, nan_arr, axis=0)                               # combine existing & missing rows
+        data = np.append(data, aligned_arr, axis=1)                                 # append arr to the data
     return data
 
 # ================================================================================================
