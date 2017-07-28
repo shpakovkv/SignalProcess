@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: Windows-1251 -*-
 from matplotlib import pyplot
-import scipy.signal as signal
 
 
 def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
@@ -182,24 +181,6 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
     return [peak_x, peak_y]
 
 
-def smooth_voltage(x, y):
-    poly_order = 3       # 3 is optimal polyorder value for speed and accuracy
-    window_len = 101    # value 101 is optimal for 1 ns resolution of voltage waveform
-                        # for 25 kV charging voltage of ERG installation
-
-    # window_len correction
-    time_step = x[1] - x[0]
-    window_len = int(window_len / time_step)
-    if window_len % 2 == 0:
-        window_len += 1
-    if window_len < 5:
-        window_len = 5
-
-    # smooth
-    y_smoothed = signal.savgol_filter(y, window_len, poly_order)
-    return y_smoothed
-
-
 def find_voltage_front(x, y, level=-0.2, is_positive=False):
     # Find x (time) of voltage front on specific level
     # Default: Negative polarity, -0.2 MV level
@@ -209,11 +190,6 @@ def find_voltage_front(x, y, level=-0.2, is_positive=False):
     if front_checked:
         return x[idx], y[idx]
     return None, None
-
-
-def timeline_corr(data, value):
-    for curve in data.curves:
-        pass
 
 
 def group_peaks(data, window):
