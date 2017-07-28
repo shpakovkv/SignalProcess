@@ -587,6 +587,25 @@ def multiplier_and_delay_obj(data,          # SignalsData obj
         return data
 
 
+def smooth_voltage(x, y):
+    import scipy.signal as signal
+    poly_order = 3       # 3 is optimal polyorder value for speed and accuracy
+    window_len = 101    # value 101 is optimal for 1 ns resolution of voltage waveform
+                        # for 25 kV charging voltage of ERG installation
+
+    # window_len correction
+    time_step = x[1] - x[0]
+    window_len = int(window_len / time_step)
+    if window_len % 2 == 0:
+        window_len += 1
+    if window_len < 5:
+        window_len = 5
+
+    # smooth
+    y_smoothed = signal.savgol_filter(y, window_len, poly_order)
+    return y_smoothed
+
+
 def save_ndarray_csv(filename, data, delimiter=",", precision=18):
     # Saves 2-dimensional numpy.ndarray as .csv file
     # Replaces 'nan' values with ''
