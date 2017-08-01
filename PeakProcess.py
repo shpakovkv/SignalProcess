@@ -30,7 +30,7 @@ def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True)
     return False, idx
 
 
-def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=False):
+def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=False, noise_attenuation=0.5):
     # ѕоиск пиков (положительных или отрицательных)
     # ѕример:
     # Peaks = PeakFinder_v4( x, y, -1, 5E-9, 0.8, 5E-9, 1);
@@ -49,16 +49,18 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
     # опуститс€ ниже определенной доли от максимума (fflevel), то за пределами
     # этого значени€ начинаетс€ поиск следующего максимума
 
-    # diffwindow - окно различи€. ≈сли на фронте спада максимума растет
+    # diff_time - окно различи€. ≈сли на фронте спада максимума растет
     # следующий максимум, то он должен отсто€ть от фронта спада предыдущего
     # пика на это значение. ¬ единицах измерени€ "x".
-    # ѕредполагаетс€ diffwindow >= tnoise (но не об€зательно)
+    # ѕредполагаетс€ diff_time >= tnoise (но не об€зательно)
 
     # graph = 0 если строить проверочный график не надо, напрмер, если функци€
     # выполн€етс€ внутри цикла
+
+    # noise_attenuation (default 0.5)
     # ќслабление второй полуволны при переполюсовке (наводке). ≈сли программа
     # пропускает (не распознает) много сигналов-наводок, понизьте значение.
-    noise_attenuation = 0.7
+
 
     # ѕроверка введенных значений
 
@@ -95,15 +97,17 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
             max_y = y[i]
             max_idx = i
 
-            # перебираем все точки внутри diffwindow или до конца данных
-            while i <= len(y) and x[i] - x[max_idx] <= diffwindow:
+            # перебираем все точки внутри diff_time или до конца данных
+            while (i <= len(y) and
+                   (x[i] - x[max_idx] <= diff_time or
+                    y[i] == max_y)):
                 if y[i] > max_y:
                     # сохранение текущих максимальных значений
                     max_y = y[i]
                     max_idx = i
                 i += 1
             # print('Found max element')
-            # перебираем точки слева от пика в пределах diffwindow
+            # перебираем точки слева от пика в пределах diff_time
             # если находим точку повыше - то это "взбрык" на фронте спада
             # а не насто€щий пик
             [is_noise, _] = level_excess_check(x,
@@ -111,7 +115,7 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
                                                max_y,
                                                start=max_idx,
                                                step=-1,
-                                               window=diffwindow,
+                                               window=diff_time,
                                                is_positive=True)
             # print('Right window check completed.')
             # if is_noise:
@@ -162,8 +166,6 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
         level = -level
         for i in range(len(peak_y)):
             peak_y[i] = -peak_y[i]
-    print('Peaks searching: done.')
-    print('--------------------------------------------------------')
     # строим проверочные графики, если это необходимо
     if graph:
         # plotting curve
@@ -179,13 +181,18 @@ def peak_finder(x, y, level, diffwindow, tnoise=None, is_negative=True, graph=Fa
 def find_voltage_front(x,
                        y,
                        level=-0.2,
-                       is_positive=False):
+                       is_positive=False,
+                       visualize=False):
     # Find x (time) of voltage front on specific level
     # Default: Negative polarity, -0.2 MV level
 
     # PeakProcess.level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
     front_checked, idx = level_excess_check(x, y, level, is_positive=is_positive)
     if front_checked:
+        if visualize:
+            pyplot.plot(x, y, '-b')
+            pyplot.plot([x[idx]], [y[idx]], '*r')
+            pyplot.show()
         return x[idx], y[idx]
     return None, None
 
