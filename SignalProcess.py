@@ -1,8 +1,12 @@
 # Python 2.7
 from __future__ import print_function, with_statement
+
 import re
 import os
+
 import numpy as np
+from scipy.signal import savgol_filter
+
 import wfm_reader_lite as wfm
 
 
@@ -43,7 +47,7 @@ class SignalsData:
         self.labels = dict()    # dict with curve labels as keys and curve indexes as values
 
         # FILL WITH VALUES
-        if input_data:
+        if input_data is not None:
             self.append(input_data, curve_labels)
 
     def append(self, input_data, curve_labels=None):
@@ -599,10 +603,17 @@ def multiplier_and_delay(data,          # an instance of SignalsData class OR 2D
         return data
 
 
-def smooth_voltage(x,                   # time array
-                   y,                   # value array
-                   x_multiplier=1e9):   # Multiplier for translating x dimension to seconds (1e9 for x in nanoseconds)
-    import scipy.signal as signal
+def smooth_voltage(x, y, x_multiplier=1):
+    '''This function returns smoothed copy of 'y'.
+    Optimized for voltage pulse of ERG installation.
+    
+    x -- 1D numpy.ndarray of time points (in seconds by default)
+    y -- 1D numpy.ndarray value points
+    x_multiplier -- multiplier applied to time data 
+        (default 1 for x in seconds)
+    
+    return -- smoothed curve (1D numpy.ndarray)
+    '''
     poly_order = 3       # 3 is optimal polyorder value for speed and accuracy
     window_len = 101    # value 101 is optimal for 1 ns (1e9 multiplier) resolution of voltage waveform
     #                     for 25 kV charging voltage of ERG installation
@@ -616,7 +627,7 @@ def smooth_voltage(x,                   # time array
         window_len = 5                                  # minimun value check
 
     # smooth
-    y_smoothed = signal.savgol_filter(y, window_len, poly_order)
+    y_smoothed = savgol_filter(y, window_len, poly_order)
     return y_smoothed
 
 
@@ -664,7 +675,8 @@ def align_and_append_ndarray(*args):
     for arr in args:
         miss_rows = max_rows - arr.shape[0]                                         # number of missing rows
         nan_arr = np.empty(shape=(miss_rows, arr.shape[1]), dtype=float, order='F') # array with missing rows...
-        nan_arr *= np.nan                                                           # ...filled with 'nan'
+        nan_arr = nan_arr * np.nan                                                  # ...filled with 'nan'
+
         aligned_arr = np.append(arr, nan_arr, axis=0)                               # combine existing & missing rows
         data = np.append(data, aligned_arr, axis=1)                                 # append arr to the data
     return data
