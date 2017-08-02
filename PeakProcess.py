@@ -3,6 +3,35 @@
 from matplotlib import pyplot
 
 
+class SinglePeak:
+    def __init__(self, time=None, value=None, index=None):
+        self.time = time
+        self.val = value
+        self.idx = index
+
+    def invert(self):
+        if self.val is not None:
+            self.val = -self.val
+
+    def get_time_val(self):
+        return [self.time, self.val]
+
+    def set_time_val_idx(self, data):
+        if len(data) > 3:
+            raise ValueError("Too many values to unpack. "
+                             "3 expected, " + str(len(data)) +
+                             " given.")
+        self.time = data[0]
+        self.val = data[1]
+        self.idx = data[2]
+
+    def get_time_val_idx(self):
+        return [self.time, self.val, self.idx]
+
+    xy = property(get_time_val, doc="Get [time, value] of peak.")
+    data = property(get_time_val_idx, set_time_val_idx, doc="Get/set [time, value, index] of peak.")
+
+
 def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
     # функци€ провер€ет, выход€т ли значение по оси Y за величину уровн€ level
     # провер€ютс€ элементы от x(start) до x(start) +/- window
@@ -82,9 +111,7 @@ def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=Fal
     elif len(x) < len(y):
         print('Warning! Length(Y) > Length(X) by ' + str(len(y) - len(x)))
 
-    peak_x = []
-    peak_y = []
-    peak_idx = []
+    peak_list = []
     # ==========================================================================
     # print('Starting peaks search...')
 
@@ -152,20 +179,18 @@ def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=Fal
 
             # если не наводка, то записываем
             if not is_noise:
-                peak_y.append(max_y)
-                peak_x.append(x[max_idx])
-                peak_idx.append(max_idx)
+                peak_list.append(SinglePeak(x[max_idx], max_y, max_idx))
                 # print('Found peak!')
                 continue
         i += 1
 
-    print('Number of peaks: ' + str(len(peak_y)))
+    print('Number of peaks: ' + str(len(peak_list)))
 
     if is_negative:
         y = -y
         level = -level
-        for i in range(len(peak_y)):
-            peak_y[i] = -peak_y[i]
+        for i in range(len(peak_list)):
+            peak_list[i].invert()
     # строим проверочные графики, если это необходимо
     if graph:
         # plotting curve
@@ -173,9 +198,11 @@ def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=Fal
         # plotting level line
         pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':g')
         # marking overall peaks
-        pyplot.plot(peak_x, peak_y, '*g')
+        peaks_x = [p.time for p in peak_list]
+        peaks_y = [p.val for p in peak_list]
+        pyplot.plot(peaks_x, peaks_y, '*g')
         pyplot.show()
-    return [peak_x, peak_y]
+    return peak_list
 
 
 def find_voltage_front(x,
