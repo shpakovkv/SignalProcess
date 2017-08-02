@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 import os
 import re
@@ -155,7 +157,7 @@ if __name__ == '__main__':
         for number in range(shoots_count):      # zero-based index of shoot
             data = sp.SignalsData()
             for osc in osc_list:    # sorted order
-                print "Reading " + file_dict[osc][number]
+                print("Reading " + file_dict[osc][number])
                 temp = np.genfromtxt(file_dict[osc][number], delimiter=",")         # read data
                 # temp = sp.multiplier_and_delay(temp, multiplier[osc], delay[osc])   # corr data
                 data.append(temp)                                                   # add data to array
@@ -231,27 +233,66 @@ if __name__ == '__main__':
     def go_peak_process():
         folder = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/2017 05 13 ERG Output final"
         type = "csv"
-        curves_list = [1,2,3,4,5,6,7,8,9,10,11,12]
+        curves_list = [0,1,2,3,4,5,6,7,8,9,10,11]
         file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
+        # GET PEAKS
         for filename in file_list:
+            # filename = file_list[1]
+            print("Reading " + filename)
             data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
             print("Curves count = " + str(data.count))
             peaks = []
             for idx in curves_list:
-                # sub_data = sp.SignalsData(data.curves[idx].data)
-                sp.save_ndarray_csv("neg_peaks.csv", data.curves[idx].data)
+                # sp.save_ndarray_csv("neg_peaks.csv", data.curves[idx].data)
                 print("Curve #" + str(idx))
                 peaks.append(
                     pp.peak_finder(
-                        data.curves[idx].get_x(),
-                        data.curves[idx].get_y(),
-                        -1, diff_time=25, tnoise=100, graph=True
+                        data.time(idx), data.value(idx),
+                        -1, diff_time=15, tnoise=200, graph=False,
+                        noise_attenuation=0.4
                     )
                 )
-            break
 
-    def test_peak_process():
-        filename = "pos_peaks.csv"
+            max_peaks = max([len(x) for x in peaks])
+            for pk in range(max_peaks):
+                for wf in range(len(peaks)):
+                    try:
+                        s = str(peaks[wf][pk].time)
+                    except IndexError:
+                        s = "---------"
+                    print(s, end="\t")
+                print()
+            print()
+
+            # GROUP PEAKS
+            peak_groups, peak_map = pp.group_peaks(peaks, 15)
+            for gr in range(len(peak_map[0])):
+                for wf in range(len(peak_map)):
+                    print(peak_map[wf][gr], end="\t")
+                print()
+
+
+            # GRAPH ALL PEAKS
+            plt.close('all')
+            fig, axes = plt.subplots(len(peak_groups), 1, sharex='all')
+            colors = "grcmy"
+            for wf in range(len(peak_groups)):
+                axes[wf].plot(data.time(curves_list[wf]), data.value(curves_list[wf]), '-b')
+                print("# " + str(wf) + ".  Waveform " + str(curves_list[wf]), end='    ')
+                color_idx = 0
+                for pk in peak_groups[wf]:
+                    setup = "*" + colors[color_idx]
+                    color_idx += 1
+                    if color_idx == len(colors): color_idx = 0
+                    if pk is not None:
+                        print("peak [{:.3f}, {:.3f}]    ".format(pk.time, pk.val), end='')
+                        axes[wf].plot([pk.time], [pk.val], setup)
+                print()
+            plt.show()
+            # input("Press Enter...")
+            # break
+
+    def test_peak_process(filename):
         data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
         # data = np.genfromtxt(filename, delimiter=',')
         # data[:,1] = -data[:,1]
@@ -260,12 +301,24 @@ if __name__ == '__main__':
         for curve in data.curves:
             peaks.append(
                 pp.peak_finder(
-                    curve.get_x(), curve.get_y(), 1,
-                    diff_time=25, tnoise=100,
-                    is_negative=False, graph=True
+                    curve.time, curve.val,
+                    -1, diff_time=14, tnoise=200, graph=True,
+                    noise_attenuation=0.4
                 )
             )
 
+    def save_curve(file_idx, curve_idx):
+        folder = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/2017 05 13 ERG Output final"
+        file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
+        filename = file_list[file_idx]
+        print("Reading " + filename)
+        data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
+        save_as = "file{}_curve{}.csv".format(file_idx, curve_idx)
+        print("Saving " + save_as)
+        sp.save_ndarray_csv(save_as, data.curves[curve_idx].data)
+        print("Done!\n")
 
-    go_peak_process()
-    # test_peak_process()
+    # save_curve(1, 9)
+    test_peak_process("file1_curve9.csv")
+
+    # go_peak_process()
