@@ -38,6 +38,9 @@ class SingleCurve:
     def get_y(self):
         return self.data[:, 1]
 
+    time = property(get_x, doc="Get curve's 1D array of time points")
+    val = property(get_y, doc="Get curve's 1D array of value points")
+
 
 class SignalsData:
     def __init__(self, input_data=None, curve_labels=None):
@@ -94,6 +97,12 @@ class SignalsData:
     def get_idx(self, label):    # returns index of the SingelCurve by label
         if label in self.labels:
             return self.labels[label]
+
+    def time(self, curve):
+        return self.curves[curve].get_x()
+
+    def value(self, curve):
+        return self.curves[curve].get_y()
 
 
 def get_subdir_list(path):
