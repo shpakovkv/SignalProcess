@@ -3,6 +3,7 @@
 from __future__ import print_function
 from matplotlib import pyplot
 import bisect
+import scipy.integrate as integrate
 
 
 class SinglePeak:
@@ -161,12 +162,11 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         raise IndexError('Warning! Length(X) < Length(Y) by ' + str(len(y) - len(x)))
 
     if time_bounds[0] is None:
-        time_bounds[0] = x[0]
+        time_bounds = (x[0], time_bounds[1])
     if time_bounds[1] is None:
-        time_bounds[1] = x[-1]
+        time_bounds = (time_bounds[0], x[-1])
     start_idx = find_nearest_idx(x, time_bounds[0], side='right')
     stop_idx = find_nearest_idx(x, time_bounds[1], side='left')
-
 
 
     peak_list = []
@@ -249,6 +249,26 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         print("[{:.3f}, {:.3f}]    ".format(pk.time, pk.val), end="")
     print()
 
+    # LOCAL INTEGRAL CHECK
+    dt = x[1] - x[0]
+    di = int(diff_time // dt) * 2    # diff window in index units
+    if di > 3:
+
+        for idx in range(len(peak_list)):
+            pk = peak_list[idx]
+            square = pk.val * dt * di
+            print("Peak[{}].time = {:.2f}.   Amp={:.2f}    "
+                  "Square factor: ".format(idx, pk.time, pk.val),
+                  end='')
+            if pk.idx - di >= 0:
+                integral_left = integrate.trapz(y[pk.idx-di : pk.idx+1])
+                print("left = {:.3f}".format(integral_left / square), end='    ')
+            if pk.idx + di <= stop_idx:
+                integral_right = integrate.trapz(y[pk.idx: pk.idx + di + 1])
+                print("right = {:.3f}".format(integral_right / square), end='')
+            print()
+
+
     if is_negative:
         y = -y
         level = -level
@@ -257,14 +277,15 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     # строим проверочные графики, если это необходимо
     if graph:
         # plotting curve
-        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-k')
+        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-b')
         pyplot.xlim(time_bounds)
         # plotting level line
         pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':g')
         # marking overall peaks
         peaks_x = [p.time for p in peak_list]
         peaks_y = [p.val for p in peak_list]
-        pyplot.plot(peaks_x, peaks_y, '*g')
+        pyplot.plot(peaks_x, peaks_y, 'og')
+        pyplot.plot(peaks_x, peaks_y, '*r')
         pyplot.show()
     return peak_list
 

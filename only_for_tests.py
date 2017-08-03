@@ -249,7 +249,7 @@ if __name__ == '__main__':
                     pp.peak_finder(
                         data.time(idx), data.value(idx),
                         -1, diff_time=15, tnoise=200, graph=False,
-                        noise_attenuation=0.4
+                        time_bounds=[-200, None], noise_attenuation=0.4
                     )
                 )
 
@@ -302,8 +302,8 @@ if __name__ == '__main__':
             peaks.append(
                 pp.peak_finder(
                     curve.time, curve.val,
-                    -1, diff_time=14, tnoise=200, graph=True,
-                    noise_attenuation=0.4
+                    -1, diff_time=20, tnoise=200, graph=True,
+                    time_bounds=(-200, None),  noise_attenuation=0.4
                 )
             )
 
@@ -318,7 +318,10 @@ if __name__ == '__main__':
         sp.save_ndarray_csv(save_as, data.curves[curve_idx].data)
         print("Done!\n")
 
-    # save_curve(1, 9)
-    test_peak_process("file1_curve9.csv")
+
+    # save_curve(1, 11)
+    # test_peak_process("file0_curve11.csv")
+    # test_peak_process("file1_curve11.csv")
+    test_peak_process("file2_curve11.csv")
 
     # go_peak_process()
