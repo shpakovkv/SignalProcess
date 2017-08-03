@@ -2,6 +2,7 @@
 # -*- coding: Windows-1251 -*-
 from __future__ import print_function
 from matplotlib import pyplot
+import bisect
 
 
 class SinglePeak:
@@ -33,6 +34,47 @@ class SinglePeak:
     data = property(get_time_val_idx, set_time_val_idx, doc="Get/set [time, value, index] of peak.")
 
 
+def find_nearest_idx(sorted_arr, value, side='auto'):
+    """
+    Returns the index of the value closest to 'value'
+    
+    sorted_arr -- sorted array/list of ints or floats
+    value -- the number to which the closest value should be found
+    side -- 'left': search among values that are lower then X
+            'right': search among values that are greater then X
+            'auto': handle all values (default)
+
+    If two numbers are equally close and side='auto', 
+    returns the index of the smallest one.
+    """
+
+    idx = bisect.bisect_left(sorted_arr, value)
+    if idx == 0:
+        if side == 'auto' or side == 'right':
+            return idx
+        else:
+            return None
+
+    if idx == len(sorted_arr):
+        if side == 'auto' or side == 'left':
+            return idx
+        else:
+            return None
+
+    after = sorted_arr[idx]
+    before = sorted_arr[idx - 1]
+    if side == 'auto':
+        if after - value < value - before:
+            return idx
+        else:
+            return idx - 1
+    elif side == 'left':
+        return idx - 1
+    elif side == 'right':
+        return idx
+
+
+
 def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
     # функция проверяет, выходят ли значение по оси Y за величину уровня level
     # проверяются элементы от x(start) до x(start) +/- window
@@ -60,7 +102,9 @@ def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True)
     return False, idx
 
 
-def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=False, noise_attenuation=0.5):
+def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
+                tnoise=None, is_negative=True, graph=False,
+                noise_attenuation=0.5):
     # Поиск пиков (положительных или отрицательных)
     # Пример:
     # Peaks = PeakFinder_v4( x, y, -1, 5E-9, 0.8, 5E-9, 1);
@@ -106,18 +150,31 @@ def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=Fal
         tnoise = x(3) - x(1)
         print('Set "tnoise" to default 2 stops = ' + str(tnoise))
 
+    if len(time_bounds) != 2:
+        raise ValueError("time_bounds has incorrect number of values. "
+                         "2 expected, " + str(len(time_bounds)) +
+                         " given.")
     # проверка длины массивов
     if len(x) > len(y):
-        print('Warning! Length(X) > Length(Y) by ' + str(len(x) - len(y)))
+        raise IndexError('Length(X) > Length(Y) by ' + str(len(x) - len(y)))
     elif len(x) < len(y):
-        print('Warning! Length(Y) > Length(X) by ' + str(len(y) - len(x)))
+        raise IndexError('Warning! Length(X) < Length(Y) by ' + str(len(y) - len(x)))
+
+    if time_bounds[0] is None:
+        time_bounds[0] = x[0]
+    if time_bounds[1] is None:
+        time_bounds[1] = x[-1]
+    start_idx = find_nearest_idx(x, time_bounds[0], side='right')
+    stop_idx = find_nearest_idx(x, time_bounds[1], side='left')
+
+
 
     peak_list = []
     # ==========================================================================
     # print('Starting peaks search...')
 
-    i = 1
-    while i < len(y):
+    i = start_idx
+    while i < stop_idx :
         # Событие превышение уровня
         if y[i] > level:
             # print('Overlevel occurance!')
@@ -126,7 +183,7 @@ def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=Fal
             max_idx = i
 
             # перебираем все точки внутри diff_time или до конца данных
-            while (i <= len(y) and
+            while (i <= stop_idx and
                    (x[i] - x[max_idx] <= diff_time or
                     y[i] == max_y)):
                 if y[i] > max_y:
@@ -134,7 +191,8 @@ def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=Fal
                     max_y = y[i]
                     max_idx = i
                 i += 1
-            print("local_max = [{}, {}]".format(x[max_idx], max_y))
+            # print("local_max = [{}, {}]".format(x[max_idx], max_y))
+
             # print('Found max element')
             # перебираем точки слева от пика в пределах diff_time
             # если находим точку повыше - то это "взбрык" на фронте спада
@@ -199,7 +257,8 @@ def peak_finder(x, y, level, diff_time, tnoise=None, is_negative=True, graph=Fal
     # строим проверочные графики, если это необходимо
     if graph:
         # plotting curve
-        pyplot.plot(x, y, '-k')
+        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-k')
+        pyplot.xlim(time_bounds)
         # plotting level line
         pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':g')
         # marking overall peaks
