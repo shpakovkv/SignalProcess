@@ -11,26 +11,52 @@ import wfm_reader_lite as wfm
 
 
 class SingleCurve:
-    def __init__(self, in_x, in_y):
+    def __init__(self, in_x=None, in_y=None):
+        self.data = np.empty([0, 2], dtype=float, order='F')
+        if in_x is not None and in_y is not None:
+            self.append(in_x, in_y)
+
+    def append(self, in_x, in_y):
         # INPUT DATA CHECK
         x = in_x
         y = in_y
         if not isinstance(x, np.ndarray) or not isinstance(y, np.ndarray):
-            raise TypeError("Input time and value arrays must be instances of numpy.ndarray class.")
+            raise TypeError("Input time and value arrays must be "
+                            "instances of numpy.ndarray class.")
         if len(x) != len(y):
-            raise IndexError("Input time and value arrays must have same length.")
+            raise IndexError("Input time and value arrays must "
+                             "have same length.")
         self.points = len(x)
 
-        if np.ndim(x) == 1:                     # check if X array has 2 dimensions
-            x = np.expand_dims(in_x, axis=1)    # add dimension to the array
-        if np.ndim(y) == 1:                     # check if Y array has 2 dimensions
-            y = np.expand_dims(in_y, axis=1)    # add dimension to the array
+        if np.ndim(x) == 1:  # check if X array has 2 dimensions
+            x = np.expand_dims(in_x, axis=1)  # add dimension to the array
+        if np.ndim(y) == 1:  # check if Y array has 2 dimensions
+            y = np.expand_dims(in_y, axis=1)  # add dimension to the array
 
         if x.shape[1] != 1 or y.shape[1] != 1:  # check if X and Y arrays have 1 column
-            raise ValueError("Input time and value arrays must have 1 column and any number of rows.")
+            raise ValueError("Input time and value arrays must "
+                             "have 1 column and any number of rows.")
 
+        start_idx = None
+        stop_idx = None
+        for i in range(len(x) - 1, 0, -1):
+            tmp_x = x[i]
+            tmp_y= y[i]
+            if not np.isnan(x[i]) and not np.isnan(y[i]):
+                stop_idx = i
+                break
+        for i in range(0, stop_idx + 1):
+            if not np.isnan(x[i]) and not np.isnan(y[i]):
+                start_idx = i
+                break
+        if start_idx == None or stop_idx == None:
+            raise ValueError("Can not append array of empty "
+                             "values to SingleCurve's data.")
         # CONVERT TO NDARRAY
-        self.data = np.append(x, y, axis=1)
+        temp = np.append(x[start_idx:stop_idx + 1],
+                         y[start_idx:stop_idx + 1],
+                         axis=1)
+        self.data = np.append(self.data, temp, axis=0)
 
     def get_x(self):
         return self.data[:, 0]
