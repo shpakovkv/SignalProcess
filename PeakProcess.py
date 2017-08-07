@@ -7,10 +7,12 @@ import scipy.integrate as integrate
 
 
 class SinglePeak:
-    def __init__(self, time=None, value=None, index=None):
+    def __init__(self, time=None, value=None, index=None, sqr_l=0, sqr_r=0):
         self.time = time
         self.val = value
         self.idx = index
+        self.sqr_l = sqr_l
+        self.sqr_r = sqr_r
 
     def invert(self):
         if self.val is not None:
@@ -20,19 +22,37 @@ class SinglePeak:
         return [self.time, self.val]
 
     def set_time_val_idx(self, data):
-        if len(data) > 3:
-            raise ValueError("Too many values to unpack. "
+        if len(data) != 3:
+            raise ValueError("Wrong number of values to unpack. "
                              "3 expected, " + str(len(data)) +
                              " given.")
         self.time = data[0]
         self.val = data[1]
         self.idx = data[2]
 
+    def set_data_full(self, data):
+        if len(data) != 5:
+            raise ValueError("Wrong number of values to unpack. "
+                             "3 expected, " + str(len(data)) +
+                             " given.")
+        self.time = data[0]
+        self.val = data[1]
+        self.idx = data[2]
+        self.sqr_l = data[3]
+        self.sqr_r = data[4]
+
     def get_time_val_idx(self):
         return [self.time, self.val, self.idx]
 
+    def get_data_full(self):
+        return [self.time, self.val, self.idx, self.sqr_l, self.sqr_r]
+
     xy = property(get_time_val, doc="Get [time, value] of peak.")
-    data = property(get_time_val_idx, set_time_val_idx, doc="Get/set [time, value, index] of peak.")
+    data = property(get_time_val_idx, set_time_val_idx,
+                    doc="Get/set [time, value, index] of peak.")
+    data_full = property(get_data_full, set_data_full,
+                         doc="Get/set [time, value, index, "
+                             "sqr_l, sqr_r] of peak.")
 
 
 def find_nearest_idx(sorted_arr, value, side='auto'):
@@ -251,21 +271,29 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
     # LOCAL INTEGRAL CHECK
     dt = x[1] - x[0]
-    di = int(diff_time // dt) * 2    # diff window in index units
+    di = int(diff_time * 2 // dt)    # diff window in index units
     if di > 3:
 
         for idx in range(len(peak_list)):
             pk = peak_list[idx]
-            square = pk.val * dt * di
-            print("Peak[{}].time = {:.2f}.   Amp={:.2f}    "
-                  "Square factor: ".format(idx, pk.time, pk.val),
+            # square = pk.val * dt * di
+            square = pk.val * di
+            integral_left = 0
+            integral_right = 0
+            print("Peak[{:3d}] = [{:7.2f},   {:4.1f}]   "
+                  "Square factor [".format(idx, pk.time, pk.val),
                   end='')
             if pk.idx - di >= 0:
                 integral_left = integrate.trapz(y[pk.idx-di : pk.idx+1])
-                print("left = {:.3f}".format(integral_left / square), end='    ')
-            if pk.idx + di <= stop_idx:
+                peak_list[idx].sqr_l = integral_left / square
+                print("{:.3f}".format(integral_left / square), end='')
+            print(" | ", end='')
+            if pk.idx + di < len(y):  # stop_idx
                 integral_right = integrate.trapz(y[pk.idx: pk.idx + di + 1])
-                print("right = {:.3f}".format(integral_right / square), end='')
+                peak_list[idx].sqr_r = integral_right / square
+                print("{:.3f}".format(integral_right / square), end='')
+            print("]", end='')
+            print("  ({:.3f})".format((integral_right + integral_left) / square), end='')
             print()
 
 
@@ -345,7 +373,7 @@ def group_peaks(data, window):
 
     peak_data = [[]]
     for peak in data[start_wf]:    # peaks of first curve
-        peak_data[0].append(SinglePeak(*peak.data))
+        peak_data[0].append(SinglePeak(*peak.data_full))
 
     for curve_idx in range(0, start_wf):
         peak_data.insert(0, [None] * len(peak_time))
@@ -379,7 +407,7 @@ def group_peaks(data, window):
                                  (num_peak_in_gr[gr] + 1))        # recalculate average X-position of group
                 num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1         # update count of peaks in current group
                 peak_map[wf][gr] = True                         # update peak_map
-                peak_data[wf][gr] = SinglePeak(*data[wf][pk].data)          # add peak to output peak data array
+                peak_data[wf][gr] = SinglePeak(*data[wf][pk].data_full)          # add peak to output peak data array
                 pk += 1                                         # go to the next peak
 
             # ===============================================================================================
@@ -390,7 +418,7 @@ def group_peaks(data, window):
                 peak_time.insert(gr, data[wf][pk].time)       # insert new group of peaks into the groups table
                 num_peak_in_gr.insert(gr, 1)                # update the number of peaks in current group
                 peak_map[wf].insert(gr, True)               # insert row to current wf column of peak map table
-                peak_data[wf].insert(gr, SinglePeak(*data[wf][pk].data))   # insert row to current wf column of peak data table
+                peak_data[wf].insert(gr, SinglePeak(*data[wf][pk].data_full))   # insert row to current wf column of peak data table
                 for curve_i in range(curves_count):
                     if curve_i != wf:
                         peak_map[curve_i].insert(gr, False)  # new row to other columns of peak map table
@@ -406,7 +434,7 @@ def group_peaks(data, window):
                 peak_time.append(data[wf][pk].time)           # add new group at the end of the group table
                 num_peak_in_gr.append(1)                    # update count of peaks and groups
                 peak_map[wf].append(True)                   # add row to current wf column of peak map table
-                peak_data[wf].append(SinglePeak(*data[wf][pk].data))           # add row to current wf column of peak data table
+                peak_data[wf].append(SinglePeak(*data[wf][pk].data_full))           # add row to current wf column of peak data table
                 for curve_i in range(curves_count):
                     if curve_i != wf:
                         peak_map[curve_i].append(False)  # add row to other columns of peak map table
