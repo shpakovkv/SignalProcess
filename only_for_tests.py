@@ -232,6 +232,7 @@ if __name__ == '__main__':
 
     def go_peak_process():
         folder = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/2017 05 13 ERG Output final"
+        save_peaks_to = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/2017 05 13 ERG Peaks"
         type = "csv"
         curves_list = [0,1,2,3,4,5,6,7,8,9,10,11]
         file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
@@ -248,8 +249,8 @@ if __name__ == '__main__':
                 peaks.append(
                     pp.peak_finder(
                         data.time(idx), data.value(idx),
-                        -1, diff_time=15, tnoise=200, graph=False,
-                        time_bounds=[-200, None], noise_attenuation=0.4
+                        -1, diff_time=20, tnoise=200, graph=False,
+                        time_bounds=[-200, 750], noise_attenuation=0.4
                     )
                 )
 
@@ -265,7 +266,7 @@ if __name__ == '__main__':
             print()
 
             # GROUP PEAKS
-            peak_groups, peak_map = pp.group_peaks(peaks, 15)
+            peak_data, peak_map = pp.group_peaks(peaks, 15)
             for gr in range(len(peak_map[0])):
                 for wf in range(len(peak_map)):
                     print(peak_map[wf][gr], end="\t")
@@ -274,23 +275,61 @@ if __name__ == '__main__':
 
             # GRAPH ALL PEAKS
             plt.close('all')
-            fig, axes = plt.subplots(len(peak_groups), 1, sharex='all')
+            fig, axes = plt.subplots(len(peak_data), 1, sharex='all')
             colors = "grcmy"
-            for wf in range(len(peak_groups)):
+            for wf in range(len(peak_data)):
                 axes[wf].plot(data.time(curves_list[wf]), data.value(curves_list[wf]), '-b')
                 print("# " + str(wf) + ".  Waveform " + str(curves_list[wf]), end='    ')
                 color_idx = 0
-                for pk in peak_groups[wf]:
+                for pk in peak_data[wf]:
                     setup = "*" + colors[color_idx]
                     color_idx += 1
                     if color_idx == len(colors): color_idx = 0
                     if pk is not None:
                         print("peak [{:.3f}, {:.3f}]    ".format(pk.time, pk.val), end='')
+                        axes[wf].set_xlim([-200, 750])
                         axes[wf].plot([pk.time], [pk.val], setup)
                 print()
-            plt.show()
+            peaks_filename = os.path.join(save_peaks_to, os.path.basename(filename))
+            save_peaks_csv(peaks_filename, peak_data)
+            # plt.show()
+            plot_filename = os.path.join(save_peaks_to, os.path.basename(filename))
+            if plot_filename.upper().endswith('.CSV'):
+                plot_filename = plot_filename[:-4]
+            plot_filename += ".plot.png"
+            print("Saving plot " + plot_filename)
+            plt.savefig(plot_filename)
+            print("Done!")
+            plt.close('all')
             # input("Press Enter...")
             # break
+
+    def save_peaks_csv(filename, peaks):
+        folder_path = os.path.dirname(filename)
+        if folder_path and not os.path.isdir(folder_path):
+            os.makedirs(folder_path)
+
+        if len(filename) > 4 and filename[-4:].upper() == ".CSV":
+            filename = filename[0:-4]
+
+        for gr in range(len(peaks[0])):
+            content = ""
+            for wf in range(len(peaks)):
+                pk = peaks[wf][gr]
+                if pk is None:
+                    pk = pp.SinglePeak(0,0,0)
+                content = (content +
+                           "{:3d},{:0.18e},{:0.18e},"
+                           "{:0.3f},{:0.3f},{:0.3f}\n".format(
+                                gr + 1, pk.time, pk.val,
+                                pk.sqr_l, pk.sqr_r, pk.sqr_l + pk.sqr_r
+                                )
+                           )
+            postfix = "_peak{:03d}.csv".format(gr + 1)
+            print("Saving " + filename + postfix)
+            with open(filename + postfix, 'w') as fid:
+                fid.writelines(content)
+        print("Done!")
 
     def test_peak_process(filename):
         data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
@@ -302,10 +341,11 @@ if __name__ == '__main__':
             peaks.append(
                 pp.peak_finder(
                     curve.time, curve.val,
-                    -1, diff_time=20, tnoise=200, graph=True,
-                    time_bounds=(-200, None),  noise_attenuation=0.4
+                    -1, diff_time=20, tnoise=150, graph=True,
+                    time_bounds=(-200, 750),  noise_attenuation=0.4
                 )
             )
+
 
     def save_curve(file_idx, curve_idx):
         folder = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/2017 05 13 ERG Output final"
@@ -319,9 +359,9 @@ if __name__ == '__main__':
         print("Done!\n")
 
 
-    # save_curve(1, 11)
-    # test_peak_process("file0_curve11.csv")
+    # save_curve(0, 6)
+    # test_peak_process("file0_curve6.csv")
     # test_peak_process("file1_curve11.csv")
-    test_peak_process("file2_curve11.csv")
+    # test_peak_process("file2_curve11.csv")
 
-    # go_peak_process()
+    go_peak_process()
