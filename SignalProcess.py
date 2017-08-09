@@ -26,7 +26,7 @@ class SingleCurve:
         if len(x_data) != len(y_data):
             raise IndexError("Input time and value arrays must "
                              "have same length.")
-        self.points = len(x_data)
+        # self.points = len(x_data)
 
         if np.ndim(x_data) == 1:  # check if X array has 2 dimensions
             x_data = np.expand_dims(x_in, axis=1)  # add dimension to the array
