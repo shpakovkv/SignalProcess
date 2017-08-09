@@ -1,9 +1,22 @@
 #!/usr/bin/python
 # -*- coding: Windows-1251 -*-
 from __future__ import print_function
+
 from matplotlib import pyplot
+import os
 import bisect
 import scipy.integrate as integrate
+
+
+pos_polarity_labels = {'pos', 'positive', '+'}
+neg_polarity_labels = {'neg', 'negative', '-'}
+
+
+
+def add_to_log(m, end='\n'):
+    global log
+    log += m + end
+    print(m, end=end)
 
 
 class SinglePeak:
@@ -121,6 +134,72 @@ def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True)
             return True, idx
         idx += step
     return False, idx
+
+def is_pos(polarity):
+    global pos_polarity_labels
+    global neg_polarity_labels
+    if polarity.lower() in pos_polarity_labels:
+        return True
+    if polarity.lower() in neg_polarity_labels:
+        return False
+    else:
+        raise ValueError("Wrong polarity value ({})".format(polarity))
+
+
+def is_neg(polarity):
+    global pos_polarity_labels
+    global neg_polarity_labels
+    if polarity.lower() in pos_polarity_labels:
+        return False
+    if polarity.lower() in neg_polarity_labels:
+        return True
+    else:
+        raise ValueError("Wrong polarity value ({})".format(polarity))
+
+
+def check_polarity(curve, time_bounds=(None, None)):
+    if time_bounds[0] is None:
+        time_bounds = (0, time_bounds[1])
+    if time_bounds[1] is None:
+        time_bounds = (time_bounds[0], curve.points)
+    integr =  integrate.trapz(curve.val[time_bounds[0]:time_bounds[1]],
+                       curve.time[time_bounds[0]:time_bounds[1]])
+    # print("Voltage_INTEGRAL = {}".format(integr))
+    if integr >= 0:
+        return 'positive'
+    return 'negative'
+
+
+def find_voltage_front(curve,
+                       level=-0.2,
+                       polarity='auto',
+                       save_plot=False,
+                       plot_name="voltage_front.png"):
+    # Find x (time) of voltage front on specific level
+    # Default: Negative polarity, -0.2 MV level
+    # PeakProcess.level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
+    if polarity=='auto':
+        polarity = check_polarity(curve)
+        if is_pos(polarity):
+            level = abs(level)
+        else:
+            level = -abs(level)
+
+    front_checked, idx = level_excess_check(curve.time, curve.val, level,
+                                            is_positive=is_pos(polarity))
+    if front_checked:
+        if save_plot:
+            pyplot.close('all')
+            pyplot.plot(curve.time, curve.val, '-b')
+            pyplot.plot([curve.time[idx]], [curve.val[idx]], '*r')
+            # pyplot.show()
+            folder = os.path.dirname(plot_name)
+            if folder != "" and not os.path.isdir(folder):
+                os.makedirs(folder)
+            pyplot.savefig(plot_name)
+            pyplot.close('all')
+        return curve.time[idx], curve.val[idx]
+    return None, None
 
 
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
@@ -318,25 +397,6 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     return peak_list
 
 
-def find_voltage_front(x,
-                       y,
-                       level=-0.2,
-                       is_positive=False,
-                       visualize=False):
-    # Find x (time) of voltage front on specific level
-    # Default: Negative polarity, -0.2 MV level
-
-    # PeakProcess.level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
-    front_checked, idx = level_excess_check(x, y, level, is_positive=is_positive)
-    if front_checked:
-        if visualize:
-            pyplot.plot(x, y, '-b')
-            pyplot.plot([x[idx]], [y[idx]], '*r')
-            pyplot.show()
-        return x[idx], y[idx]
-    return None, None
-
-
 def group_peaks(data, window):
     # Groups the peaks from different X-Ray detectors
     # each group corresponds to one single act of X-Ray emission
@@ -454,3 +514,7 @@ def group_peaks(data, window):
     # print peak_time
     # print num_peak_in_gr
     return peak_data, peak_map
+
+
+if __name__ == '__main__':
+    print('Done!!!')
