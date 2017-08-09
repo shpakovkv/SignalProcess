@@ -16,45 +16,45 @@ class SingleCurve:
         if in_x is not None and in_y is not None:
             self.append(in_x, in_y)
 
-    def append(self, in_x, in_y):
+    def append(self, x_in, y_in):
         # INPUT DATA CHECK
-        x = in_x
-        y = in_y
-        if not isinstance(x, np.ndarray) or not isinstance(y, np.ndarray):
+        x_data = x_in
+        y_data = y_in
+        if not isinstance(x_data, np.ndarray) or not isinstance(y_data, np.ndarray):
             raise TypeError("Input time and value arrays must be "
                             "instances of numpy.ndarray class.")
-        if len(x) != len(y):
+        if len(x_data) != len(y_data):
             raise IndexError("Input time and value arrays must "
                              "have same length.")
-        self.points = len(x)
+        self.points = len(x_data)
 
-        if np.ndim(x) == 1:  # check if X array has 2 dimensions
-            x = np.expand_dims(in_x, axis=1)  # add dimension to the array
-        if np.ndim(y) == 1:  # check if Y array has 2 dimensions
-            y = np.expand_dims(in_y, axis=1)  # add dimension to the array
+        if np.ndim(x_data) == 1:  # check if X array has 2 dimensions
+            x_data = np.expand_dims(x_in, axis=1)  # add dimension to the array
+        if np.ndim(y_data) == 1:  # check if Y array has 2 dimensions
+            y_data = np.expand_dims(y_in, axis=1)  # add dimension to the array
 
-        if x.shape[1] != 1 or y.shape[1] != 1:  # check if X and Y arrays have 1 column
+        if x_data.shape[1] != 1 or y_data.shape[1] != 1:  # check if X and Y arrays have 1 column
             raise ValueError("Input time and value arrays must "
                              "have 1 column and any number of rows.")
 
         start_idx = None
         stop_idx = None
-        for i in range(len(x) - 1, 0, -1):
-            tmp_x = x[i]
-            tmp_y= y[i]
-            if not np.isnan(x[i]) and not np.isnan(y[i]):
+        for i in range(len(x_data) - 1, 0, -1):
+            tmp_x = x_data[i]
+            tmp_y= y_data[i]
+            if not np.isnan(x_data[i]) and not np.isnan(y_data[i]):
                 stop_idx = i
                 break
         for i in range(0, stop_idx + 1):
-            if not np.isnan(x[i]) and not np.isnan(y[i]):
+            if not np.isnan(x_data[i]) and not np.isnan(y_data[i]):
                 start_idx = i
                 break
         if start_idx == None or stop_idx == None:
             raise ValueError("Can not append array of empty "
                              "values to SingleCurve's data.")
         # CONVERT TO NDARRAY
-        temp = np.append(x[start_idx:stop_idx + 1],
-                         y[start_idx:stop_idx + 1],
+        temp = np.append(x_data[start_idx:stop_idx + 1],
+                         y_data[start_idx:stop_idx + 1],
                          axis=1)
         self.data = np.append(self.data, temp, axis=0)
 
@@ -64,8 +64,12 @@ class SingleCurve:
     def get_y(self):
         return self.data[:, 1]
 
+    def get_points(self):
+        return self.data.shape[0]
+
     time = property(get_x, doc="Get curve's 1D array of time points")
     val = property(get_y, doc="Get curve's 1D array of value points")
+    points = property(get_points, doc="Get the number of points in curve")
 
 
 class SignalsData:
@@ -184,7 +188,7 @@ def group_files_lecroy(file_list, files_in_group=4):
     return groups_list
 
 
-def get_name_from_group_of_files(group, ch_postfix_len=8, ch_prefix_len=0):
+def get_name_from_group(group, ch_postfix_len=8, ch_prefix_len=0):
     # INPUT
     # group:            list of files corresponding to one shoot
     #                   each file is a single channel record from the oscilloscope
@@ -243,7 +247,7 @@ def combine_wfm_to_csv(dir_path,
 
         if save_to:
             # SAVE CSV
-            file_name = get_name_from_group_of_files(group, ch_postfix_len)
+            file_name = get_name_from_group(group, ch_postfix_len)
             file_name += save_with_ext
             # file_full_name = save_to + file_name
             np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
@@ -299,7 +303,7 @@ def combine_tds2024c_csv(dir_path,
 
         if save_to:
             # SAVE 'ALL-IN' CSV
-            file_name = get_name_from_group_of_files(group, ch_postfix_len)
+            file_name = get_name_from_group(group, ch_postfix_len)
             file_name += save_with_ext
             # file_full_name = save_to + file_name
             np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
@@ -362,7 +366,7 @@ def combine_hmo3004_csv(dir_path,
 
         if save_to:
             # SAVE 'ALL-IN' CSV
-            file_name = get_name_from_group_of_files(group, ch_postfix_len)
+            file_name = get_name_from_group(group, ch_postfix_len)
             file_name = add_zeros_to_filename(file_name, 4)
             file_name += save_with_ext
             # file_full_name = save_to + file_name
@@ -421,7 +425,7 @@ def combine_lecroy_csv(dir_path,
 
         if save_to:
             # SAVE CSV
-            file_name = get_name_from_group_of_files(group, ch_postfix_len, ch_prefix_len=ch_prefix_len)
+            file_name = get_name_from_group(group, ch_postfix_len, ch_prefix_len=ch_prefix_len)
             file_name += save_with_ext
             # file_full_name = save_to + file_name
             np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
@@ -482,7 +486,7 @@ def read_csv_group(group_of_files,
     return data
 
 
-def compare_2_files(first_file_name, second_file_name, lines=10):
+def compare_2_files(first_file_name, second_file_name, lines=30):
     # compare a number of first lines of two files
     # return True if lines matches exactly
     with open(first_file_name, 'r') as file:
