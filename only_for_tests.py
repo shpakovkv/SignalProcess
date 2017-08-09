@@ -88,27 +88,49 @@ def make_final():
     # path_list = list()
     osc_list = ["DPO7054", "HMO3004", "TDS2024C", "LeCroy"]
 
-    path_dict["DPO7054"] = ("/media/shpakovkv/6ADA8899DA886365/"
-                            "WORK/2017/2017 05 12-19 ERG/"
-                            "2017 05 13 ERG Input united/"
-                            "2017 05 13 DPO7054")
-    path_dict["HMO3004"] = ("/media/shpakovkv/6ADA8899DA886365/"
-                            "WORK/2017/2017 05 12-19 ERG/"
-                            "2017 05 13 ERG Input united/"
-                            "2017 05 13 HMO3004")
+    # path_dict["DPO7054"] = ("/media/shpakovkv/6ADA8899DA886365/"
+    #                         "WORK/2017/2017 05 12-19 ERG/"
+    #                         "2017 05 13 ERG Input united/"
+    #                         "2017 05 13 DPO7054")
+    # path_dict["HMO3004"] = ("/media/shpakovkv/6ADA8899DA886365/"
+    #                         "WORK/2017/2017 05 12-19 ERG/"
+    #                         "2017 05 13 ERG Input united/"
+    #                         "2017 05 13 HMO3004")
+    #
+    # path_dict["TDS2024C"] = ("/media/shpakovkv/6ADA8899DA886365/"
+    #                          "WORK/2017/2017 05 12-19 ERG/"
+    #                          "2017 05 13 ERG Input united/"
+    #                          "2017 05 13 TDS2024C")
+    #
+    # path_dict["LeCroy"] = ("/media/shpakovkv/6ADA8899DA886365/"
+    #                        "WORK/2017/2017 05 12-19 ERG/"
+    #                        "2017 05 13 ERG Input united/"
+    #                        "2017 05 13 LeCroy")
+    #
+    # save_to_folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                   "2017 05 12-19 ERG/2017 05 13 ERG Output FINAL")
 
-    path_dict["TDS2024C"] = ("/media/shpakovkv/6ADA8899DA886365/"
-                             "WORK/2017/2017 05 12-19 ERG/"
-                             "2017 05 13 ERG Input united/"
-                             "2017 05 13 TDS2024C")
+    path_dict["DPO7054"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+                            "2017 05 13-19 ERG Output final\\"
+                            "2017 05 19 ERG Input final\\"
+                            "2017 05 19 DPO7054")
+    path_dict["HMO3004"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+                            "2017 05 13-19 ERG Output final\\"
+                            "2017 05 19 ERG Input final\\"
+                            "2017 05 19 HMO3004")
 
-    path_dict["LeCroy"] = ("/media/shpakovkv/6ADA8899DA886365/"
-                           "WORK/2017/2017 05 12-19 ERG/"
-                           "2017 05 13 ERG Input united/"
-                           "2017 05 13 LeCroy")
+    path_dict["TDS2024C"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+                             "2017 05 13-19 ERG Output final\\"
+                             "2017 05 19 ERG Input final\\"
+                             "2017 05 19 TDS2024C")
 
-    save_to_folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                      "2017 05 12-19 ERG/2017 05 13 ERG Output FINAL")
+    path_dict["LeCroy"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+                           "2017 05 13-19 ERG Output final\\"
+                           "2017 05 19 ERG Input final\\"
+                           "2017 05 19 LeCroy")
+
+    save_to_folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+                      "2017 05 19 ERG Output FINAL")
 
     save_log_to = os.path.join(save_to_folder, "SignalProcess.log")
 
@@ -127,7 +149,9 @@ def make_final():
 
     multiplier_dict["HMO3004"] = [1e9, 0.272, 1e9, 0.951,
                                   1e9, 1.138, 1e9, 1.592]
-    delay_dict["HMO3004"] = [87, 0, 124, 0,
+    # delay_dict["HMO3004"] = [87, 0, 124, 0,   # 14.05 shoot #9 and below
+    #                          142, 0, 124, 0]
+    delay_dict["HMO3004"] = [87, 0, 144, 0,
                              142, 0, 124, 0]
 
     multiplier_dict["TDS2024C"] = [1e9, 1.261, 1e9, 1.094,
@@ -146,10 +170,13 @@ def make_final():
                  for osc in osc_list
                  for i in range(len(delay_dict[osc]))]
 
-    no_voltage = {1, 64, 76, 79}
+    # no_voltage = {1, 64, 76, 79}    # 2017 05 13
+    # no_voltage = {75, 87, 88, 89, 90, 91}  # 2017 05 14
+    # no_voltage = {8, 30, 70, 77, 80, 92}  # 2017 05 15
+    # no_voltage = {19, 23}  # 2017 05 18
+    no_voltage = {0}  # 2017 05 19
     voltage_idx = 12  # zero-based index of voltage curve
     voltage_front_level = -0.2
-    is_positive = False
     duplicate_check = True
 
     # GET FILE GROUPS
@@ -163,18 +190,11 @@ def make_final():
             raise IndexError("The number of .csv files in "
                              "osc-directories must be the same.")
     for number in range(shoots_count):  # zero-based index of shoot
-        number = 20
-        if number < 25 or number > 79:
-            is_positive = True
-            voltage_front_level = 0.2
-        else:
-            is_positive = False
-            voltage_front_level = -0.2
-
+        # number = 80
         data = sp.SignalsData()
 
         file_name = "ERG_" + sp.get_name_from_group(
-            [file_dict["DPO7054"][number]], 4)
+            [file_dict["DPO7054"][number]], 4, 3)
         # READ CSV
         for osc in osc_list:  # sorted order
             add_to_log("Reading " + file_dict[osc][number])
@@ -197,10 +217,10 @@ def make_final():
         # FIND VOLTAGE FRONT
         local_delay = None
         if number not in no_voltage:
-            add_to_log("Polarity: ", end="")
+            add_to_log("Polarity:  ", end="")
             polarity = pp.check_polarity(data.curves[voltage_idx])
-            add_to_log(str(polarity))
-            volt_plot_name = file_name + ".png"
+            add_to_log(str(polarity) + "  (autodetect)")
+            volt_plot_name = file_name + "_voltage.png"
             volt_plot_name = os.path.join(save_to_folder,
                                           "voltage_front", volt_plot_name)
             if pp.is_pos(polarity):
@@ -270,10 +290,11 @@ def make_final():
         add_to_log("Saving " + save_to + ".csv")
         sp.save_ndarray_csv(save_to, table)  # auto adds ".csv"
         add_to_log("Done!\n")
-        break
+
+        # break
 
     print("Saving log file...")
-    with open(save_log_to, 'w') as f:
+    with open(save_log_to, 'a') as f:
         f.write(log)
     print("Done!")
 
@@ -420,12 +441,32 @@ if __name__ == '__main__':
     # =================================================================
     # -----     MAIN     -----------------------------
     # =================================================================
-    log = ""
 
+    log = ""
     make_final()
+
     # save_curve(0, 6)
     # test_peak_process("file0_curve6.csv")
     # test_peak_process("file1_curve11.csv")
     # test_peak_process("file2_curve11.csv")
 
     # go_peak_process()
+
+    # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+    #                            "2017 05 13-19 ERG Output final\\"
+    #                            "2017 05 19 ERG Input final\\"
+    #                            "2017 05 19 DPO7054")
+    # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+    #                            "2017 05 13-19 ERG Output final\\"
+    #                            "2017 05 19 ERG Input final\\"
+    #                            "2017 05 19 HMO3004")
+    #
+    # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+    #                            "2017 05 13-19 ERG Output final\\"
+    #                            "2017 05 19 ERG Input final\\"
+    #                            "2017 05 19 TDS2024C")
+    #
+    # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+    #                            "2017 05 13-19 ERG Output final\\"
+    #                            "2017 05 19 ERG Input final\\"
+    #                            "2017 05 19 LeCroy")
