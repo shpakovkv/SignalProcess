@@ -12,11 +12,13 @@ pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
 
 
-
-def add_to_log(m, end='\n'):
-    global log
-    log += m + end
-    print(m, end=end)
+# def add_to_log(m, end='\n'):
+#     if __name__ != "__main__":
+#         from only_for_tests import log
+#     else:
+#         global log
+#     log += m + end
+#     print(m, end=end)
 
 
 class SinglePeak:
@@ -237,7 +239,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
 
     # Проверка введенных значений
-
+    peak_log = ""
     if level == 0:
         raise ValueError('Invalid level value!')
 
@@ -248,7 +250,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     if not tnoise:
         # print('tnoise parameter is empty. ')
         tnoise = x(3) - x(1)
-        print('Set "tnoise" to default 2 stops = ' + str(tnoise))
+        peak_log += 'Set "tnoise" to default 2 stops = ' + str(tnoise) + "\n"
 
     if len(time_bounds) != 2:
         raise ValueError("time_bounds has incorrect number of values. "
@@ -266,7 +268,9 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         time_bounds = (time_bounds[0], x[-1])
     start_idx = find_nearest_idx(x, time_bounds[0], side='right')
     stop_idx = find_nearest_idx(x, time_bounds[1], side='left')
-
+    if start_idx is None or stop_idx is None:
+        peak_log += "Time bounds is out of range.\n"
+        return [], peak_log
 
     peak_list = []
     # ==========================================================================
@@ -343,37 +347,38 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                 continue
         i += 1
 
-    print('Number of peaks: ' + str(len(peak_list)), end=':    ')
-    for pk in peak_list:
-        print("[{:.3f}, {:.3f}]    ".format(pk.time, pk.val), end="")
-    print()
+    peak_log += 'Number of peaks: ' + str(len(peak_list)) + "\n"
+    # for pk in peak_list:
+    #     print("[{:.3f}, {:.3f}]    ".format(pk.time, pk.val), end="")
+    # print()
 
     # LOCAL INTEGRAL CHECK
     dt = x[1] - x[0]
     di = int(diff_time * 2 // dt)    # diff window in index units
-    if di > 3:
 
+    if di > 3:
         for idx in range(len(peak_list)):
             pk = peak_list[idx]
             # square = pk.val * dt * di
             square = pk.val * di
             integral_left = 0
             integral_right = 0
-            print("Peak[{:3d}] = [{:7.2f},   {:4.1f}]   "
-                  "Square factor [".format(idx, pk.time, pk.val),
-                  end='')
+            peak_log += ("Peak[{:3d}] = [{:7.2f},   {:4.1f}]   "
+                         "Square factor [".format(idx, pk.time, pk.val))
             if pk.idx - di >= 0:
                 integral_left = integrate.trapz(y[pk.idx-di : pk.idx+1])
                 peak_list[idx].sqr_l = integral_left / square
-                print("{:.3f}".format(integral_left / square), end='')
-            print(" | ", end='')
+                peak_log += "{:.3f}".format(integral_left / square)
+            peak_log += " | "
             if pk.idx + di < len(y):  # stop_idx
                 integral_right = integrate.trapz(y[pk.idx: pk.idx + di + 1])
                 peak_list[idx].sqr_r = integral_right / square
-                print("{:.3f}".format(integral_right / square), end='')
-            print("]", end='')
-            print("  ({:.3f})".format((integral_right + integral_left) / square), end='')
-            print()
+                peak_log += "{:.3f}".format(integral_right / square)
+            peak_log += "]"
+            peak_log += "  ({:.3f})".format((integral_right + integral_left) / square)
+            peak_log += "\n"
+        if peak_list:
+            peak_log += "\n"
 
 
     if is_negative:
@@ -394,7 +399,8 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         pyplot.plot(peaks_x, peaks_y, 'og')
         pyplot.plot(peaks_x, peaks_y, '*r')
         pyplot.show()
-    return peak_list
+
+    return peak_list, peak_log
 
 
 def group_peaks(data, window):
@@ -460,15 +466,29 @@ def group_peaks(data, window):
             # ADD PEAK TO GROUP
             # check if curve[i]'s peak[j] is in +/-dt interval from peaks of group[gr]
             # print "Checking Group[" + str(gr) + "]"
-
+            next_is_closer = False
             if abs(peak_time[gr] - data[wf][pk].time) <= dt:
-                # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "group match"
-                peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] + data[wf][pk].time) /
-                                 (num_peak_in_gr[gr] + 1))        # recalculate average X-position of group
-                num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1         # update count of peaks in current group
-                peak_map[wf][gr] = True                         # update peak_map
-                peak_data[wf][gr] = SinglePeak(*data[wf][pk].data_full)          # add peak to output peak data array
-                pk += 1                                         # go to the next peak
+                if (len(data[wf]) > pk + 1 and
+                        (abs(peak_time[gr] - data[wf][pk].time) >
+                         abs(peak_time[gr] - data[wf][pk + 1].time))):
+                    peak_time.insert(gr, data[wf][pk].time)  # insert new group of peaks into the groups table
+                    num_peak_in_gr.insert(gr, 1)  # update the number of peaks in current group
+                    peak_map[wf].insert(gr, True)  # insert row to current wf column of peak map table
+                    peak_data[wf].insert(gr, SinglePeak(
+                        *data[wf][pk].data_full))  # insert row to current wf column of peak data table
+                    for curve_i in range(curves_count):
+                        if curve_i != wf:
+                            peak_map[curve_i].insert(gr, False)  # new row to other columns of peak map table
+                            peak_data[curve_i].insert(gr, None)  # new row to other columns of peak data table
+                    pk += 1
+                else:
+                    # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "group match"
+                    peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] + data[wf][pk].time) /
+                                     (num_peak_in_gr[gr] + 1))        # recalculate average X-position of group
+                    num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1         # update count of peaks in current group
+                    peak_map[wf][gr] = True                         # update peak_map
+                    peak_data[wf][gr] = SinglePeak(*data[wf][pk].data_full)          # add peak to output peak data array
+                    pk += 1                                         # go to the next peak
 
             # ===============================================================================================
             # INSERT NEW GROUP
