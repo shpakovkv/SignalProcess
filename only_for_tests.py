@@ -32,11 +32,86 @@ import PeakProcess as pp
 #         data = sp.multiplier_and_delay(data, None, delay)
 #     return data
 
+ext_of_type = {"CSV": ".csv", "DPO7054": ".wfm", "TDS2024C": ".csv",
+               "HMO3004": ".csv", "LECROY": ".txt"}
 
-def add_to_log(m, end='\n'):
+
+def add_to_log(m="", end='\n'):
     global log
     log += m + end
     print(m, end=end)
+
+
+def read_signals(file_list, file_type='csv'):
+    '''
+    Function returns SignalsData object filled with
+    data from files in file_list.
+    Do not forget to sort the list of files
+    for the correct order of curves.
+
+    file_list -- list of full paths or 1 path (str)
+    type -- type of files in file_list:
+            CSV, DPO7054, HMO3004, TDS2024C, LeCroy
+
+    returns -- SignalsData object
+    '''
+    # check inputs
+    if isinstance(file_list, str):
+        file_list = [file_list]
+    elif not isinstance(file_list, list):
+        raise TypeError("file_list must be an instance of str or list of str")
+    for filename in file_list:
+        if not isinstance(filename, str):
+            raise TypeError("A non-str element is found in the file_list")
+        if not os.path.isfile(filename):
+            raise FileNotFoundError("File \"{}\" not found.".format(filename))
+
+    # read
+    if file_type.upper() == 'CSV':
+        data = sp.SignalsData()
+        for filename in file_list:
+            data.append(np.genfromtxt(filename, delimiter=','))
+        return data
+    else:
+        raise TypeError("Unknown type of file \"{}\"".format(type))
+
+
+def zero_single_curve(curve, lenght=30):
+    curve.data = curve.data[0:lenght + 1, :]
+    for row in range(lenght):
+        curve.data[row, 1] = 0
+    return curve
+
+
+def zero_and_save(filename, file_type="CSV", curves=None, length=30):
+    # read
+    file_type = file_type.upper()
+    # print("Reading " + filename)
+    add_to_log("Reading " + filename)
+    data = read_signals(filename, file_type)
+
+    # zero
+    if curves is None:
+        curves = range(data.count)
+    # print("Set to zero curves: ", end="")
+    add_to_log("Set to zero curves: ", end="")
+    for idx in curves:
+        # print("{}  ".format(idx), end="")
+        add_to_log("{}  ".format(idx), end="")
+        data.curves[idx] = zero_single_curve(data.curves[idx], length)
+    # print()
+    add_to_log("")
+
+    # save
+    save_as = filename
+    # if isinstance(filename, list):
+    #     save_as = filename[0]
+    # save_as = save_as[0:-4] + "_zero.csv"
+    # print("Saveing " + save_as)
+    add_to_log("Saveing " + save_as)
+    sp.save_ndarray_csv(save_as, data.get_array())
+    # print("Done!\n")
+    add_to_log("Done!\n")
 
 
 def offset_by_voltage(voltage, level, delay,
@@ -112,25 +187,25 @@ def make_final():
 
     path_dict["DPO7054"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
                             "2017 05 13-19 ERG Output final\\"
-                            "2017 05 19 ERG Input final\\"
-                            "2017 05 19 DPO7054")
+                            "2017 05 18 ERG Input final\\"
+                            "2017 05 18 DPO7054")
     path_dict["HMO3004"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
                             "2017 05 13-19 ERG Output final\\"
-                            "2017 05 19 ERG Input final\\"
-                            "2017 05 19 HMO3004")
+                            "2017 05 18 ERG Input final\\"
+                            "2017 05 18 HMO3004")
 
     path_dict["TDS2024C"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
                              "2017 05 13-19 ERG Output final\\"
-                             "2017 05 19 ERG Input final\\"
-                             "2017 05 19 TDS2024C")
+                             "2017 05 18 ERG Input final\\"
+                             "2017 05 18 TDS2024C")
 
     path_dict["LeCroy"] = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
                            "2017 05 13-19 ERG Output final\\"
-                           "2017 05 19 ERG Input final\\"
-                           "2017 05 19 LeCroy")
+                           "2017 05 18 ERG Input final\\"
+                           "2017 05 18 LeCroy")
 
     save_to_folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-                      "2017 05 19 ERG Output FINAL")
+                      "2017 05 18 ERG Output FINAL")
 
     save_log_to = os.path.join(save_to_folder, "SignalProcess.log")
 
@@ -173,8 +248,8 @@ def make_final():
     # no_voltage = {1, 64, 76, 79}    # 2017 05 13
     # no_voltage = {75, 87, 88, 89, 90, 91}  # 2017 05 14
     # no_voltage = {8, 30, 70, 77, 80, 92}  # 2017 05 15
-    # no_voltage = {19, 23}  # 2017 05 18
-    no_voltage = {0}  # 2017 05 19
+    no_voltage = {19, 23}  # 2017 05 18
+    # no_voltage = {0}  # 2017 05 19
     voltage_idx = 12  # zero-based index of voltage curve
     voltage_front_level = -0.2
     duplicate_check = True
@@ -299,85 +374,135 @@ def make_final():
     print("Done!")
 
 
+def plot_single_curve(curve, peaks=None, xlim=None,
+                      save=False, show=False, save_as=""):
+    plt.close('all')
+    if xlim is not None:
+        plt.xlim(xlim)
+    plt.plot(curve.time, curve.val, '-b')
+
+    if peaks is not None:
+        peak_x = [peak.time for peak in peaks if peak is not None]
+        peak_y = [peak.val for peak in peaks if peak is not None]
+        plt.plot(peak_x, peak_y, 'or')
+        # plt.plot(peak_x, peak_y, '*g')
+    if save:
+        # print("Saveing " + save_as)
+        plt.savefig(save_as)
+    if show:
+        plt.show()
+    plt.close('all')
+
+
+def plot_peaks_all(data, peak_data, curves_list, xlim=None,
+                   show=False, save=False, save_as=""):
+    plt.close('all')
+    fig, axes = plt.subplots(len(peak_data), 1, sharex='all')
+    colors = "grcmy"
+    for wf in range(len(peak_data)):
+        axes[wf].plot(data.time(curves_list[wf]),
+                      data.value(curves_list[wf]), '-b')
+        color_idx = 0
+        for pk in peak_data[wf]:
+            setup = "*" + colors[color_idx]
+            color_idx += 1
+            if color_idx == len(colors):
+                color_idx = 0
+            if pk is not None:
+                if xlim is not None:
+                    axes[wf].set_xlim(xlim)
+                axes[wf].plot([pk.time], [pk.val], setup)
+    if save:
+        # print("Saving plot " + save_as)
+        plt.savefig(save_as)
+        # print("Done!")
+    if show:
+        plt.show()
+    plt.close('all')
+
+
 def go_peak_process():
-    folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-              "2017 05 12-19 ERG/2017 05 13 ERG Output final")
-    save_peaks_to = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                     "2017 05 12-19 ERG/2017 05 13 ERG Peaks")
-    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    # folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #           "2017 05 12-19 ERG/2017 05 13 ERG Output final")
+    # save_peaks_to = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                  "2017 05 12-19 ERG/2017 05 13 ERG Peaks")
+
+    folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+                      "2017 05 13 ERG Output FINAL")
+
+    # folder = "H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\TEMP\\"
+
+    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
     # GET PEAKS
     for filename in file_list:
-        # filename = file_list[1]
-        print("Reading " + filename)
+        # filename = file_list[19]
+        add_to_log("Reading " + filename)
         data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
-        print("Curves count = " + str(data.count))
+        add_to_log("Curves count = " + str(data.count) + "\n")
         peaks = []
         for idx in curves_list:
             # sp.save_ndarray_csv("neg_peaks.csv", data.curves[idx].data)
-            print("Curve #" + str(idx))
-            peaks.append(
-                pp.peak_finder(
+            add_to_log("Curve #" + str(idx), end="    ")
+            new_peaks, peak_log = pp.peak_finder(
                     data.time(idx), data.value(idx),
-                    -1, diff_time=20, tnoise=200, graph=False,
-                    time_bounds=[-200, 750], noise_attenuation=0.4
+                    -0.3, diff_time=15, tnoise=150, graph=False,
+                    time_bounds=[-200, 750], noise_attenuation=0.75
                 )
-            )
+            peaks.append(new_peaks)
+            add_to_log(peak_log, end="")
 
-        max_peaks = max([len(x) for x in peaks])
-        for pk in range(max_peaks):
-            for wf in range(len(peaks)):
-                try:
-                    s = str(peaks[wf][pk].time)
-                except IndexError:
-                    s = "---------"
-                print(s, end="\t")
-            print()
-        print()
+        # max_peaks = max([len(x) for x in peaks])
+        # for pk in range(max_peaks):
+        #     for wf in range(len(peaks)):
+        #         try:
+        #             s = str(peaks[wf][pk].time)
+        #         except IndexError:
+        #             s = "---------"
+        #         print(s, end="\t")
+        #     print()
+        # print()
 
         # GROUP PEAKS
-        peak_data, peak_map = pp.group_peaks(peaks, 15)
-        for gr in range(len(peak_map[0])):
-            for wf in range(len(peak_map)):
-                print(peak_map[wf][gr], end="\t")
-            print()
+        peak_data, peak_map = pp.group_peaks(peaks, 25)
+        # for gr in range(len(peak_map[0])):
+        #     for wf in range(len(peak_map)):
+        #         print(peak_map[wf][gr], end="\t")
+        #     print()
 
         # GRAPH ALL PEAKS
-        plt.close('all')
-        fig, axes = plt.subplots(len(peak_data), 1, sharex='all')
-        colors = "grcmy"
-        for wf in range(len(peak_data)):
-            axes[wf].plot(data.time(curves_list[wf]),
-                          data.value(curves_list[wf]), '-b')
-            print("# " + str(wf) + ".  Waveform " +
-                  str(curves_list[wf]), end='    ')
-            color_idx = 0
-            for pk in peak_data[wf]:
-                setup = "*" + colors[color_idx]
-                color_idx += 1
-                if color_idx == len(colors):
-                    color_idx = 0
-                if pk is not None:
-                    print("peak [{:.3f}, "
-                          "{:.3f}]    ".format(pk.time, pk.val), end='')
-                    axes[wf].set_xlim([-200, 750])
-                    axes[wf].plot([pk.time], [pk.val], setup)
-            print()
-        peaks_filename = os.path.join(save_peaks_to,
+        add_to_log("Saving peaks and plots...")
+        peaks_filename = os.path.join(folder, "Peaks_all",
                                       os.path.basename(filename))
         save_peaks_csv(peaks_filename, peak_data)
         # plt.show()
-        plot_filename = os.path.join(save_peaks_to,
+        plot_filename = os.path.join(folder, "Peaks_all",
                                      os.path.basename(filename))
         if plot_filename.upper().endswith('.CSV'):
             plot_filename = plot_filename[:-4]
         plot_filename += ".plot.png"
-        print("Saving plot " + plot_filename)
-        plt.savefig(plot_filename)
-        print("Done!")
-        plt.close('all')
-        # input("Press Enter...")
-        # break
+        plot_peaks_all(data, peak_data, curves_list, [-200, 750],
+                       save=True, save_as=plot_filename)
+        for idx in range(len(curves_list)):
+            curve_filename = os.path.join(folder, "Peaks_single")
+            if not os.path.isdir(curve_filename):
+                os.makedirs(curve_filename)
+            curve_filename = os.path.join(curve_filename,
+                                          os.path.basename(filename))
+            if curve_filename.upper().endswith('.CSV'):
+                curve_filename = curve_filename[:-4]
+            curve_filename += "_curve" + str(curves_list[idx]) + ".png"
+            plot_single_curve(data.curves[curves_list[idx]], peak_data[idx],
+                              [-200, 750], save=True, save_as=curve_filename)
+        add_to_log("Done!\n")
+
+    print("Saving log...")
+    log_filename = os.path.join(folder, "PeakProcess.log")
+    with open(log_filename, 'w') as f:
+        f.write(log)
+    print("Done!")
+    # input("Press Enter...")
+    # break
 
 
 def save_peaks_csv(filename, peaks):
@@ -402,10 +527,10 @@ def save_peaks_csv(filename, peaks):
                        )
                        )
         postfix = "_peak{:03d}.csv".format(gr + 1)
-        print("Saving " + filename + postfix)
+        # print("Saving " + filename + postfix)
         with open(filename + postfix, 'w') as fid:
             fid.writelines(content)
-    print("Done!")
+    # print("Done!")
 
 
 def test_peak_process(filename):
@@ -443,14 +568,14 @@ if __name__ == '__main__':
     # =================================================================
 
     log = ""
-    make_final()
+    # make_final()
 
     # save_curve(0, 6)
     # test_peak_process("file0_curve6.csv")
     # test_peak_process("file1_curve11.csv")
     # test_peak_process("file2_curve11.csv")
 
-    # go_peak_process()
+    go_peak_process()
 
     # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
     #                            "2017 05 13-19 ERG Output final\\"
@@ -470,3 +595,26 @@ if __name__ == '__main__':
     #                            "2017 05 13-19 ERG Output final\\"
     #                            "2017 05 19 ERG Input final\\"
     #                            "2017 05 19 LeCroy")
+
+    # folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+    #           "2017 05 19 ERG Output FINAL")
+    # file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
+    # DPO7054_fail_list = [3]
+    # HMO3004_fail_list = [3, 9]
+    # TDS2024C_fail_list = [0]
+    # LeCroy_fail_list = [0]
+    # for idx in range(len(file_list)):
+    #     curves = []
+    #     if idx in DPO7054_fail_list:
+    #         curves += [0, 1, 2, 3]
+    #     if idx in HMO3004_fail_list:
+    #         curves += [4, 5, 6, 7]
+    #     if idx in TDS2024C_fail_list:
+    #         curves += [8, 9, 10, 11]
+    #     if idx in LeCroy_fail_list:
+    #         curves += [12, 13, 14]
+    #     if len(curves) > 0:
+    #         zero_and_save(file_list[idx], file_type="csv", curves=curves)
+    # zero_log_filename = os.path.join(folder, "zero_curves.log")
+    # with open(zero_log_filename, 'w') as f:
+    #     f.write(log)
