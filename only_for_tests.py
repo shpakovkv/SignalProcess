@@ -421,14 +421,14 @@ def plot_peaks_all(data, peak_data, curves_list, xlim=None,
     plt.close('all')
 
 
-def go_peak_process():
+def go_peak_process(params, group_diff, single_file_name=None):
     # folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #           "2017 05 12-19 ERG/2017 05 13 ERG Output final")
     # save_peaks_to = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #                  "2017 05 12-19 ERG/2017 05 13 ERG Peaks")
 
     folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-                      "2017 05 13 ERG Output FINAL")
+              "2017 05 13 ERG Output FINAL")
 
     # folder = "H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\TEMP\\"
 
@@ -436,7 +436,8 @@ def go_peak_process():
     file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
     # GET PEAKS
     for filename in file_list:
-        # filename = file_list[19]
+        if single_file_name is not None:
+            filename = single_file_name
         add_to_log("Reading " + filename)
         data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
         add_to_log("Curves count = " + str(data.count) + "\n")
@@ -445,10 +446,7 @@ def go_peak_process():
             # sp.save_ndarray_csv("neg_peaks.csv", data.curves[idx].data)
             add_to_log("Curve #" + str(idx), end="    ")
             new_peaks, peak_log = pp.peak_finder(
-                    data.time(idx), data.value(idx),
-                    -0.3, diff_time=15, tnoise=150, graph=False,
-                    time_bounds=[-200, 750], noise_attenuation=0.75
-                )
+                data.time(idx), data.value(idx), **params)
             peaks.append(new_peaks)
             add_to_log(peak_log, end="")
 
@@ -464,7 +462,7 @@ def go_peak_process():
         # print()
 
         # GROUP PEAKS
-        peak_data, peak_map = pp.group_peaks(peaks, 25)
+        peak_data, peak_map = pp.group_peaks(peaks, group_diff)
         # for gr in range(len(peak_map[0])):
         #     for wf in range(len(peak_map)):
         #         print(peak_map[wf][gr], end="\t")
@@ -495,6 +493,8 @@ def go_peak_process():
             plot_single_curve(data.curves[curves_list[idx]], peak_data[idx],
                               [-200, 750], save=True, save_as=curve_filename)
         add_to_log("Done!\n")
+        if single_file_name is not None:
+            break
 
     print("Saving log...")
     log_filename = os.path.join(folder, "PeakProcess.log")
@@ -522,7 +522,7 @@ def save_peaks_csv(filename, peaks):
             content = (content +
                        "{:3d},{:0.18e},{:0.18e},"
                        "{:0.3f},{:0.3f},{:0.3f}\n".format(
-                           gr + 1, pk.time, pk.val,
+                           wf, pk.time, pk.val,
                            pk.sqr_l, pk.sqr_r, pk.sqr_l + pk.sqr_r
                        )
                        )
@@ -533,20 +533,45 @@ def save_peaks_csv(filename, peaks):
     # print("Done!")
 
 
-def test_peak_process(filename):
+def test_peak_process(filename, params, save=False):
+    add_to_log("Reading " + filename)
     data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
     # data = np.genfromtxt(filename, delimiter=',')
     # data[:,1] = -data[:,1]
     # sp.save_ndarray_csv("pos_peaks.csv", data)
+
+    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     peaks = []
-    for curve in data.curves:
-        peaks.append(
-            pp.peak_finder(
-                curve.time, curve.val,
-                -1, diff_time=20, tnoise=150, graph=True,
-                time_bounds=(-200, 750), noise_attenuation=0.4
-            )
-        )
+    add_to_log("Finding peaks...")
+    for idx in curves_list:
+        add_to_log("Curve #" + str(idx), end="    ")
+        new_peaks, peak_log = pp.peak_finder(
+            data.time(idx), data.value(idx), **params)
+        peaks.append(new_peaks)
+        add_to_log(peak_log, end="")
+    add_to_log("Grouping peaks...")
+    peak_data, peak_map = pp.group_peaks(peaks, 25)
+
+    plot_peaks_all(data, peak_data, curves_list, [-200, 750],
+                   show=True)
+
+
+def plot_one_curve_peaks(filename, idx, params):
+    add_to_log("Reading " + filename)
+    data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
+    peaks = []
+    add_to_log("Finding peaks...")
+    add_to_log("Curve #" + str(idx), end="    ")
+    new_peaks, peak_log = pp.peak_finder(
+        data.time(idx), data.value(idx), **params)
+    peaks.append(new_peaks)
+    add_to_log(peak_log, end="")
+    # add_to_log("Grouping peaks...")
+    # peak_data, peak_map = pp.group_peaks(peaks, 25)
+    plot_single_curve(data.curves[idx], peaks[0], xlim=[-200, 750],
+                      show=True)
+    # plot_peaks_all(data, peak_data, curves_list, [-200, 750],
+    #                show=True)
 
 
 def save_curve(file_idx, curve_idx):
@@ -574,8 +599,20 @@ if __name__ == '__main__':
     # test_peak_process("file0_curve6.csv")
     # test_peak_process("file1_curve11.csv")
     # test_peak_process("file2_curve11.csv")
+    filename = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+                "2017 05 13 ERG Output FINAL\\ERG_106.csv")
 
-    go_peak_process()
+    params = {"level": -0.25, "diff_time": 15, "tnoise": 100, "graph": False,
+              "time_bounds": [-200, 750], "noise_attenuation": 0.85}
+    group_params = 19
+    curve_idx = 9
+
+
+
+    plot_one_curve_peaks(filename, curve_idx, params)
+    # test_peak_process(filename, params)
+
+    go_peak_process(params, group_params, filename)
 
     # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
     #                            "2017 05 13-19 ERG Output final\\"
