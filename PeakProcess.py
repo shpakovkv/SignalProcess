@@ -106,41 +106,38 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
 def level_excess_check(x, y, level, start=0, step=1,
                        window=0, is_positive=True):
     '''
-    Checks if y values excess level value 
-    for x in range from x(start) to x(start) + window
-    OR for x in range from x(start) - window to x(start)
+    Checks if 'Y' values excess 'level' value 
+    for 'X' in range from X(start) to X(start) + window
+    OR for x in range from X(start) - window to X(start)
     
     x -- array with X data
     y -- array with Y data
     level -- level value
     start -- start index of data
-    step -- default=1; set step > 1 for faster calculation  
-    window -- 
-    is_positive --  
+    step -- the step with which elements of the array are traversed
+        step > 0: checks elements to the RIGHT from start index
+        step < 0: checks elements to the LEFT from start index
+    window -- check window width
+    is_positive -- the derection of the check
+        True: checks whether the 'Y' value rises above 'level'
+        False: checks whether the 'Y' value comes down below 'level'
     
-    returns 
+    returns True and an index of first Y element 
+            that are bigger/lower 'level'
+    OR returns False and an index of the last checked element
     '''
-    # функция проверяет, выходят ли значение по оси Y за величину уровня level
-    # проверяются элементы от x(start) до x(start) +/- window
-    #
-    # step > 0 проверяются значения СПРАВА от стартового элемента (i = start)
-    # step < 0 проверяются значения СЛЕВА от стартового элемента (i = start)
-    #
-    # is_positive == True: функция проверяет, поднимается ли значение 'y' выше значения 'level'
-    # is_positive == False: функция проверяет, опускается ли значение 'y' ниже значения 'level'
-    # Если да, то ВЫВОДИТ True и индекс первого элемента массива выходящего за 'level'
-    # Если нет, то ВЫВОДИТ False и индекс последнего проверенного элемента
 
     idx = start          # zero-based index
     if window == 0:      # window default value
         window = x[-1] - x[start]
 
-    while (idx >= 0) and (idx < len(y)) and (abs(x[idx] - x[start]) <= window):
+    while ((idx >= 0) and (idx < len(y)) and
+               (abs(x[idx] - x[start]) <= window)):
         if not is_positive and (y[idx] < level):
-            # проверка на выход величины за пределы уровня level (в сторону уменьшения)
+            # downward
             return True, idx
         elif is_positive and (y[idx] > level):
-            # проверка на выход величины за пределы уровня level (в сторону уменьшения)
+            # upward
             return True, idx
         idx += step
     return False, idx
@@ -187,7 +184,8 @@ def find_voltage_front(curve,
                        plot_name="voltage_front.png"):
     # Find x (time) of voltage front on specific level
     # Default: Negative polarity, -0.2 MV level
-    # PeakProcess.level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
+    # PeakProcess.level_excess_check(x, y, level, start=0, step=1,
+    # window=0, is_positive=True):
     if polarity=='auto':
         polarity = check_polarity(curve)
         if is_pos(polarity):
