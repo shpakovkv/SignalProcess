@@ -12,17 +12,9 @@ pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
 
 
-# def add_to_log(m, end='\n'):
-#     if __name__ != "__main__":
-#         from only_for_tests import log
-#     else:
-#         global log
-#     log += m + end
-#     print(m, end=end)
-
-
 class SinglePeak:
-    def __init__(self, time=None, value=None, index=None, sqr_l=0, sqr_r=0):
+    def __init__(self, time=None, value=None, index=None,
+                 sqr_l=0, sqr_r=0):
         self.time = time
         self.val = value
         self.idx = index
@@ -111,7 +103,23 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
 
 
 
-def level_excess_check(x, y, level, start=0, step=1, window=0, is_positive=True):
+def level_excess_check(x, y, level, start=0, step=1,
+                       window=0, is_positive=True):
+    '''
+    Checks if y values excess level value 
+    for x in range from x(start) to x(start) + window
+    OR for x in range from x(start) - window to x(start)
+    
+    x -- array with X data
+    y -- array with Y data
+    level -- level value
+    start -- start index of data
+    step -- default=1; set step > 1 for faster calculation  
+    window -- 
+    is_positive --  
+    
+    returns 
+    '''
     # функци€ провер€ет, выход€т ли значение по оси Y за величину уровн€ level
     # провер€ютс€ элементы от x(start) до x(start) +/- window
     #
@@ -467,6 +475,8 @@ def group_peaks(data, window):
             # check if curve[i]'s peak[j] is in +/-dt interval from peaks of group[gr]
             # print "Checking Group[" + str(gr) + "]"
             next_is_closer = False
+            if wf == 3:
+                pass
             if abs(peak_time[gr] - data[wf][pk].time) <= dt:
                 if (len(data[wf]) > pk + 1 and
                         (abs(peak_time[gr] - data[wf][pk].time) >
@@ -481,9 +491,14 @@ def group_peaks(data, window):
                             peak_map[curve_i].insert(gr, False)  # new row to other columns of peak map table
                             peak_data[curve_i].insert(gr, None)  # new row to other columns of peak data table
                     pk += 1
+                elif (len(peak_time) > gr + 1 and
+                          (abs(peak_time[gr] - data[wf][pk].time) >
+                               abs(peak_time[gr + 1] - data[wf][pk].time))):
+                    pass
                 else:
                     # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "group match"
-                    peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] + data[wf][pk].time) /
+                    peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] +
+                                     data[wf][pk].time) /
                                      (num_peak_in_gr[gr] + 1))        # recalculate average X-position of group
                     num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1         # update count of peaks in current group
                     peak_map[wf][gr] = True                         # update peak_map
