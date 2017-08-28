@@ -64,7 +64,7 @@ def read_signals(file_list, file_type='csv'):
         if not isinstance(filename, str):
             raise TypeError("A non-str element is found in the file_list")
         if not os.path.isfile(filename):
-            raise FileNotFoundError("File \"{}\" not found.".format(filename))
+            raise Exception("File \"{}\" not found.".format(filename))
 
     # read
     if file_type.upper() == 'CSV':
@@ -206,6 +206,7 @@ def make_final():
 
     save_to_folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
                       "2017 05 18 ERG Output FINAL")
+
 
     save_log_to = os.path.join(save_to_folder, "SignalProcess.log")
 
@@ -397,21 +398,22 @@ def plot_single_curve(curve, peaks=None, xlim=None,
 def plot_peaks_all(data, peak_data, curves_list, xlim=None,
                    show=False, save=False, save_as=""):
     plt.close('all')
-    fig, axes = plt.subplots(len(peak_data), 1, sharex='all')
+    fig, axes = plt.subplots(len(curves_list), 1, sharex='all')
     colors = "grcmy"
-    for wf in range(len(peak_data)):
+    for wf in range(len(curves_list)):
         axes[wf].plot(data.time(curves_list[wf]),
                       data.value(curves_list[wf]), '-b')
+        if xlim is not None:
+            axes[wf].set_xlim(xlim)
         color_idx = 0
-        for pk in peak_data[wf]:
-            setup = "*" + colors[color_idx]
-            color_idx += 1
-            if color_idx == len(colors):
-                color_idx = 0
-            if pk is not None:
-                if xlim is not None:
-                    axes[wf].set_xlim(xlim)
-                axes[wf].plot([pk.time], [pk.val], setup)
+        if peak_data is not None:
+            for pk in peak_data[wf]:
+                setup = "*" + colors[color_idx]
+                color_idx += 1
+                if color_idx == len(colors):
+                    color_idx = 0
+                if pk is not None:
+                    axes[wf].plot([pk.time], [pk.val], setup)
     if save:
         # print("Saving plot " + save_as)
         plt.savefig(save_as)
@@ -421,19 +423,19 @@ def plot_peaks_all(data, peak_data, curves_list, xlim=None,
     plt.close('all')
 
 
-def go_peak_process(params, group_diff, single_file_name=None):
-    # folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-    #           "2017 05 12-19 ERG/2017 05 13 ERG Output final")
+def go_peak_process(data_folder, params, group_diff, single_file_name=None):
+    # data_folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #           "2017 05 12-19 ERG/2017 05 15 ERG Output FINAL")
     # save_peaks_to = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #                  "2017 05 12-19 ERG/2017 05 13 ERG Peaks")
 
-    folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-              "2017 05 13 ERG Output FINAL")
+    # folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+    #           "2017 05 14 ERG Output FINAL")
 
     # folder = "H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\TEMP\\"
 
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
+    file_list = sp.get_file_list_by_ext(data_folder, ".CSV", sort=True)
     # GET PEAKS
     for filename in file_list:
         if single_file_name is not None:
@@ -470,19 +472,20 @@ def go_peak_process(params, group_diff, single_file_name=None):
 
         # GRAPH ALL PEAKS
         add_to_log("Saving peaks and plots...")
-        peaks_filename = os.path.join(folder, "Peaks_all",
+        peaks_filename = os.path.join(data_folder, "Peaks_all",
                                       os.path.basename(filename))
         save_peaks_csv(peaks_filename, peak_data)
         # plt.show()
-        plot_filename = os.path.join(folder, "Peaks_all",
+        plot_filename = os.path.join(data_folder, "Peaks_all",
                                      os.path.basename(filename))
         if plot_filename.upper().endswith('.CSV'):
             plot_filename = plot_filename[:-4]
         plot_filename += ".plot.png"
         plot_peaks_all(data, peak_data, curves_list, [-200, 750],
                        save=True, save_as=plot_filename)
+        add_to_log("Saving all peaks as " + plot_filename)
         for idx in range(len(curves_list)):
-            curve_filename = os.path.join(folder, "Peaks_single")
+            curve_filename = os.path.join(data_folder, "Peaks_single")
             if not os.path.isdir(curve_filename):
                 os.makedirs(curve_filename)
             curve_filename = os.path.join(curve_filename,
@@ -497,7 +500,7 @@ def go_peak_process(params, group_diff, single_file_name=None):
             break
 
     print("Saving log...")
-    log_filename = os.path.join(folder, "PeakProcess.log")
+    log_filename = os.path.join(data_folder, "PeakProcess.log")
     with open(log_filename, 'w') as f:
         f.write(log)
     print("Done!")
@@ -574,7 +577,7 @@ def plot_one_curve_peaks(filename, idx, params):
     #                show=True)
 
 
-def save_curve(file_idx, curve_idx):
+def save_curve_for_test(file_idx, curve_idx):
     folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
               "2017 05 12-19 ERG/2017 05 13 ERG Output final")
     file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
@@ -585,6 +588,62 @@ def save_curve(file_idx, curve_idx):
     print("Saving " + save_as)
     sp.save_ndarray_csv(save_as, data.curves[curve_idx].data)
     print("Done!\n")
+
+
+def read_peaks_group(filename):
+    data = np.genfromtxt(filename, delimiter=',')
+    sh = data.shape
+    peaks = []
+    for idx in range(data.shape[0]):
+        peaks.append([])    # new group
+        new_peak = pp.SinglePeak(time=data[idx, 1], value=data[idx,2])
+        if new_peak.time != 0 and new_peak.val != 0:
+            peaks[idx].append(new_peak)
+        else:
+            peaks[idx].append(None)
+    return peaks
+
+
+def read_all_groups(file_list):
+    if file_list is None or len(file_list) == 0:
+        return None
+    else:
+        groups = read_peaks_group(file_list[0])
+        curves_number = len(groups)
+        for file_idx in range(1,len(file_list)):
+            new_group = read_peaks_group(file_list[file_idx])
+            for wf in range(curves_number):     # wavefrorm number
+                groups[wf].append(new_group[wf][0])
+        return groups
+
+
+def peak_gr_file_list(data_file, folder):
+    data_file_name = os.path.basename(data_file)
+    data_file_name = data_file_name[0:-4]
+    peak_file_list = []
+    for name in sp.get_file_list_by_ext(folder, '.csv',sort=True):
+        if os.path.basename(name).startswith(data_file_name):
+            peak_file_list.append(name)
+    return peak_file_list
+
+def plot_peaks_from_file(data_file, peaks_folder):
+    peak_file_list = peak_gr_file_list(data_file, peaks_folder)
+    peaks = read_all_groups(peak_file_list)
+    if peaks is None:
+        print("No peaks.")
+    elif isinstance(peaks, list):
+        print("Number of peaks: {}".format(len(peaks[0])))
+
+    data = sp.SignalsData(np.genfromtxt(data_file, delimiter=','))
+    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    plot_name = os.path.basename(data_file)
+    plot_name = plot_name[0:-4] + ".plot.png"
+    plot_name = os.path.join(peaks_folder, plot_name)
+    print("Saving as " + plot_name)
+    plot_peaks_all(data, peaks, curves_list, xlim=[-200, 750],
+                   save=True, save_as=plot_name)
+
+
 
 
 if __name__ == '__main__':
@@ -599,47 +658,59 @@ if __name__ == '__main__':
     # test_peak_process("file0_curve6.csv")
     # test_peak_process("file1_curve11.csv")
     # test_peak_process("file2_curve11.csv")
-    filename = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-                "2017 05 13 ERG Output FINAL\\ERG_106.csv")
+    # filename = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
+    #             "2017 05 13 ERG Output FINAL\\ERG_106.csv")
 
-    params = {"level": -0.25, "diff_time": 15, "tnoise": 100, "graph": False,
-              "time_bounds": [-200, 750], "noise_attenuation": 0.85}
-    group_params = 19
-    curve_idx = 9
+    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+                "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
+    data_folder = os.path.dirname(filename)
+    peaks_folder = os.path.join(data_folder, "Peaks_all")
 
+    params = {"level": -0.3, "diff_time": 15, "tnoise": 100, "graph": False,
+              "time_bounds": [-200, 750], "noise_attenuation": 1.75}
+    group_params = 25
+    curve_idx = 8
 
-
-    plot_one_curve_peaks(filename, curve_idx, params)
+    # plot_one_curve_peaks(filename, curve_idx, params)
     # test_peak_process(filename, params)
 
-    go_peak_process(params, group_params, filename)
+    # go_peak_process(data_folder, params, group_params, filename)
+
+    data_folder_list = []
+    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+                            "2017 05 12-19 ERG/2017 05 13 ERG Output FINAL")
+    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+                            "2017 05 12-19 ERG/2017 05 14 ERG Output FINAL")
+    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+                            "2017 05 12-19 ERG/2017 05 15 ERG Output FINAL")
+    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+                            "2017 05 12-19 ERG/2017 05 16 ERG Output FINAL")
+    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+                            "2017 05 12-19 ERG/2017 05 18 ERG Output FINAL")
+    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+                            "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL")
+    for item in data_folder_list:
+        data_file_list = sp.get_file_list_by_ext(item, ".csv", sort=True)
+        for name in data_file_list:
+            print("Reading " + name)
+            current_peaks_folder = os.path.join(item, "Peaks_all")
+            plot_peaks_from_file(name, current_peaks_folder)
+            print("Done!\n")
+
+    # plot_peaks_from_file(filename, peaks_folder)
 
     # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
     #                            "2017 05 13-19 ERG Output final\\"
     #                            "2017 05 19 ERG Input final\\"
     #                            "2017 05 19 DPO7054")
-    # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-    #                            "2017 05 13-19 ERG Output final\\"
-    #                            "2017 05 19 ERG Input final\\"
-    #                            "2017 05 19 HMO3004")
-    #
-    # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-    #                            "2017 05 13-19 ERG Output final\\"
-    #                            "2017 05 19 ERG Input final\\"
-    #                            "2017 05 19 TDS2024C")
-    #
-    # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-    #                            "2017 05 13-19 ERG Output final\\"
-    #                            "2017 05 19 ERG Input final\\"
-    #                            "2017 05 19 LeCroy")
 
-    # folder = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
-    #           "2017 05 19 ERG Output FINAL")
+    # folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #           "2017 05 12-19 ERG/2017 05 13 ERG Output FINAL")
     # file_list = sp.get_file_list_by_ext(folder, ".CSV", sort=True)
-    # DPO7054_fail_list = [3]
-    # HMO3004_fail_list = [3, 9]
-    # TDS2024C_fail_list = [0]
-    # LeCroy_fail_list = [0]
+    # DPO7054_fail_list = []
+    # HMO3004_fail_list = []
+    # TDS2024C_fail_list = [1, 64, 79, ]
+    # LeCroy_fail_list = [1, 64, 76, 79, ]
     # for idx in range(len(file_list)):
     #     curves = []
     #     if idx in DPO7054_fail_list:
