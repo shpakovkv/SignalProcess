@@ -114,7 +114,7 @@ def zero_and_save(filename, file_type="CSV", curves=None, length=30):
     add_to_log("Done!\n")
 
 
-def offset_by_voltage(voltage, level, delay,
+def offset_by_voltage(voltage, level,
                       time_multiplier=1, polarity='auto',
                       save_plot=False, plot_name="voltage_plot.png"):
     '''
@@ -311,7 +311,6 @@ def make_final():
                           all_delays[voltage_idx * 2 + 1]) /
                          all_multipliers[voltage_idx * 2 + 1])
             front_raw = offset_by_voltage(data.curves[voltage_idx], level_raw,
-                                          all_delays,
                                           save_plot=True, polarity=polarity,
                                           plot_name=volt_plot_name)
 
@@ -661,8 +660,11 @@ if __name__ == '__main__':
     # filename = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
     #             "2017 05 13 ERG Output FINAL\\ERG_106.csv")
 
-    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
+    # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #             "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
+
+    filename = ("C:\\WORK\\2014\\2014 11 14 ERG\\"
+                "2014 11 14 TDS Neutron\\0001 osc1.csv")
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
@@ -672,30 +674,52 @@ if __name__ == '__main__':
     curve_idx = 8
 
     # plot_one_curve_peaks(filename, curve_idx, params)
+
     # test_peak_process(filename, params)
 
     # go_peak_process(data_folder, params, group_params, filename)
 
-    data_folder_list = []
-    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                            "2017 05 12-19 ERG/2017 05 13 ERG Output FINAL")
-    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                            "2017 05 12-19 ERG/2017 05 14 ERG Output FINAL")
-    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                            "2017 05 12-19 ERG/2017 05 15 ERG Output FINAL")
-    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                            "2017 05 12-19 ERG/2017 05 16 ERG Output FINAL")
-    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                            "2017 05 12-19 ERG/2017 05 18 ERG Output FINAL")
-    data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
-                            "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL")
-    for item in data_folder_list:
-        data_file_list = sp.get_file_list_by_ext(item, ".csv", sort=True)
-        for name in data_file_list:
-            print("Reading " + name)
-            current_peaks_folder = os.path.join(item, "Peaks_all")
-            plot_peaks_from_file(name, current_peaks_folder)
-            print("Done!\n")
+    data_file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
+    for name in data_file_list:
+        voltage_front_level = -0.2
+        voltage_idx = 0
+        all_delays = [125, 0, 78, 0, 135, 0, 135, 0]  # for 2014.11.10-11
+        # all_delays = [117, 0, 70, 0, 127, 0, 127, 0]  # for 2014.11.13
+        # all_delays = [132, 0, 85, 0, 142, 0, 142, 0]  # for 2014.11.14
+        all_multipliers = [1e9, 0.17771, 1e9, 0.46, 1e9, 1, 1e9, 1]
+        data = sp.SignalsData(np.genfromtxt(name, delimiter=","))
+        level_raw = ((voltage_front_level +
+                      all_delays[voltage_idx * 2 + 1]) /
+                     all_multipliers[voltage_idx * 2 + 1])
+        front_raw = offset_by_voltage(data.curves[voltage_idx], level_raw,
+                                      save_plot=False, polarity="neg")
+        if front_raw is not None:
+            time_offset = (front_raw * all_multipliers[voltage_idx * 2] -
+                           all_delays[voltage_idx * 2])
+            print(time_offset)
+        else:
+            print("None")
+
+    # data_folder_list = []
+    # data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                         "2017 05 12-19 ERG/2017 05 13 ERG Output FINAL")
+    # data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                         "2017 05 12-19 ERG/2017 05 14 ERG Output FINAL")
+    # data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                         "2017 05 12-19 ERG/2017 05 15 ERG Output FINAL")
+    # data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                         "2017 05 12-19 ERG/2017 05 16 ERG Output FINAL")
+    # data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                         "2017 05 12-19 ERG/2017 05 18 ERG Output FINAL")
+    # data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
+    #                         "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL")
+    # for item in data_folder_list:
+    #     data_file_list = sp.get_file_list_by_ext(item, ".csv", sort=True)
+    #     for name in data_file_list:
+    #         print("Reading " + name)
+    #         current_peaks_folder = os.path.join(item, "Peaks_all")
+    #         plot_peaks_from_file(name, current_peaks_folder)
+    #         print("Done!\n")
 
     # plot_peaks_from_file(filename, peaks_folder)
 
