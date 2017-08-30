@@ -660,14 +660,18 @@ def smooth_voltage(x, y, x_multiplier=1):
     # window_len correction
     time_step = (x[1] - x[0]) * 1e9 / x_multiplier      # calc time_step and converts to nanoseconds
     window_len = int(window_len / time_step)            # calc savgol filter window
+    if len(y) < window_len:
+        window_len = len(y)
     if window_len % 2 == 0:
-        window_len += 1                                 # window must be even number
+        window_len += 1     # window must be even number
     if window_len < 5:
-        window_len = 5                                  # minimun value check
+        window_len = 5
 
     # smooth
-    y_smoothed = savgol_filter(y, window_len, poly_order)
-    return y_smoothed
+    if len(y) >= 5:
+        y_smoothed = savgol_filter(y, window_len, poly_order)
+        return y_smoothed
+    return y
 
 
 def save_ndarray_csv(filename, data, delimiter=",", precision=18):
