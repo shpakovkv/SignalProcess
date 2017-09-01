@@ -661,7 +661,7 @@ def smooth_voltage(x, y, x_multiplier=1):
     time_step = (x[1] - x[0]) * 1e9 / x_multiplier      # calc time_step and converts to nanoseconds
     window_len = int(window_len / time_step)            # calc savgol filter window
     if len(y) < window_len:
-        window_len = len(y)
+        window_len = len(y) - 1
     if window_len % 2 == 0:
         window_len += 1     # window must be even number
     if window_len < 5:
