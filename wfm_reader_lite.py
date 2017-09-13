@@ -337,41 +337,63 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
 # --------      MAIN      --------------------------------------------
 # ====================================================================
 if __name__ == "__main__":
-    import matplotlib.pyplot as mplt
     import sys
+    import os
 
-    time_arr, value_arr, wfm_info, overranged_ind, underranged_ind =\
-        read_wfm("Over_ranged_data.wfm")
+    args = sys.argv[1:]
+    path = ''
+    file_list = ''
+    setup_file = ''
+    save_as = ''
+    key_list = (
+        '-d',  # input dir path
+        '-t',  # setup filename
+        '-o',  # output file name
+        '-i'  # input file names
+    )
+    
+    # print(args)
+    for idx, val in enumerate(args):
+        if val == '-d': # dir path
+            assert len(args) > idx + 1, "Specify dir path after '-d'."
+            path = args[idx + 1]
+        if val == '-t': # setup file name
+            assert len(args) > idx + 1, ("Specify setup file "
+                                         "name after '-t'.")
+            setup_file = args[idx + 1]
+        if val =='-o': # output file name
+            assert len(args) > idx + 1, "Specify filename after '-o'."
+            save_as = os.path.abspath(val)
+        if val == '-i': # input file names
+            assert len(args) > idx + 1, "Specify filename after '-i'."
+            file_list = [args[idx + 1:]]
+    assert not ('-i' in args and '-t' in args), ('Error! The parameters '
+                                                 '\'-i\' and \'-t\' can '
+                                                 'not be used together.')
+    if all(key not in args for key in key_list):
+        file_list = [args[:]]
 
-    print("=========================================================")
-    print("File version = {0}".format(wfm_info['version_string']))
-    for item in wfm_info.items():
-        out_str = str(item[0])
-        out_str += " " * (44 - len(item[0]))
-        out_str += "= "
-        out_str += str(item[1])
-        print(out_str)
-    print()
-    # plot graph
-    # converts seconds to nanoseconds
-    t_ns = [val_in_sec * 1.0e9 for val_in_sec in time_arr]
-    mplt.plot(t_ns, value_arr)
-    mplt.show()
-    # mplt.savefig('temp_fig.png')
-    # numpy.savetxt('temp_data.csv', data)
+    if path:
+        # path = os.path.abspath(path)
+        assert os.path.isdir(path), ("Error! Can not find dir '" +
+                                     path + "'.")
+    assert len(file_list) or setup_file, "Error! No input files specified!"
 
-    print("Size of {0} t = {1} "
-          "for {2} elements".format(type(time_arr),
-                                    sys.getsizeof(time_arr),
-                                    len(time_arr)))
-    print("Size of {0} y = {1} "
-          "for {2} elements".format(type(value_arr),
-                                    sys.getsizeof(value_arr),
-                                    len(value_arr)))
-    print("Size of {0} bool = {1} "
-          "for {2} elements".format(type(overranged_ind),
-                                    sys.getsizeof(overranged_ind),
-                                    len(overranged_ind)))
-    print("curve_data_format = {0}".format(wfm_info['data_format_str']))
-    print()
-    print(numpy.shape(value_arr))
+    if setup_file:
+        # import xml
+        pass
+    else:
+        for idx, fname in enumerate(file_list[0]):
+            file_list[0][idx] = os.path.join(path, fname)
+            assert os.path.isfile(file_list[0][idx]), ("Error! Can not find "
+                                                    "file '" + fname + "'.")
+        if save_as:
+            save_as = [save_as]
+        save_as = [file_list[0][:-4] + '.csv']
+
+    for idx, group in enumerate(file_list):
+        print('Reading files: ', end='')
+        print(', '.join(group))
+        data = read_wfm_group(group)
+        numpy.savetxt(save_as[idx], data, delimiter=",")
+        print('Saved as: \'{}\''.format(save_as[idx]))
