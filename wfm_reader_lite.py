@@ -341,38 +341,64 @@ if __name__ == "__main__":
     import os
 
     args = sys.argv[1:]
+    params = {}
     path = ''
     file_list = ''
     setup_file = ''
     save_as = ''
+
     key_list = (
         '-d',  # input dir path
-        '-t',  # setup filename
+        '-u',  # setup filename
         '-o',  # output file name
-        '-i'  # input file names
+        '-i',  # input file names (Do not change index of this parameter)
+        '-g',  # number of files in groupe (one shot)
+        '-t'  # group type (number-first or channel-first) (num-first/ch-first)
     )
-    
-    # print(args)
-    for idx, val in enumerate(args):
-        if val == '-d': # dir path
-            assert len(args) > idx + 1, "Specify dir path after '-d'."
-            path = args[idx + 1]
-        if val == '-t': # setup file name
-            assert len(args) > idx + 1, ("Specify setup file "
-                                         "name after '-t'.")
-            setup_file = args[idx + 1]
-        if val =='-o': # output file name
-            assert len(args) > idx + 1, "Specify filename after '-o'."
-            save_as = os.path.abspath(val)
-        if val == '-i': # input file names
-            assert len(args) > idx + 1, "Specify filename after '-i'."
-            file_list = [args[idx + 1:]]
-    assert not ('-i' in args and '-t' in args), ('Error! The parameters '
-                                                 '\'-i\' and \'-t\' can '
-                                                 'not be used together.')
-    if all(key not in args for key in key_list):
-        file_list = [args[:]]
+    long_keys = (
+        '--dir-path',
+        '--setup-file',
+        '--output-file',
+        '--input-files',  # Do not change index of this parameter
+        '--grouped-by',
+        '--group-type'
+    )
 
+    # checks input parameters and gets values
+    arg_idx = 0
+    while arg_idx < len(args) - 1:
+        val = args[arg_idx]
+        key_idx = -1
+        assert val in key_list or val in long_keys, \
+            ('Error! Unexpected parameter \'' + val + '\'.')
+        if val == key_list[3] or val == long_keys[3]:
+            # -i OR --input-files
+            assert len(args) > arg_idx + 1, ("Specify file name(s) "
+                                             "after '" + val + "'.")
+            params[key_list[3]] = [args[arg_idx + 1:]]
+            break
+        if val in long_keys:
+            key_idx = long_keys.index(val)
+        else:
+            key_idx = key_list.index(val)
+        assert len(args) > arg_idx + 1, ("Specify parameter value(s) "
+                                         "after '" + val + "'.")
+        params[key_list[key_idx]] = args[arg_idx + 1]
+        arg_idx += 2
+
+    # check parameters conflicts
+    assert not ('-i' in params.keys() and '-u' in params.keys()), \
+        ('Error! The parameters \'-i\'(\'--input-files\') and '
+         '\'-u\'(\'--setup-file\') can not be used together.')
+
+    assert not ('-u' in params.keys() and '-o' in params.keys()), \
+        ('Error! The parameters \'-u\'(\'--setup-file\') and '
+         '\'-o\'(\'--output-file\') can not be used together.')
+
+    file_list = params.get('-i', [])
+    setup_file = params.get('-u', False)
+    save_as = params.get('-o', '')
+    path = params.get('-d', '')
     if path:
         # path = os.path.abspath(path)
         assert os.path.isdir(path), ("Error! Can not find dir '" +
@@ -383,13 +409,19 @@ if __name__ == "__main__":
         # import xml
         pass
     else:
+        ''' 
+        file_list == [[file1.wfm, file2.wfm, etc.]] 
+        list with 1 group of files, that corresponds to one shot. 
+        Thus the output of the program will be 1 file.
+        '''
         for idx, fname in enumerate(file_list[0]):
             file_list[0][idx] = os.path.join(path, fname)
             assert os.path.isfile(file_list[0][idx]), ("Error! Can not find "
-                                                    "file '" + fname + "'.")
+                                                       "file '" + fname + "'.")
         if save_as:
             save_as = [save_as]
-        save_as = [file_list[0][:-4] + '.csv']
+        else:
+            save_as = [file_list[0][0][:-4] + '.csv']
 
     for idx, group in enumerate(file_list):
         print('Reading files: ', end='')
