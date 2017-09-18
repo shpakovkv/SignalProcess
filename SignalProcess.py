@@ -724,6 +724,73 @@ def align_and_append_ndarray(*args):
         data = np.append(data, aligned_arr, axis=1)                                 # append arr to the data
     return data
 
+
+def numbering_parser(group):
+    '''
+    Finds serial number (substring) in the file name string.
+
+    group -- list of files (each file must corresponds 
+             to different shot)
+
+    return -- (start, digits), where: 
+        start -- index of the first digit of the serial number
+                 in a file name
+        end -- index of the last digit of the serial number
+    '''
+    names = []
+    for raw in group:
+        names.append(os.path.basename(raw))
+    assert all(len(name) for name in names), \
+        ("Error! All file names must have the same length")
+    numbers = []
+    # for idx in range(2):
+    #     numbers.append(parse_filename(names[idx]))
+    for name in names:
+        numbers.append(parse_filename(name))
+
+    # numbers[filename_idx][number_idx]{}
+    num_count = len(numbers[0])
+    if len(numbers) == 1:
+        return (numbers[0][0]['start'], numbers[0][0]['end'])
+    for num_idx in range(num_count):
+        unique = True
+        for file_idx in range(len(names)):
+            name = names[file_idx]
+
+    for match_idx in range(num_count):
+        unique = all(all(numbers[num][match_idx]['num'] not in names[name_idx]
+                         for name_idx in range(len(names))
+                         if name_idx != num) for num in range(len(names)))
+        if unique:
+            return (numbers[0][match_idx]['start'],
+                    numbers[0][match_idx]['end'])
+
+    return (0, len(names[0]))
+
+
+def parse_filename(name):
+    '''
+    Finds substrings with numbers in the input string.
+
+    name -- string with numbers.
+
+    return -- list of dicts. [{...}, {...}, ...]
+        where each dict contains info about one founded number:
+        'start' -- index of the first digit of the found number in the string
+        'end' -- index of the last digit of the found number in the string
+        'num' -- string representation of the number
+    '''
+    import re
+    matches = re.finditer(r'\d+', name)
+    match_list = []
+    for match in matches:
+        # num = int(match)
+        match_list.append({'start': match.start(),
+                           'end': match.end(),
+                           'num': match.group()})
+    return match_list
+
+
 # ================================================================================================
 # --------------   MAIN    ----------------------------------------
 # ======================================================
