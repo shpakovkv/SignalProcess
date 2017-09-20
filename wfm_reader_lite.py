@@ -344,13 +344,14 @@ if __name__ == "__main__":
     params = {}  # input parameters dict
 
     key_list = (
-        '-d',  # input dir path
-        '-u',  # setup filename
-        '-o',  # output file name
-        '-i',  # input file names (Do not change index of this parameter)
-        '-g',  # number of files in groupe (one shot)
-        '-b',  # sorted by (num-first/ch-first) (num/ch)
-        '-t'  # save to dir
+        '-d',  # 0 input dir path
+        '-u',  # 1 setup filename
+        '-o',  # 2 output file name
+        '-i',  # 3 input file names (Do not change index of this parameter)
+        '-g',  # 4 number of files in groupe (one shot)
+        '-b',  # 5 sorted by (num-first/ch-first) (num/ch)
+        '-t',  # 6 save to dir
+        '-p'  # 7 save with postfix
     )
     long_keys = (
         '--dir-path',
@@ -359,11 +360,12 @@ if __name__ == "__main__":
         '--input-files',  # Do not change index of this parameter
         '--grouped-by',
         '--sorted-by',
-        '--save-to'
+        '--save-to',
+        '--save-postfix'
     )
     # some keys should not be used together:
-    #                (u, i); (u, o); (u, g); (o, g); (i, g)
-    key_conflicts = ((1, 3), (1, 2), (1, 4), (2, 4), (3, 4))
+    #                (u, i); (u, o); (u, g); (u, p); (o, g); (o, p); (i, g)
+    key_conflicts = ((1, 3), (1, 2), (1, 4), (1, 7), (2, 4), (2, 7), (3, 4))
 
     # checks input parameters and gets values
     for arg_idx in range(len(args)):
@@ -404,6 +406,7 @@ if __name__ == "__main__":
     group_size = params.get('-g', 0)
     sorted_by = params.get('b', 'num')
     save_to = params.get('-t', '')
+    postfix = params.get('-p', '')
 
     if path:
         # path = os.path.abspath(path)
@@ -417,44 +420,72 @@ if __name__ == "__main__":
     assert len(file_list) or setup_file or group_size and path, \
         "Error! No input files specified!"
 
+    # gets file list and group files by shots
     if setup_file:
         '''
-        import xml
+        Import xml file with all parameters.
         '''
         pass
     elif group_size:
         '''
-        Dir with files was input.
+        The folder with the files was specified.
+        
+        Needed to group them by shots. 
+        The output of this section should be so:
+        file_list == [
+                        ['file01_ch1.wfm', 'file01_ch2.wfm', ...], 
+                        ['file02_ch1.wfm', 'file02_ch2.wfm', ...],
+                        ...
+                     ] 
+        save_as == ['/path/file1.csv', '/path/file2.csv', ...]
         '''
-        pass
+        import SignalProcess as sp
+        file_list = sp.get_file_list_by_ext(path, '.wfm', sort=True)
+        grouped_list = []
+        try:
+            gs = int(group_size)
+        except ValueError as e:
+            raise ValueError("Wrong group size value ({}).".format(group_size))
+        for idx in range(0, len(file_list), gs):
+            grouped_list.append(file_list[idx: idx + gs])
+        file_list = grouped_list
+        save_as = []
+        if not postfix.lower().endswith('.csv'):
+            postfix += '.csv'
+        # finds shot number in filename
+        num_start, num_end = sp.numbering_parser(names[0] for names in file_list)
+        if not save_to:
+            save_to = os.path.dirname(file_list[0][0])
+        for filename in (os.path.basename(name[0]) for name in file_list):
+            shot_number = filename[num_start: num_end]
+            save_as.append(os.path.join(save_to, shot_number + postfix))
     else:
         ''' 
-        One group of files was input.
-        file_list == [[file1.wfm, file2.wfm, etc.]] 
+        One group of files was specified.
+        
+        file_list == [['file1.wfm', 'file2.wfm', etc.]] 
         List with 1 group of files, that corresponds to one shot. 
         Thus the output of the program will be 1 file.
+        save_as == ['/path/file1.csv']
         '''
         for idx, fname in enumerate(file_list[0]):
             file_list[0][idx] = os.path.join(path, fname)
             assert os.path.isfile(file_list[0][idx]), ("Error! Can not find "
                                                        "file '" + fname + "'.")
-        # if save_as:
-        #     save_as = os.path.join(save_to, save_as)
-        # elif save_to:
-        #     save_as = os.path.basename(file_list[0][0])[:-4] + '.csv'
-        #     save_as = os.path.join(save_to, save_as)
         if not save_as:
             save_as = file_list[0][0]
         if save_as.lower().endswith(".wfm"):
             save_as = save_as[:-4]
+        save_as += postfix
         if not save_as.lower().endswith(".csv"):
             save_as = save_as + '.csv'
         save_as = os.path.join(save_to, save_as)
         save_as = [save_as]
 
+    # read .wfm and save .csv
     for idx, group in enumerate(file_list):
         print('Reading files: ', end='')
         print(', '.join(group))
         data = read_wfm_group(group)
         numpy.savetxt(save_as[idx], data, delimiter=",")
-        print('Saved as: \'{}\''.format(save_as[idx]))
+        print('Saved as: {}'.format(save_as[idx]))
