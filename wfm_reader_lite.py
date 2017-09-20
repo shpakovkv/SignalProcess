@@ -363,6 +363,8 @@ if __name__ == "__main__":
         '--save-to',
         '--save-postfix'
     )
+    num_first_sort = ('num', 'number', 'num-first', 'number-first')
+    ch_first_sort = ('ch', 'channel', 'ch-first', 'channel-first')
     # some keys should not be used together:
     #                (u, i); (u, o); (u, g); (u, p); (o, g); (o, p); (i, g)
     key_conflicts = ((1, 3), (1, 2), (1, 4), (1, 7), (2, 4), (2, 7), (3, 4))
@@ -404,7 +406,7 @@ if __name__ == "__main__":
     save_as = params.get('-o', '')
     path = params.get('-d', '')
     group_size = params.get('-g', 0)
-    sorted_by = params.get('b', 'num')
+    sorted_by = params.get('-b', 'num')
     save_to = params.get('-t', '')
     postfix = params.get('-p', '')
 
@@ -446,8 +448,21 @@ if __name__ == "__main__":
             gs = int(group_size)
         except ValueError as e:
             raise ValueError("Wrong group size value ({}).".format(group_size))
-        for idx in range(0, len(file_list), gs):
-            grouped_list.append(file_list[idx: idx + gs])
+        assert len(file_list) % gs == 0, \
+            ("Wrong group_size parameter's value ({}) "
+             "for the number of files ({}).".format(gs, len(file_list)))
+
+        if sorted_by in num_first_sort:
+            for idx in range(0, len(file_list), gs):
+                grouped_list.append(file_list[idx: idx + gs])
+        elif sorted_by in ch_first_sort:
+            shots_count = len(file_list) / gs
+            for shot in range(shots_count):
+                grouped_list.append([file_list[idx] for idx in
+                                     range(shot, len(file_list), shots_count)])
+        else:
+            raise ValueError("Unexpected value for sorted-by parameter "
+                             "({}).".format(sorted_by))
         file_list = grouped_list
         save_as = []
         if not postfix.lower().endswith('.csv'):
