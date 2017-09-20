@@ -341,11 +341,7 @@ if __name__ == "__main__":
     import os
 
     args = sys.argv[1:]
-    params = {}
-    path = ''
-    file_list = ''
-    setup_file = ''
-    save_as = ''
+    params = {}  # input parameters dict
 
     key_list = (
         '-d',  # input dir path
@@ -353,7 +349,8 @@ if __name__ == "__main__":
         '-o',  # output file name
         '-i',  # input file names (Do not change index of this parameter)
         '-g',  # number of files in groupe (one shot)
-        '-t'  # group type (number-first or channel-first) (num-first/ch-first)
+        '-b',  # sorted by (num-first/ch-first) (num/ch)
+        '-t'  # save to dir
     )
     long_keys = (
         '--dir-path',
@@ -361,67 +358,99 @@ if __name__ == "__main__":
         '--output-file',
         '--input-files',  # Do not change index of this parameter
         '--grouped-by',
-        '--group-type'
+        '--sorted-by',
+        '--save-to'
     )
+    # some keys should not be used together:
+    #                (u, i); (u, o); (u, g); (o, g); (i, g)
+    key_conflicts = ((1, 3), (1, 2), (1, 4), (2, 4), (3, 4))
 
     # checks input parameters and gets values
-    arg_idx = 0
-    while arg_idx < len(args) - 1:
-        val = args[arg_idx]
-        key_idx = -1
-        assert val in key_list or val in long_keys, \
-            ('Error! Unexpected parameter \'' + val + '\'.')
-        if val == key_list[3] or val == long_keys[3]:
-            # -i OR --input-files
+    for arg_idx in range(len(args)):
+        match = re.match(r'(--?[^=]+)(?:[="\' ]*)([^="\']*)', args[arg_idx])
+        assert match, "Error! Invalid syntax at:\"" + args[arg_idx] + "\""
+        key = match.group(1)
+        val = match.group(2)
+        # print("{} : {}".format(key, val))
+        # key = re.match(r'--?[\w]+', args[arg_idx])
+        # val = re.search(r'(?:=["\' ]*)([^="]+)', args[arg_idx]).group(1)
+        if key == key_list[3] or key == long_keys[3]:
+            # handle input file list at the end of the string
             assert len(args) > arg_idx + 1, ("Specify file name(s) "
-                                             "after '" + val + "'.")
+                                             "after '" + key + "'.")
             params[key_list[3]] = [args[arg_idx + 1:]]
             break
-        if val in long_keys:
-            key_idx = long_keys.index(val)
+        if key in long_keys:
+            key_idx = long_keys.index(key)
+        elif key in key_list:
+            key_idx = key_list.index(key)
         else:
-            key_idx = key_list.index(val)
-        assert len(args) > arg_idx + 1, ("Specify parameter value(s) "
-                                         "after '" + val + "'.")
-        params[key_list[key_idx]] = args[arg_idx + 1]
-        arg_idx += 2
+            raise Exception('Error! Unexpected parameter \'' + key + '\'.')
+        params[key_list[key_idx]] = val
 
     # check parameters conflicts
-    assert not ('-i' in params.keys() and '-u' in params.keys()), \
-        ('Error! The parameters \'-i\'(\'--input-files\') and '
-         '\'-u\'(\'--setup-file\') can not be used together.')
+    for k1, k2 in key_conflicts:
+        ex_keys = params.keys()
+        assert not (key_list[k1] in ex_keys and key_list[k2] in ex_keys), \
+            ('Error! The parameters \'' + key_list[k1] + '\'(\'' +
+             long_keys[k1] + '\') and \'' + key_list[k2] + '\'(\'' +
+             long_keys[k2] + '\') can not be used together.')
 
-    assert not ('-u' in params.keys() and '-o' in params.keys()), \
-        ('Error! The parameters \'-u\'(\'--setup-file\') and '
-         '\'-o\'(\'--output-file\') can not be used together.')
-
+    # assign parameters values
     file_list = params.get('-i', [])
     setup_file = params.get('-u', False)
     save_as = params.get('-o', '')
     path = params.get('-d', '')
+    group_size = params.get('-g', 0)
+    sorted_by = params.get('b', 'num')
+    save_to = params.get('-t', '')
+
     if path:
         # path = os.path.abspath(path)
         assert os.path.isdir(path), ("Error! Can not find dir '" +
                                      path + "'.")
-    assert len(file_list) or setup_file, "Error! No input files specified!"
+    if save_to:
+        # save_to = os.path.abspath(save_to)
+        if not os.path.isdir(save_to):
+            os.mkdir(save_to)
+
+    assert len(file_list) or setup_file or group_size and path, \
+        "Error! No input files specified!"
 
     if setup_file:
-        # import xml
+        '''
+        import xml
+        '''
+        pass
+    elif group_size:
+        '''
+        Dir with files was input.
+        '''
         pass
     else:
         ''' 
+        One group of files was input.
         file_list == [[file1.wfm, file2.wfm, etc.]] 
-        list with 1 group of files, that corresponds to one shot. 
+        List with 1 group of files, that corresponds to one shot. 
         Thus the output of the program will be 1 file.
         '''
         for idx, fname in enumerate(file_list[0]):
             file_list[0][idx] = os.path.join(path, fname)
             assert os.path.isfile(file_list[0][idx]), ("Error! Can not find "
                                                        "file '" + fname + "'.")
-        if save_as:
-            save_as = [save_as]
-        else:
-            save_as = [file_list[0][0][:-4] + '.csv']
+        # if save_as:
+        #     save_as = os.path.join(save_to, save_as)
+        # elif save_to:
+        #     save_as = os.path.basename(file_list[0][0])[:-4] + '.csv'
+        #     save_as = os.path.join(save_to, save_as)
+        if not save_as:
+            save_as = file_list[0][0]
+        if save_as.lower().endswith(".wfm"):
+            save_as = save_as[:-4]
+        if not save_as.lower().endswith(".csv"):
+            save_as = save_as + '.csv'
+        save_as = os.path.join(save_to, save_as)
+        save_as = [save_as]
 
     for idx, group in enumerate(file_list):
         print('Reading files: ', end='')
