@@ -245,6 +245,8 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
 
         # calc POINTS TO BE READ
         data_points_to_read = data_points_all - start_index
+        if data_points_to_read < 0:
+            data_points_to_read = 0
         if number_of_points < 1 or not isinstance(number_of_points, int):
             # set to maximum number of data points
             # which can be securely read from the file,
