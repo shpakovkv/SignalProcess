@@ -26,30 +26,7 @@ class BinaryReadEOFException(Exception):  # EOF error for fread function
         return 'Not enought bytes in file. EOF reached while reading.'
 
 
-def fread(file_obj, count, data_type, b_order, skip=0):
-    """
-    binary file read function
-    file      - reference (file pointer)
-    count     - number of values if file to be processed
-    data_type - type of values to be read
-    b_order   - bytes order of file
-    skip      - number of values to be skip every 1 read value
-                useful for reading array of values with specific step
-    """
-
-    type_len = {  # length in bytes for all supported types
-        'int8': 1,
-        'uint8': 1,
-        'int16': 2,
-        'uint16': 2,
-        'int32': 4,
-        'uint32': 4,
-        'int64': 8,
-        'uint64': 8,
-        'float32': 4,
-        'double': 8,
-        'str': 1}
-
+def numpy_type_char(type):
     # data type for bytes-to-value convert function
     type_dict = {
         'int8': 'i',
@@ -66,6 +43,35 @@ def fread(file_obj, count, data_type, b_order, skip=0):
     # for char:
     #   1) converts bytes to uint8,
     #   2) converts uint8 to char using ASCII table
+    return type_dict[type]
+
+
+def numpy_type_len(type):
+    type_len_dict = {  # length in bytes for all supported types
+        'int8': 1,
+        'uint8': 1,
+        'int16': 2,
+        'uint16': 2,
+        'int32': 4,
+        'uint32': 4,
+        'int64': 8,
+        'uint64': 8,
+        'float32': 4,
+        'double': 8,
+        'str': 1}
+    return type_len_dict[type]
+
+
+def fread(file_obj, count, data_type, b_order, skip=0):
+    """
+    binary file read function
+    file      - reference (file pointer)
+    count     - number of values if file to be processed
+    data_type - type of values to be read
+    b_order   - bytes order of file
+    skip      - number of values to be skip every 1 read value
+                useful for reading array of values with specific step
+    """
 
     # print("bytes to read = {0}".format(type_len[data_type] * count))
     if skip < 0:  # check input parameters
@@ -73,26 +79,24 @@ def fread(file_obj, count, data_type, b_order, skip=0):
     if skip > count:
         skip = count
 
-    units_to_read = int(float(count) / (1 + skip))
+    # units_to_read = int(float(count) / (1 + skip))
 
     bytes_read = bytes()
-    for _ in range(0, units_to_read):
-        bytes_read += file_obj.read(type_len[data_type])
-        file_obj.seek(type_len[data_type] * skip, 1)
+    for _ in range(0, count):
+    #for _ in range(0, units_to_read):
+        bytes_read += file_obj.read(numpy_type_len(data_type))
+        file_obj.seek(numpy_type_len(data_type) * skip, 1)
 
     # print("bytes read = {0}".format(bytes_read))
     # check end of file
-    if len(bytes_read) != type_len[data_type] * count:
-        # print("len(bytes_read) = {} != "
-        #       "{}".format(len(bytes_read), type_len[data_type] * count))
+    if len(bytes_read) != numpy_type_len(data_type) * count:
         raise BinaryReadEOFException
 
-    numpy_type = (b_order + type_dict[data_type] +
-                  str(type_len[data_type]))
+    numpy_type = (b_order + numpy_type_char(data_type) +
+                  str(numpy_type_len(data_type)))
     # print("numpy dtype = " + numpy_type)
     result = numpy.ndarray(shape=(count,), dtype=numpy_type,
                            buffer=bytes_read)
-
     # string output:
     if data_type == 'str':
         result_str = ''
@@ -120,6 +124,7 @@ def read_wfm_group(group_of_files, start_index=0, number_of_points=-1,
                  number_of_points=number_of_points,
                  read_step=read_step,
                  silent_mode=silent_mode)
+    # print(t.shape, y.shape)
     data = numpy.c_[t, y]
     for i in range(1, len(group_of_files)):
         t, y, info, over_i, under_i = \
@@ -255,6 +260,8 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
         # which can be securely read from the frame in the file,
         # using startind and step parameters:
         data_points_to_read = int(data_points_to_read / read_step)
+        if data_points_to_read == 0:
+            data_points_to_read = 1
 
         # if more data_points are requested than provided in the file
         if number_of_points > data_points_to_read and not silent_mode:
@@ -268,7 +275,7 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
                        "in the trace is only " +
                        str(data_points_all) + " .\n")
             warning(message)
-        else:
+        elif number_of_points < data_points_to_read:
             data_points_to_read = number_of_points
 
         # READ DATA values from curve buffer
@@ -281,6 +288,10 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
 
         raw_data = fread(fid, data_points_to_read,
                          curve_data_format, byteorder, read_step - 1)
+        if data_points_to_read == 1:
+            numpy_type = (byteorder + numpy_type_char(curve_data_format) +
+                          str(numpy_type_len(curve_data_format)))
+            raw_data = raw_data * numpy.ones((data_points_to_read, ), dtype=numpy_type)
         data_y = (raw_data * file_info['ed1_dim_scale'] +
                   file_info['ed1_dim_offset'])
 
