@@ -406,7 +406,7 @@ if __name__ == "__main__":
     save_as = params.get('-o', '')
     path = params.get('-d', '')
     group_size = params.get('-g', 0)
-    sorted_by = params.get('-b', 'num')
+    sorted_by = params.get('-b', 'num-first')
     save_to = params.get('-t', '')
     postfix = params.get('-p', '')
 
@@ -473,6 +473,8 @@ if __name__ == "__main__":
             save_to = os.path.dirname(file_list[0][0])
         for filename in (os.path.basename(name[0]) for name in file_list):
             shot_number = filename[num_start: num_end]
+            if shot_number.lower().endswith(".wfm"):
+                shot_number = shot_number[:-4]
             save_as.append(os.path.join(save_to, shot_number + postfix))
     else:
         ''' 
