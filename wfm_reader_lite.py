@@ -1,12 +1,86 @@
 """
-wfm_reader_lite
+NAME
+    wfm_reader_lite - WFM files converter
+        
+SYNOPSIS
+    wfm_reader_lite [OPTION=OPT_VALUE]... -i FILE1 [FILE2 ...]
+    wfm_reader_lite [OPTION=OPT_VALUE]... -g=NUMBER
+    wfm_reader_lite [OPTION=OPT_VALUE]... -s=SETUPFILE
+    
+DESCRIPTION
+    Converts WFM files to CSV files.
+    There are three way to launch the program:
+    1) One group of files.
+        Specify one or more filenames (or full paths) after 
+        key -i or --input-files. 
+        
+        You may also specify directory path (-d), 
+        output file name (-o), directory to save to (-t),
+        and add to the output file name postfix (-p).
+        
+        NOTE: the key -i or --input-files must be the last.
+        
+    2) Dir with files.
+        Specify directory, containing input files via key -d 
+        and group size (positive integer) via key -g.
+        Input files will be divided into the groups of the equal size.
+        Each group will be converted to one CSV file.
+        
+        You may also specify directory for output files via key -t
+        (default is the input directory) 
+        and the type of file sorting (for correct grouping) via key -b
+        (default is number-first)
+        
+        ???????????
+         
+    3) Setup file containing all input parameters.
+        
+OPTIONS
+    -i, --input-files
+        After space specify one or more (space separated) file name(s)
+        (or full paths to files). You can specify the path to the 
+        directory separately via the key '-d' and specify here only 
+        the names of the files.
+        Specified files will be converted to one CSV file.
+        
+        NOTE: if the key -i or --input-files is specified, 
+              then it must be the last.
+        
+    -d, --dir-path 
+        Path to the dir containing input files (setup file 
+        or WFM files).
+        
+    -u, --setup-file 
+        The filename (or full path) of the file, containing all 
+        input parameters.
+        
+    -o, --output-file 
+        2 output file name
+        
+    -i, --input-files 
+        3 input file names
+        
+    -g, --grouped-by 
+        4 number of files in groupe (one shot)
+        
+    -b, --sorted-by 
+        5 sorted by (num-first/ch-first) (num/ch)
+        
+    -t, --save-to 
+        6 save to dir
+        
+    -p, --save-postfix 
+        7 save with postfix
+        
+    --start,  
+        # start index of data points to be read
+    
+    --step,  
+        # step of data reading
+    
+    --count  
+        # ???
 
-wfm2read(filename, datapoints, step = 1, startind = 1)
-Optional input arguments:
-read data points startind:step:datapoints from the wfm file.
-if datapoints is omitted, all data are read,
-if step is omitted, step=1.
-If startind omitted, startind=1
 """
 
 from __future__ import print_function, with_statement
@@ -293,7 +367,8 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
         if data_points_to_read == 1:
             numpy_type = (byteorder + numpy_type_char(curve_data_format) +
                           str(numpy_type_len(curve_data_format)))
-            raw_data = raw_data * numpy.ones((data_points_to_read, ), dtype=numpy_type)
+            raw_data = raw_data * numpy.ones((data_points_to_read, ),
+                                             dtype=numpy_type)
         data_y = (raw_data * file_info['ed1_dim_scale'] +
                   file_info['ed1_dim_offset'])
 
@@ -432,7 +507,7 @@ if __name__ == "__main__":
     sorted_by = params.get('-b', 'num-first')
     save_to = params.get('-t', '')
     postfix = params.get('-p', '')
-    start =  int(params.get('--start', 0))
+    start = int(params.get('--start', 0))
     step = int(params.get('--step', 1))
     count = int(params.get('--count', -1))
 
@@ -467,8 +542,8 @@ if __name__ == "__main__":
                      ] 
         save_as == ['/path/file1.csv', '/path/file2.csv', ...]
         '''
-        import SignalProcess as sp
-        file_list = sp.get_file_list_by_ext(path, '.wfm', sort=True)
+        import SignalProcess
+        file_list = SignalProcess.get_file_list_by_ext(path, '.wfm', sort=True)
         grouped_list = []
         try:
             gs = int(group_size)
@@ -494,7 +569,8 @@ if __name__ == "__main__":
         if not postfix.lower().endswith('.csv'):
             postfix += '.csv'
         # finds shot number in filename
-        num_start, num_end = sp.numbering_parser(names[0] for names in file_list)
+        num_start, num_end = \
+            SignalProcess.numbering_parser(names[0] for names in file_list)
         if not save_to:
             save_to = os.path.dirname(file_list[0][0])
         for filename in (os.path.basename(name[0]) for name in file_list):
