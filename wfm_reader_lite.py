@@ -1,5 +1,5 @@
 """
-Python 2.7
+wfm_reader_lite
 
 wfm2read(filename, datapoints, step = 1, startind = 1)
 Optional input arguments:
@@ -83,6 +83,8 @@ def fread(file_obj, count, data_type, b_order, skip=0):
     # print("bytes read = {0}".format(bytes_read))
     # check end of file
     if len(bytes_read) != type_len[data_type] * count:
+        # print("len(bytes_read) = {} != "
+        #       "{}".format(len(bytes_read), type_len[data_type] * count))
         raise BinaryReadEOFException
 
     numpy_type = (b_order + type_dict[data_type] +
@@ -112,7 +114,12 @@ def read_wfm_group(group_of_files, start_index=0, number_of_points=-1,
                    read_step=1, silent_mode=True):
     # reads a number of wfm files, unites columns to 1 table
     # returns data as 2-dimensional ndarray
-    t, y, info, over_i, under_i = read_wfm(group_of_files[0])
+    t, y, info, over_i, under_i = \
+        read_wfm(group_of_files[0],
+                 start_index=start_index,
+                 number_of_points=number_of_points,
+                 read_step=read_step,
+                 silent_mode=silent_mode)
     data = numpy.c_[t, y]
     for i in range(1, len(group_of_files)):
         t, y, info, over_i, under_i = \
@@ -351,7 +358,10 @@ if __name__ == "__main__":
         '-g',  # 4 number of files in groupe (one shot)
         '-b',  # 5 sorted by (num-first/ch-first) (num/ch)
         '-t',  # 6 save to dir
-        '-p'  # 7 save with postfix
+        '-p',  # 7 save with postfix
+        '--start',  # start index of data points to be read
+        '--step',  # step of data reading
+        '--count'  # number of data points to be read
     )
     long_keys = (
         '--dir-path',
@@ -409,6 +419,9 @@ if __name__ == "__main__":
     sorted_by = params.get('-b', 'num-first')
     save_to = params.get('-t', '')
     postfix = params.get('-p', '')
+    start =  int(params.get('--start', 0))
+    step = int(params.get('--step', 1))
+    count = int(params.get('--count', -1))
 
     if path:
         # path = os.path.abspath(path)
@@ -476,6 +489,9 @@ if __name__ == "__main__":
             if shot_number.lower().endswith(".wfm"):
                 shot_number = shot_number[:-4]
             save_as.append(os.path.join(save_to, shot_number + postfix))
+        start = [start for _ in range(len(file_list))]
+        count = [count for _ in range(len(file_list))]
+        step = [step for _ in range(len(file_list))]
     else:
         ''' 
         One group of files was specified.
@@ -498,11 +514,14 @@ if __name__ == "__main__":
             save_as = save_as + '.csv'
         save_as = os.path.join(save_to, save_as)
         save_as = [save_as]
+        start = [start]
+        count = [count]
+        step = [step]
 
     # read .wfm and save .csv
     for idx, group in enumerate(file_list):
         print('Reading files: ', end='')
         print(', '.join(group))
-        data = read_wfm_group(group)
+        data = read_wfm_group(group, start[idx], count[idx], step[idx])
         numpy.savetxt(save_as[idx], data, delimiter=",")
         print('Saved as: {}'.format(save_as[idx]))
