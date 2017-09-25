@@ -534,7 +534,20 @@ if __name__ == "__main__":
         '''
         Import xml file with all parameters.
         '''
-        pass
+        from bs4 import BeautifulSoup as BS
+        setup_file = os.path.join(path, setup_file)
+        with open(setup_file, 'r') as fid:
+            data = BS(fid, 'lxml-xml').find('setup')
+        shots = data.find_all('shot')
+        temp = data.find('savewithpostfix')
+        print("No tag found: type={}  value={}  text={}".format(type(temp), temp, temp.text.strip('\'" ')))
+        print(type(shots))
+        for item in shots:
+            print(type(item))
+        print(data.prettify())
+
+        raise Exception("All is Ok. Keep coding.")
+
     elif group_size:
         '''
         The folder with the files was specified.
