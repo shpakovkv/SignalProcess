@@ -192,6 +192,9 @@ def read_wfm_group(group_of_files, start_index=0, number_of_points=-1,
                    read_step=1, silent_mode=True):
     # reads a number of wfm files, unites columns to 1 table
     # returns data as 2-dimensional ndarray
+
+    print("start = {}  |  count = {}  |  step ="
+          " {}".format(start_index, number_of_points, read_step))
     t, y, info, over_i, under_i = \
         read_wfm(group_of_files[0],
                  start_index=start_index,
@@ -443,7 +446,7 @@ if __name__ == "__main__":
         '-u',  # 1 setup filename
         '-o',  # 2 output file name
         '-i',  # 3 input file names (Do not change index of this parameter)
-        '-g',  # 4 number of files in groupe (one shot)
+        '-g',  # 4 number of files in group (one shot)
         '-b',  # 5 sorted by (num-first/ch-first) (num/ch)
         '-t',  # 6 save to dir
         '-p',  # 7 save with postfix
@@ -507,9 +510,12 @@ if __name__ == "__main__":
     sorted_by = params.get('-b', 'num-first')
     save_to = params.get('-t', '')
     postfix = params.get('-p', '')
-    start = int(params.get('--start', 0))
-    step = int(params.get('--step', 1))
-    count = int(params.get('--count', -1))
+    start_int = int(params.get('--start', 0))
+    step_int = int(params.get('--step', 1))
+    count_int = int(params.get('--count', -1))
+    start = tuple()
+    count = tuple()
+    step = tuple()
 
     if path:
         # path = os.path.abspath(path)
@@ -578,9 +584,9 @@ if __name__ == "__main__":
             if shot_number.lower().endswith(".wfm"):
                 shot_number = shot_number[:-4]
             save_as.append(os.path.join(save_to, shot_number + postfix))
-        start = [start for _ in range(len(file_list))]
-        count = [count for _ in range(len(file_list))]
-        step = [step for _ in range(len(file_list))]
+        start = tuple(start_int for _ in range(len(file_list)))
+        count = tuple(count_int for _ in range(len(file_list)))
+        step = tuple(step_int for _ in range(len(file_list)))
     else:
         ''' 
         One group of files was specified.
@@ -603,9 +609,9 @@ if __name__ == "__main__":
             save_as = save_as + '.csv'
         save_as = os.path.join(save_to, save_as)
         save_as = [save_as]
-        start = [start]
-        count = [count]
-        step = [step]
+        start = tuple(start_int for _ in range(1))
+        count = tuple(count_int for _ in range(1))
+        step = tuple(step_int for _ in range(1))
 
     # read .wfm and save .csv
     for idx, group in enumerate(file_list):
