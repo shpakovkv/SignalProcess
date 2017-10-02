@@ -643,6 +643,13 @@ def plot_peaks_from_file(data_file, peaks_folder):
                    save=True, save_as=plot_name)
 
 
+def union_and_save(path_list, save_to, postfix="", prefix=""):
+    if not os.path.isdir(save_to):
+        os.makedirs(save_to)
+    for path in path_list:
+        assert os.path.isdir(path), \
+            "Can not find directory {}".format(path)
+
 
 
 if __name__ == '__main__':
@@ -679,26 +686,26 @@ if __name__ == '__main__':
 
     # go_peak_process(data_folder, params, group_params, filename)
 
-    data_file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
-    for name in data_file_list:
-        voltage_front_level = -0.2
-        voltage_idx = 0
-        all_delays = [125, 0, 78, 0, 135, 0, 135, 0]  # for 2014.11.10-11
-        # all_delays = [117, 0, 70, 0, 127, 0, 127, 0]  # for 2014.11.13
-        # all_delays = [132, 0, 85, 0, 142, 0, 142, 0]  # for 2014.11.14
-        all_multipliers = [1e9, 0.17771, 1e9, 0.46, 1e9, 1, 1e9, 1]
-        data = sp.SignalsData(np.genfromtxt(name, delimiter=","))
-        level_raw = ((voltage_front_level +
-                      all_delays[voltage_idx * 2 + 1]) /
-                     all_multipliers[voltage_idx * 2 + 1])
-        front_raw = offset_by_voltage(data.curves[voltage_idx], level_raw,
-                                      save_plot=False, polarity="neg")
-        if front_raw is not None:
-            time_offset = (front_raw * all_multipliers[voltage_idx * 2] -
-                           all_delays[voltage_idx * 2])
-            print(time_offset)
-        else:
-            print("None")
+    # data_file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
+    # for name in data_file_list:
+    #     voltage_front_level = -0.2
+    #     voltage_idx = 0
+    #     all_delays = [125, 0, 78, 0, 135, 0, 135, 0]  # for 2014.11.10-11
+    #     # all_delays = [117, 0, 70, 0, 127, 0, 127, 0]  # for 2014.11.13
+    #     # all_delays = [132, 0, 85, 0, 142, 0, 142, 0]  # for 2014.11.14
+    #     all_multipliers = [1e9, 0.17771, 1e9, 0.46, 1e9, 1, 1e9, 1]
+    #     data = sp.SignalsData(np.genfromtxt(name, delimiter=","))
+    #     level_raw = ((voltage_front_level +
+    #                   all_delays[voltage_idx * 2 + 1]) /
+    #                  all_multipliers[voltage_idx * 2 + 1])
+    #     front_raw = offset_by_voltage(data.curves[voltage_idx], level_raw,
+    #                                   save_plot=False, polarity="neg")
+    #     if front_raw is not None:
+    #         time_offset = (front_raw * all_multipliers[voltage_idx * 2] -
+    #                        all_delays[voltage_idx * 2])
+    #         print(time_offset)
+    #     else:
+    #         print("None")
 
     # data_folder_list = []
     # data_folder_list.append("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
@@ -737,7 +744,7 @@ if __name__ == '__main__':
     # LeCroy_fail_list = [1, 64, 76, 79, ]
     # for idx in range(len(file_list)):
     #     curves = []
-    #     if idx in DPO7054_fail_list:
+    #     if idx in DPO7054_fail_lis
     #         curves += [0, 1, 2, 3]
     #     if idx in HMO3004_fail_list:
     #         curves += [4, 5, 6, 7]
@@ -750,3 +757,35 @@ if __name__ == '__main__':
     # zero_log_filename = os.path.join(folder, "zero_curves.log")
     # with open(zero_log_filename, 'w') as f:
     #     f.write(log)
+
+    # UNION AND SAVE
+    group_size = 5
+    save_to = "///////////////////////////////////"
+    postfix = "_Data.csv"
+    grouped_list = []
+    save_as = []
+    file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
+    shots_count = len(file_list) / group_size
+    for shot in range(shots_count):
+        grouped_list.append([file_list[idx] for idx in
+                             range(shot, len(file_list), shots_count)])
+    num_start, num_end = \
+        sp.numbering_parser(names[0] for names in file_list)
+
+    for filename in (os.path.basename(name[0]) for name in grouped_list):
+        shot_number = filename[num_start: num_end]
+        if shot_number.lower().endswith(".csv"):
+            shot_number = shot_number[:-4]
+        save_as.append(os.path.join(save_to, shot_number + postfix))
+    for idx, group in enumerate(grouped_list):
+        print('Reading files: ', end='')
+        print(', '.join(group))
+        data = sp.read_csv_group(group, delimiter=";")
+        np.savetxt(save_as[idx], data, delimiter=",")
+        print('Saved as: {}'.format(save_as[idx]))
+    '''grouped_list == [
+                        ['file01_ch1.wfm', 'file01_ch2.wfm', ...], 
+                        ['file02_ch1.wfm', 'file02_ch2.wfm', ...],
+                        ...
+                     ] 
+        save_as == ['/path/file1.csv', '/path/file2.csv', ...]'''

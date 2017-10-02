@@ -540,7 +540,7 @@ if __name__ == "__main__":
             data = BS(fid, 'lxml-xml').find('setup')
         shots = data.find_all('shot')
         temp = data.find('savewithpostfix')
-        print("No tag found: type={}  value={}  text={}".format(type(temp), temp, temp.text.strip('\'" ')))
+        print("Tag found: type={}  value={}  text={}".format(type(temp), temp, temp.text.strip('\'" ')))
         print(type(shots))
         for item in shots:
             print(type(item))

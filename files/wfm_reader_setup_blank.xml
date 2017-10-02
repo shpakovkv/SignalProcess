@@ -16,6 +16,10 @@
 			<savewithpostfix> 	tag with filename postfix for output files (default is '')
 
 		Tag <shot> may contain:
+			<shot number="42">  Optional arg 'number' is one-based index of the shot. If you omit this parameter in 
+								all tags <shot>, then all the specified tags will be numbered consecutively from 1 (by default).
+								You may specify folder with data files and global parameters (start, step, count parameters of 
+								<args> tag inside the <setup> tag) and specify only <shot> with different parameters (by it's number)
 			<saveas> 			tag with output filename for corresponding shot (if not specified the filename will be: 
 								shot_number + postfix + '.csv' (example for shot_0003: "0003_DPO7054.csv"))
 			<args> 				tag with import parameters:
@@ -37,7 +41,7 @@
 	</shot>
 	<shot>
 		<args count="20">
-		<filename>0002_Ch1.wfm</filename>
+		<filename null="true">0002_Ch1.wfm</filename>
 		<filename>0002_Ch2.wfm</filename>
 		<filename>0002_Ch3.wfm</filename>
 		<filename>0002_Ch4.wfm</filename>
