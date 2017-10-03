@@ -436,15 +436,6 @@ def combine_lecroy_csv(dir_path,
     return data
 
 
-def add_new_dir_to_path(old_leaf_dir, new_parent_dir):
-    # adds last dir name from old_leaf_dir to new_parent_dir path
-    # dir_name = re.search(r'[^/]+/$', old_leaf_dir).group(0)
-    if old_leaf_dir.endswith("/") or old_leaf_dir.endswith("\\"):
-        old_leaf_dir = old_leaf_dir[0:-1]
-    dir_name = os.path.basename(old_leaf_dir)
-    return os.path.join(new_parent_dir, dir_name)    # new leaf dir
-
-
 def add_zeros_to_filename(full_path, count):
     # adds zeros to number in filename
     # Example: f("shoot22.csv", 4) => "shoot0022.csv"
@@ -484,6 +475,15 @@ def read_csv_group(group_of_files,
         new_data = np.genfromtxt(group_of_files[i], delimiter=delimiter, skip_header=skip_header, usecols=usecols)
         data = np.c_[data, new_data]  # adds data to the array
     return data
+
+
+def add_new_dir_to_path(old_leaf_dir, new_parent_dir):
+    # adds last dir name from old_leaf_dir to new_parent_dir path
+    # dir_name = re.search(r'[^/]+/$', old_leaf_dir).group(0)
+    if old_leaf_dir.endswith("/") or old_leaf_dir.endswith("\\"):
+        old_leaf_dir = old_leaf_dir[0:-1]
+    dir_name = os.path.basename(old_leaf_dir)
+    return os.path.join(new_parent_dir, dir_name)    # new leaf dir
 
 
 def compare_2_files(first_file_name, second_file_name, lines=30):
