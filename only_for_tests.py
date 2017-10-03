@@ -393,29 +393,54 @@ def plot_single_curve(curve, peaks=None, xlim=None,
         plt.show()
     plt.close('all')
 
+def calc_ylim(time, y, time_bounds=None, reserve=0.1):
+    if time_bounds is None:
+        time_bounds = (None, None)
+    if time_bounds[0] is None:
+        time_bounds = (time[0], time_bounds[1])
+    if time_bounds[1] is None:
+        time_bounds = (time_bounds[0], time[-1])
+    start = pp.find_nearest_idx(time, time_bounds[0], side='right')
+    stop = pp.find_nearest_idx(time, time_bounds[1], side='left')
+    y_max = np.amax(y[start:stop])
+    y_min = np.amin(y[start:stop])
+    y_range = y_max - y_min
+    reserve *= y_range
+    if y_max == 0 and y_min == 0:
+        y_max = 1.4
+        y_min = -1.4
+    return y_min - reserve, y_max + reserve
+
 
 def plot_peaks_all(data, peak_data, curves_list, xlim=None,
                    show=False, save=False, save_as=""):
+    from cycler import cycler
     plt.close('all')
     fig, axes = plt.subplots(len(curves_list), 1, sharex='all')
-    colors = "grcmy"
+    colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
+              '#8c564b', '#17becf', '#bcbd22', '#e377c2']
     for wf in range(len(curves_list)):
         axes[wf].plot(data.time(curves_list[wf]),
-                      data.value(curves_list[wf]), '-b')
+                      data.value(curves_list[wf]), '-', color='#999999', linewidth=0.5)
         if xlim is not None:
             axes[wf].set_xlim(xlim)
+            axes[wf].set_ylim(calc_ylim(data.time(curves_list[wf]),
+                                        data.value(curves_list[wf]),
+                                        xlim, reserve=0.1))
         color_idx = 0
         if peak_data is not None:
             for pk in peak_data[wf]:
-                setup = "*" + colors[color_idx]
+                color = colors[color_idx]
                 color_idx += 1
                 if color_idx == len(colors):
                     color_idx = 0
                 if pk is not None:
-                    axes[wf].plot([pk.time], [pk.val], setup)
+                    axes[wf].plot([pk.time], [pk.val], '*', color=color, markersize=5)
+    # figManager = plt.get_current_fig_manager()
+    # figManager.window.showMaximized()
     if save:
         # print("Saving plot " + save_as)
-        plt.savefig(save_as)
+        plt.savefig(save_as, dpi=400)
         # print("Done!")
     if show:
         plt.show()
@@ -480,7 +505,8 @@ def go_peak_process(data_folder, curves_list, params, group_diff, single_file_na
         if plot_filename.upper().endswith('.CSV'):
             plot_filename = plot_filename[:-4]
         plot_filename += ".plot.png"
-        plot_peaks_all(data, peak_data, curves_list, [-200, 750],
+        plot_peaks_all(data, peak_data, curves_list,
+                       params.get("time_bounds", None),
                        save=True, save_as=plot_filename)
         add_to_log("Saving all peaks as " + plot_filename)
         for idx in range(len(curves_list)):
@@ -555,7 +581,8 @@ def test_peak_process(filename, curves_list, params, save=False):
     add_to_log("Grouping peaks...")
     peak_data, peak_map = pp.group_peaks(peaks, 25)
 
-    plot_peaks_all(data, peak_data, curves_list, [-200, 750],
+    plot_peaks_all(data, peak_data, curves_list,
+                   params.get("time_bounds", None),
                    show=True)
 
 
@@ -666,6 +693,8 @@ if __name__ == '__main__':
     # =================================================================
     # -----     MAIN     -----------------------------
     # =================================================================
+    # import sys
+    # filename = sys.argv[1]
 
     log = ""
     # make_final()
@@ -678,11 +707,12 @@ if __name__ == '__main__':
     #             "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
 
     filename = ("H:\\WORK\ERG\\2016\\2016 06 07 ERG\\"
-                "2016 06 07 UnitedData\\0005_Data.csv")
+                "2016 06 07 UnitedData\\0013_Data.csv")
+
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
-    params = {"level": -0.4, "diff_time": 4, "tnoise": 100, "graph": False,
+    params = {"level": -0.39, "diff_time": 9, "tnoise": 100, "graph": True,
               "time_bounds": [-100, 600], "noise_attenuation": 1.75}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13]
     group_params = 15
@@ -692,10 +722,11 @@ if __name__ == '__main__':
 
     # test_peak_process(filename, curves_list, params)
 
-    go_peak_process(data_folder, curves_list, params, group_params, filename)
-    # go_peak_process(data_folder, params, group_params)
+    # go_peak_process(data_folder, curves_list, params, group_params, filename)
+    # go_peak_process(data_folder, curves_list, params, group_params,)
     input("Press enter")
     replot_peaks(data_folder, curves_list, params, filename)
+    # replot_peaks(data_folder, curves_list, params)
 
     # OLD---------------------------------------------------------------------
     # data_file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
