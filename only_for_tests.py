@@ -42,7 +42,7 @@ def add_to_log(m="", end='\n'):
     print(m, end=end)
 
 
-def read_signals(file_list, file_type='csv'):
+def read_signals(file_list, file_type='csv', delimiter=","):
     '''
     Function returns SignalsData object filled with
     data from files in file_list.
@@ -70,7 +70,7 @@ def read_signals(file_list, file_type='csv'):
     if file_type.upper() == 'CSV':
         data = sp.SignalsData()
         for filename in file_list:
-            data.append(np.genfromtxt(filename, delimiter=','))
+            data.append(np.genfromtxt(filename, delimiter=delimiter))
         return data
     else:
         raise TypeError("Unknown type of file \"{}\"".format(type))
@@ -422,7 +422,7 @@ def plot_peaks_all(data, peak_data, curves_list, xlim=None,
     plt.close('all')
 
 
-def go_peak_process(data_folder, params, group_diff, single_file_name=None):
+def go_peak_process(data_folder, curves_list, params, group_diff, single_file_name=None):
     # data_folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #           "2017 05 12-19 ERG/2017 05 15 ERG Output FINAL")
     # save_peaks_to = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
@@ -433,7 +433,7 @@ def go_peak_process(data_folder, params, group_diff, single_file_name=None):
 
     # folder = "H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\TEMP\\"
 
-    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13]
     file_list = sp.get_file_list_by_ext(data_folder, ".CSV", sort=True)
     # GET PEAKS
     for filename in file_list:
@@ -493,7 +493,8 @@ def go_peak_process(data_folder, params, group_diff, single_file_name=None):
                 curve_filename = curve_filename[:-4]
             curve_filename += "_curve" + str(curves_list[idx]) + ".png"
             plot_single_curve(data.curves[curves_list[idx]], peak_data[idx],
-                              [-200, 750], save=True, save_as=curve_filename)
+                              params.get("time_bounds", None),
+                              save=True, save_as=curve_filename)
         add_to_log("Done!\n")
         if single_file_name is not None:
             break
@@ -535,14 +536,14 @@ def save_peaks_csv(filename, peaks):
     # print("Done!")
 
 
-def test_peak_process(filename, params, save=False):
+def test_peak_process(filename, curves_list, params, save=False):
     add_to_log("Reading " + filename)
     data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
     # data = np.genfromtxt(filename, delimiter=',')
     # data[:,1] = -data[:,1]
     # sp.save_ndarray_csv("pos_peaks.csv", data)
 
-    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     peaks = []
     add_to_log("Finding peaks...")
     for idx in curves_list:
@@ -570,8 +571,8 @@ def plot_one_curve_peaks(filename, idx, params):
     add_to_log(peak_log, end="")
     # add_to_log("Grouping peaks...")
     # peak_data, peak_map = pp.group_peaks(peaks, 25)
-    plot_single_curve(data.curves[idx], peaks[0], xlim=[-200, 750],
-                      show=True)
+    plot_single_curve(data.curves[idx], peaks[0],
+                      xlim=params.get("time_bounds", None), show=True)
     # plot_peaks_all(data, peak_data, curves_list, [-200, 750],
     #                show=True)
 
@@ -595,7 +596,7 @@ def read_peaks_group(filename):
     peaks = []
     for idx in range(data.shape[0]):
         peaks.append([])    # new group
-        new_peak = pp.SinglePeak(time=data[idx, 1], value=data[idx,2])
+        new_peak = pp.SinglePeak(time=data[idx, 1], value=data[idx, 2])
         if new_peak.time != 0 and new_peak.val != 0:
             peaks[idx].append(new_peak)
         else:
@@ -609,7 +610,7 @@ def read_all_groups(file_list):
     else:
         groups = read_peaks_group(file_list[0])
         curves_number = len(groups)
-        for file_idx in range(1,len(file_list)):
+        for file_idx in range(1, len(file_list)):
             new_group = read_peaks_group(file_list[file_idx])
             for wf in range(curves_number):     # wavefrorm number
                 groups[wf].append(new_group[wf][0])
@@ -620,12 +621,12 @@ def peak_gr_file_list(data_file, folder):
     data_file_name = os.path.basename(data_file)
     data_file_name = data_file_name[0:-4]
     peak_file_list = []
-    for name in sp.get_file_list_by_ext(folder, '.csv',sort=True):
+    for name in sp.get_file_list_by_ext(folder, '.csv', sort=True):
         if os.path.basename(name).startswith(data_file_name):
             peak_file_list.append(name)
     return peak_file_list
 
-def plot_peaks_from_file(data_file, peaks_folder):
+def plot_peaks_from_file(data_file, peaks_folder, curves_list, params):
     peak_file_list = peak_gr_file_list(data_file, peaks_folder)
     peaks = read_all_groups(peak_file_list)
     if peaks is None:
@@ -634,21 +635,30 @@ def plot_peaks_from_file(data_file, peaks_folder):
         print("Number of peaks: {}".format(len(peaks[0])))
 
     data = sp.SignalsData(np.genfromtxt(data_file, delimiter=','))
-    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13]
     plot_name = os.path.basename(data_file)
     plot_name = plot_name[0:-4] + ".plot.png"
     plot_name = os.path.join(peaks_folder, plot_name)
     print("Saving as " + plot_name)
-    plot_peaks_all(data, peaks, curves_list, xlim=[-200, 750],
+    plot_peaks_all(data, peaks, curves_list,
+                   xlim=params.get("time_bounds", None),
                    save=True, save_as=plot_name)
 
 
-def union_and_save(path_list, save_to, postfix="", prefix=""):
-    if not os.path.isdir(save_to):
-        os.makedirs(save_to)
-    for path in path_list:
-        assert os.path.isdir(path), \
-            "Can not find directory {}".format(path)
+def replot_peaks(path, curves_list, params, filename=None):
+    data_file_list = sp.get_file_list_by_ext(path, ".csv", sort=True)
+    current_peaks_folder = os.path.join(path, "Peaks_all")
+    assert os.path.isdir(current_peaks_folder), \
+        "Can not find folder with peaks data '" + current_peaks_folder + "'."
+    if filename is not None:
+        print("Reading " + filename)
+        plot_peaks_from_file(filename, current_peaks_folder, curves_list, params)
+        print("Done!\n")
+    else:
+        for idx, name in enumerate(data_file_list):
+            print("Reading " + name)
+            plot_peaks_from_file(name, current_peaks_folder, curves_list, params)
+            print("Done!\n")
 
 
 
@@ -659,33 +669,35 @@ if __name__ == '__main__':
 
     log = ""
     # make_final()
-
     # save_curve(0, 6)
-    # test_peak_process("file0_curve6.csv")
-    # test_peak_process("file1_curve11.csv")
-    # test_peak_process("file2_curve11.csv")
+
     # filename = ("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
     #             "2017 05 13 ERG Output FINAL\\ERG_106.csv")
 
     # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #             "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
 
-    filename = ("C:\\WORK\\2014\\2014 11 14 ERG\\"
-                "2014 11 14 TDS Neutron\\0001 osc1.csv")
+    filename = ("H:\\WORK\ERG\\2016\\2016 06 07 ERG\\"
+                "2016 06 07 UnitedData\\0005_Data.csv")
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
-    params = {"level": -0.3, "diff_time": 15, "tnoise": 100, "graph": False,
-              "time_bounds": [-200, 750], "noise_attenuation": 1.75}
-    group_params = 25
+    params = {"level": -0.4, "diff_time": 4, "tnoise": 100, "graph": False,
+              "time_bounds": [-100, 600], "noise_attenuation": 1.75}
+    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13]
+    group_params = 15
     curve_idx = 8
 
     # plot_one_curve_peaks(filename, curve_idx, params)
 
-    # test_peak_process(filename, params)
+    # test_peak_process(filename, curves_list, params)
 
-    # go_peak_process(data_folder, params, group_params, filename)
+    go_peak_process(data_folder, curves_list, params, group_params, filename)
+    # go_peak_process(data_folder, params, group_params)
+    input("Press enter")
+    replot_peaks(data_folder, curves_list, params, filename)
 
+    # OLD---------------------------------------------------------------------
     # data_file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
     # for name in data_file_list:
     #     voltage_front_level = -0.2
@@ -725,10 +737,10 @@ if __name__ == '__main__':
     #     for name in data_file_list:
     #         print("Reading " + name)
     #         current_peaks_folder = os.path.join(item, "Peaks_all")
-    #         plot_peaks_from_file(name, current_peaks_folder)
+    #         plot_peaks_from_file(name, current_peaks_folder, curves_list, params)
     #         print("Done!\n")
 
-    # plot_peaks_from_file(filename, peaks_folder)
+    # plot_peaks_from_file(filename, peaks_folder, curves_list, params)
 
     # sp.compare_files_in_folder("H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\"
     #                            "2017 05 13-19 ERG Output final\\"
@@ -758,19 +770,37 @@ if __name__ == '__main__':
     # with open(zero_log_filename, 'w') as f:
     #     f.write(log)
 
+    '''
     # UNION AND SAVE
     group_size = 5
-    save_to = "///////////////////////////////////"
+    data_folder = "H:\\WORK\\ERG\\2016\\2016 06 13 ERG\\2016 06 13 DataSheets"
+    # data_folder = "H:\\WORK\\ERG\\2016\\2016 06 13 ERG\\2016 06 13 DataSheets"
+    save_to = "H:\\WORK\\ERG\\2016\\2016 06 13 ERG\\2016 06 13 UnitedData"
+    if not os.path.isdir((save_to)):
+        os.makedirs(save_to)
     postfix = "_Data.csv"
     grouped_list = []
     save_as = []
     file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
-    shots_count = len(file_list) / group_size
+    # # REPLACE DELIMITERS
+    # import re
+    # for name in file_list:
+    #     print(name)
+    #     with open(name, 'r') as fid:
+    #         lines = fid.readlines()
+    #         for idx, line in enumerate(lines):
+    #             lines[idx] = re.sub(r',', '.', line)
+    #             lines[idx] = re.sub(r';', ',', lines[idx])
+    #     with open(name, 'w') as fid:
+    #         fid.writelines(lines)
+    # raise Exception("STOP IT!")
+
+    shots_count = len(file_list) // group_size
     for shot in range(shots_count):
         grouped_list.append([file_list[idx] for idx in
                              range(shot, len(file_list), shots_count)])
     num_start, num_end = \
-        sp.numbering_parser(names[0] for names in file_list)
+        sp.numbering_parser(names[0] for names in grouped_list)
 
     for filename in (os.path.basename(name[0]) for name in grouped_list):
         shot_number = filename[num_start: num_end]
@@ -780,12 +810,13 @@ if __name__ == '__main__':
     for idx, group in enumerate(grouped_list):
         print('Reading files: ', end='')
         print(', '.join(group))
-        data = sp.read_csv_group(group, delimiter=";")
-        np.savetxt(save_as[idx], data, delimiter=",")
+        data = read_signals(group, delimiter=",")
+        np.savetxt(save_as[idx], data.get_array(), delimiter=",")
         print('Saved as: {}'.format(save_as[idx]))
-    '''grouped_list == [
-                        ['file01_ch1.wfm', 'file01_ch2.wfm', ...], 
-                        ['file02_ch1.wfm', 'file02_ch2.wfm', ...],
-                        ...
-                     ] 
-        save_as == ['/path/file1.csv', '/path/file2.csv', ...]'''
+    # grouped_list == [
+    #                     ['file01_ch1.wfm', 'file01_ch2.wfm', ...], 
+    #                     ['file02_ch1.wfm', 'file02_ch2.wfm', ...],
+    #                     ...
+    #                  ] 
+    #     save_as == ['/path/file1.csv', '/path/file2.csv', ...]
+    '''
