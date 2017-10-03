@@ -395,15 +395,17 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     # строим проверочные графики, если это необходимо
     if graph:
         # plotting curve
-        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-b')
+        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-', color='#8888bb')
         pyplot.xlim(time_bounds)
         # plotting level line
-        pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':g')
+        pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':', color='#80ff80')
         # marking overall peaks
         peaks_x = [p.time for p in peak_list]
         peaks_y = [p.val for p in peak_list]
-        pyplot.plot(peaks_x, peaks_y, 'og')
-        pyplot.plot(peaks_x, peaks_y, '*r')
+        pyplot.scatter(peaks_x, peaks_y, s=50, edgecolors='#ff7f0e', facecolors='none', linewidths=2)
+        pyplot.scatter(peaks_x, peaks_y, s=80, edgecolors='#dd3328', facecolors='none', linewidths=2)
+        # pyplot.plot(peaks_x, peaks_y, 'o', color='#ff550e', facecolors='none')
+        # pyplot.plot(peaks_x, peaks_y, 'xb', markersize=9)
         pyplot.show()
 
     return peak_list, peak_log
