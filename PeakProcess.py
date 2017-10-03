@@ -553,10 +553,13 @@ def group_peaks(data, window):
             # if we are here then the X-position of current peak of curve[curve_i]
             # is to the right of current group by more than dt
             # so go to the next group
+            '''
             print()
             for cr_dat in peak_data:
-                tmp_list = ["[{} : {}]".format(*local_peak.xy) if local_peak is not None else "[.....]" for local_peak in cr_dat]
+                tmp_list = ["[{} : {}]".format(*local_peak.xy) 
+                            if local_peak is not None else "[.....]" for local_peak in cr_dat]
                 print("  |\t".join(tmp_list))
+            '''
             if gr < len(peak_time) - 1:
                 gr += 1
     # END OF GROUPING
