@@ -379,12 +379,14 @@ def plot_single_curve(curve, peaks=None, xlim=None,
     plt.close('all')
     if xlim is not None:
         plt.xlim(xlim)
-    plt.plot(curve.time, curve.val, '-b')
+    plt.plot(curve.time, curve.val, '-', color='#999999', linewidth=0.5)
 
     if peaks is not None:
         peak_x = [peak.time for peak in peaks if peak is not None]
         peak_y = [peak.val for peak in peaks if peak is not None]
-        plt.plot(peak_x, peak_y, 'or')
+        # plt.plot(peak_x, peak_y, 'or')
+        plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e', facecolors='none', linewidths=2)
+        plt.scatter(peak_x, peak_y, s=80, edgecolors='#dd3328', facecolors='none', linewidths=2)
         # plt.plot(peak_x, peak_y, '*g')
     if save:
         # print("Saveing " + save_as)
@@ -707,12 +709,12 @@ if __name__ == '__main__':
     #             "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
 
     filename = ("H:\\WORK\ERG\\2016\\2016 06 07 ERG\\"
-                "2016 06 07 UnitedData\\0013_Data.csv")
+                "2016 06 07 UnitedData\\0025_Data.csv")
 
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
-    params = {"level": -0.39, "diff_time": 9, "tnoise": 100, "graph": True,
+    params = {"level": -0.4, "diff_time": 10, "tnoise": 100, "graph": True,
               "time_bounds": [-100, 600], "noise_attenuation": 1.75}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13]
     group_params = 15
@@ -722,7 +724,7 @@ if __name__ == '__main__':
 
     # test_peak_process(filename, curves_list, params)
 
-    # go_peak_process(data_folder, curves_list, params, group_params, filename)
+    go_peak_process(data_folder, curves_list, params, group_params, filename)
     # go_peak_process(data_folder, curves_list, params, group_params,)
     input("Press enter")
     replot_peaks(data_folder, curves_list, params, filename)
