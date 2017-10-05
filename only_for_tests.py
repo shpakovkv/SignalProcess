@@ -708,15 +708,15 @@ if __name__ == '__main__':
     # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #             "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
 
-    filename = ("H:\\WORK\ERG\\2016\\2016 06 07 ERG\\"
-                "2016 06 07 UnitedData\\0025_Data.csv")
+    filename = ("H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\"
+                "2015 06 25 UnitedData\\ERG_002.csv")
 
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
-    params = {"level": -0.4, "diff_time": 10, "tnoise": 100, "graph": True,
-              "time_bounds": [-100, 600], "noise_attenuation": 1.75}
-    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13]
+    params = {"level": -0.26, "diff_time": 30, "tnoise": 100, "graph": True,
+              "time_bounds": [-100, 600], "noise_attenuation": 0.75}
+    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     group_params = 15
     curve_idx = 8
 
@@ -724,10 +724,13 @@ if __name__ == '__main__':
 
     # test_peak_process(filename, curves_list, params)
 
-    go_peak_process(data_folder, curves_list, params, group_params, filename)
+
     # go_peak_process(data_folder, curves_list, params, group_params,)
+
+    go_peak_process(data_folder, curves_list, params, group_params, filename)
     input("Press enter")
     replot_peaks(data_folder, curves_list, params, filename)
+
     # replot_peaks(data_folder, curves_list, params)
 
     # OLD---------------------------------------------------------------------
@@ -805,20 +808,22 @@ if __name__ == '__main__':
 
     '''
     # UNION AND SAVE
-    group_size = 5
-    data_folder = "H:\\WORK\\ERG\\2016\\2016 06 13 ERG\\2016 06 13 DataSheets"
-    # data_folder = "H:\\WORK\\ERG\\2016\\2016 06 13 ERG\\2016 06 13 DataSheets"
-    save_to = "H:\\WORK\\ERG\\2016\\2016 06 13 ERG\\2016 06 13 UnitedData"
+    group_size = 4
+    data_folder = "H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\Data_CSV"
+    save_to = "H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\2015 06 25 UnitedData"
     if not os.path.isdir((save_to)):
         os.makedirs(save_to)
-    postfix = "_Data.csv"
+    prefix = "ERG_"
+    postfix = ".csv"
     grouped_list = []
     save_as = []
     file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
+
     # # REPLACE DELIMITERS
+    # # for direct EXPORTED from OriginPro csv files
     # import re
     # for name in file_list:
-    #     print(name)
+    #     print("Replacing delimiters in " + name, end="    ")
     #     with open(name, 'r') as fid:
     #         lines = fid.readlines()
     #         for idx, line in enumerate(lines):
@@ -826,7 +831,8 @@ if __name__ == '__main__':
     #             lines[idx] = re.sub(r';', ',', lines[idx])
     #     with open(name, 'w') as fid:
     #         fid.writelines(lines)
-    # raise Exception("STOP IT!")
+    #     print("Done.")
+    # # raise Exception("STOP HERE!")
 
     shots_count = len(file_list) // group_size
     for shot in range(shots_count):
@@ -839,17 +845,11 @@ if __name__ == '__main__':
         shot_number = filename[num_start: num_end]
         if shot_number.lower().endswith(".csv"):
             shot_number = shot_number[:-4]
-        save_as.append(os.path.join(save_to, shot_number + postfix))
+        save_as.append(os.path.join(save_to, prefix + shot_number + postfix))
     for idx, group in enumerate(grouped_list):
-        print('Reading files: ', end='')
-        print(', '.join(group))
+        print('Reading files: ')
+        print('\n'.join(group))
         data = read_signals(group, delimiter=",")
         np.savetxt(save_as[idx], data.get_array(), delimiter=",")
         print('Saved as: {}'.format(save_as[idx]))
-    # grouped_list == [
-    #                     ['file01_ch1.wfm', 'file01_ch2.wfm', ...], 
-    #                     ['file02_ch1.wfm', 'file02_ch2.wfm', ...],
-    #                     ...
-    #                  ] 
-    #     save_as == ['/path/file1.csv', '/path/file2.csv', ...]
     '''
