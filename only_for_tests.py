@@ -437,7 +437,11 @@ def plot_peaks_all(data, peak_data, curves_list, xlim=None,
                 if color_idx == len(colors):
                     color_idx = 0
                 if pk is not None:
-                    axes[wf].plot([pk.time], [pk.val], '*', color=color, markersize=5)
+                    # axes[wf].plot([pk.time], [pk.val], '*',
+                    #               color=color, markersize=5)
+                    axes[wf].scatter([pk.time], [pk.val], s=20,
+                                     edgecolors=color, facecolors='none',
+                                     linewidths=1.5)
     # figManager = plt.get_current_fig_manager()
     # figManager.window.showMaximized()
     if save:
@@ -714,7 +718,7 @@ if __name__ == '__main__':
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
-    params = {"level": -0.26, "diff_time": 30, "tnoise": 100, "graph": True,
+    params = {"level": -0.5, "diff_time": 30, "tnoise": 100, "graph": True,
               "time_bounds": [-100, 600], "noise_attenuation": 0.75}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     group_params = 15
