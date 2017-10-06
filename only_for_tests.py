@@ -675,7 +675,7 @@ def plot_peaks_from_file(data_file, peaks_folder, curves_list, params):
     print("Saving as " + plot_name)
     plot_peaks_all(data, peaks, curves_list,
                    xlim=params.get("time_bounds", None),
-                   save=True, save_as=plot_name)
+                   show=True, save=True, save_as=plot_name)
 
 
 def replot_peaks(path, curves_list, params, filename=None):
@@ -712,30 +712,58 @@ if __name__ == '__main__':
     # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #             "2017 05 12-19 ERG/2017 05 19 ERG Output FINAL/ERG_020.csv")
 
-    filename = ("H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\"
-                "2015 06 25 UnitedData\\ERG_002.csv")
+    # filename = ("H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\"
+    #             "2015 06 25 UnitedData\\ERG_002.csv")
+
+    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/2015 06 25 ERG/"
+                "2015 06 25 UnitedData/ERG_006.csv")
 
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
-    params = {"level": -0.5, "diff_time": 30, "tnoise": 100, "graph": True,
-              "time_bounds": [-100, 600], "noise_attenuation": 0.75}
+    params = {"level": -0.44, "diff_time": 8, "tnoise": 80, "graph": True,
+              "time_bounds": [-100, 500], "noise_attenuation": 0.57}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     group_params = 15
     curve_idx = 8
 
-    # plot_one_curve_peaks(filename, curve_idx, params)
+    go_peak_process(data_folder, curves_list, params, group_params, filename)
+    try:
+        input("Press enter >> ")
+    except:
+        pass
 
-    # test_peak_process(filename, curves_list, params)
-
+    replot_peaks(data_folder, curves_list, params, filename)
+    raise Exception("STOP HERE!")
 
     # go_peak_process(data_folder, curves_list, params, group_params,)
-
-    go_peak_process(data_folder, curves_list, params, group_params, filename)
-    input("Press enter")
-    replot_peaks(data_folder, curves_list, params, filename)
-
     # replot_peaks(data_folder, curves_list, params)
+
+    # plot_one_curve_peaks(filename, curve_idx, params)
+    # test_peak_process(filename, curves_list, params)
+
+    # CORR DATA
+    # single file
+    multipliers = None
+    delays = [0, 0,  # 0 grad
+              0, 0,  # 10 grad
+              0, 0,  # 20 grad
+              0, 0,  # 30 grad
+              -20, 0,  # 40 grad
+              -20, -0.33,  # 50 grad
+              -20, 0,  # 60 grad
+              -20, 0,  # 70 grad
+              0, 0,  # 80 grad
+              0, 0,  # 90 grad
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    print("Reading " + filename)
+    data = read_signals([filename], file_type='csv', delimiter=",")
+    print("Applying multipliers and delays...", )
+    data = sp.multiplier_and_delay(data, multipliers, delays)
+    print("Saving...")
+    sp.save_ndarray_csv(filename, data.get_array())
+    print("Done.")
 
     # OLD---------------------------------------------------------------------
     # data_file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
