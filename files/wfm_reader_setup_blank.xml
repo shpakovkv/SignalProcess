@@ -42,9 +42,9 @@
 	<shot>
 		<args count="20">
 		<filename null="true">0002_Ch1.wfm</filename>
-		<filename>0002_Ch2.wfm</filename>
-		<filename>0002_Ch3.wfm</filename>
-		<filename>0002_Ch4.wfm</filename>
+		<filename null="true">0002_Ch2.wfm</filename>
+		<filename null="true">0002_Ch3.wfm</filename>
+		<filename null="true">0002_Ch4.wfm</filename>
 		<saveas>0002_ERG_failed_record.csv</saveas>
 	</shot>
 	<shot>
