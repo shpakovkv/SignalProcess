@@ -212,7 +212,7 @@ def find_voltage_front(curve,
 
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                 tnoise=None, is_negative=True, graph=False,
-                noise_attenuation=0.5):
+                noise_attenuation=0.5, debug=False):
     # Поиск пиков (положительных или отрицательных)
     # Пример:
     # Peaks = PeakFinder_v4( x, y, -1, 5E-9, 0.8, 5E-9, 1);
@@ -277,6 +277,9 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     if start_idx is None or stop_idx is None:
         peak_log += "Time bounds is out of range.\n"
         return [], peak_log
+    diff_idx = int(diff_time // (x[1] - x[0]))
+    if debug:
+        print("Diff_time = {}, Diff_idx = {}".format(diff_time, diff_idx))
 
     peak_list = []
     # ==========================================================================
@@ -295,12 +298,17 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
             while (i <= stop_idx and
                    (x[i] - x[max_idx] <= diff_time or
                     y[i] == max_y)):
+                if x[i] > 82 and x[i] < 83:
+                    pass
+                temp01 = y[i]
+                temp02 = x[i]
                 if y[i] > max_y:
                     # сохранение текущих максимальных значений
                     max_y = y[i]
                     max_idx = i
                 i += 1
-            # print("local_max = [{}, {}]".format(x[max_idx], max_y))
+            if debug:
+                print("local_max = [{:.3f}, {:.3f}] i={}".format(x[max_idx], max_y, max_idx))
 
             # print('Found max element')
             # перебираем точки слева от пика в пределах diff_time
@@ -314,8 +322,9 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                                                window=diff_time,
                                                is_positive=True)
             # print('Right window check completed.')
-            # if is_noise:
-            #     print('Left Excess at x(' + str([x(j), y(j)]) + ')')
+            if debug and is_noise:
+                print('Left Excess at x({:.2f}, {:.2f}) '
+                      '== Not a peak at front fall!'.format(x[i], y[i]))
 
             # проверка пика (наводка или нет)
             # перебираем от max_idx справа все точки в пределах tnoise
@@ -332,19 +341,19 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                                                    window=tnoise,
                                                    is_positive=False)
 
-                if is_noise:
-                    i = j
+                if debug and is_noise:
+                    print('Noise to the right x({:.2f}, {:.2f})'.format(x[j], y[j]))
                 else:
                     # проверка на наводку в другую сторону от max_idx
-                    [is_noise, _] = level_excess_check(x,
+                    [is_noise, j] = level_excess_check(x,
                                                        y,
                                                        -max_y * noise_attenuation,
                                                        start=max_idx,
                                                        step=-1,
                                                        window=tnoise,
                                                        is_positive=False)
-                    # if is_noise:
-                    #     print('Noise at x(' + str([x(j), y(j)]) + ')')
+                    if debug and is_noise:
+                        print('Noise to the left x({:.2f}, {:.2f})'.format(x[j], y[j]))
 
             # если не наводка, то записываем
             if not is_noise:
