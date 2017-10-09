@@ -513,7 +513,7 @@ def go_peak_process(data_folder, curves_list, params, group_diff, single_file_na
         plot_filename += ".plot.png"
         plot_peaks_all(data, peak_data, curves_list,
                        params.get("time_bounds", None),
-                       save=True, save_as=plot_filename)
+                       save=True, save_as=plot_filename, show=True)
         add_to_log("Saving all peaks as " + plot_filename)
         for idx in range(len(curves_list)):
             curve_filename = os.path.join(data_folder, "Peaks_single")
@@ -715,16 +715,16 @@ if __name__ == '__main__':
     # filename = ("H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\"
     #             "2015 06 25 UnitedData\\ERG_002.csv")
 
-    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/2015 06 25 ERG/"
-                "2015 06 25 UnitedData/ERG_006.csv")
+    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
+                "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_003.csv")
 
     data_folder = os.path.dirname(filename)
     peaks_folder = os.path.join(data_folder, "Peaks_all")
 
-    params = {"level": -0.44, "diff_time": 8, "tnoise": 80, "graph": True,
-              "time_bounds": [-100, 500], "noise_attenuation": 0.57}
+    params = {"level": -0.44, "diff_time":12, "tnoise": 40, "graph": True,
+              "time_bounds": [-100, 500], "noise_attenuation": 0.87}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    group_params = 15
+    group_params = 20
     curve_idx = 8
 
     go_peak_process(data_folder, curves_list, params, group_params, filename)
@@ -749,10 +749,10 @@ if __name__ == '__main__':
               0, 0,  # 10 grad
               0, 0,  # 20 grad
               0, 0,  # 30 grad
-              -20, 0,  # 40 grad
-              -20, -0.33,  # 50 grad
-              -20, 0,  # 60 grad
-              -20, 0,  # 70 grad
+              -19, 0,  # 40 grad
+              -19, 0,  # 50 grad
+              -19, 0,  # 60 grad
+              -19, 0,  # 70 grad
               0, 0,  # 80 grad
               0, 0,  # 90 grad
               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -842,7 +842,11 @@ if __name__ == '__main__':
     # UNION AND SAVE
     group_size = 4
     data_folder = "H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\Data_CSV"
+    data_folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
+                   "2015 05 15 ERG VNIIA/2015 05 15 DataSheets")
     save_to = "H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\2015 06 25 UnitedData"
+    save_to = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
+               "2015 05 15 ERG VNIIA/2015 05 15 UnitedData")
     if not os.path.isdir((save_to)):
         os.makedirs(save_to)
     prefix = "ERG_"
