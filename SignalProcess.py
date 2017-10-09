@@ -752,19 +752,21 @@ def numbering_parser(group):
     num_count = len(numbers[0])
     if len(numbers) == 1:
         return (numbers[0][0]['start'], numbers[0][0]['end'])
-    for num_idx in range(num_count):
-        unique = True
-        for file_idx in range(len(names)):
-            name = names[file_idx]
 
     for match_idx in range(num_count):
-        unique = all(all(numbers[num][match_idx]['num'] not in names[name_idx]
-                         for name_idx in range(len(names))
-                         if name_idx != num) for num in range(len(names)))
+        unique = True
+        for num in range(len(names)):
+            for name_idx in range(len(names)):
+                start = numbers[num][match_idx]['start']
+                end = numbers[num][match_idx]['end']
+                if num != name_idx and numbers[num][match_idx]['num'] == names[name_idx][start:end]:
+                    unique = False
+                    break
+            if not unique:
+                break
         if unique:
             return (numbers[0][match_idx]['start'],
                     numbers[0][match_idx]['end'])
-
     return (0, len(names[0]))
 
 
