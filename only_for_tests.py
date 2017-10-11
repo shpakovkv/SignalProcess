@@ -55,6 +55,7 @@ def read_signals(file_list, file_type='csv', delimiter=","):
 
     returns -- SignalsData object
     '''
+
     # check inputs
     if isinstance(file_list, str):
         file_list = [file_list]
@@ -67,7 +68,7 @@ def read_signals(file_list, file_type='csv', delimiter=","):
             raise Exception("File \"{}\" not found.".format(filename))
 
     # read
-    if file_type.upper() == 'CSV':
+    if file_type.upper() == "CSV":
         data = sp.SignalsData()
         for filename in file_list:
             data.append(np.genfromtxt(filename, delimiter=delimiter))
@@ -453,7 +454,8 @@ def plot_peaks_all(data, peak_data, curves_list, xlim=None,
     plt.close('all')
 
 
-def go_peak_process(data_folder, curves_list, params, group_diff, single_file_name=None):
+def go_peak_process(data, curves_list, params, group_diff,
+                    filename=None):
     # data_folder = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
     #           "2017 05 12-19 ERG/2017 05 15 ERG Output FINAL")
     # save_peaks_to = ("/media/shpakovkv/6ADA8899DA886365/WORK/2017/"
@@ -464,80 +466,71 @@ def go_peak_process(data_folder, curves_list, params, group_diff, single_file_na
 
     # folder = "H:\\WORK\\ERG\\2017\\2017 05 12-19 ERG\\TEMP\\"
 
-    # curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13]
-    file_list = sp.get_file_list_by_ext(data_folder, ".CSV", sort=True)
     # GET PEAKS
-    for filename in file_list:
-        if single_file_name is not None:
-            filename = single_file_name
-        add_to_log("Reading " + filename)
-        data = sp.SignalsData(np.genfromtxt(filename, delimiter=','))
-        add_to_log("Curves count = " + str(data.count) + "\n")
-        peaks = []
-        for idx in curves_list:
-            # sp.save_ndarray_csv("neg_peaks.csv", data.curves[idx].data)
-            add_to_log("Curve #" + str(idx), end="    ")
-            new_peaks, peak_log = pp.peak_finder(
-                data.time(idx), data.value(idx), **params)
-            peaks.append(new_peaks)
-            add_to_log(peak_log, end="")
+    add_to_log("Curves count = " + str(data.count) + "\n")
+    peaks = []
+    for idx in curves_list:
+        # sp.save_ndarray_csv("neg_peaks.csv", data.curves[idx].data)
+        y_zero_offset = get_y_zero_offset(data.curves[idx], -100, 0)
+        print("Curve #{} Y zero offset = {}".format(idx, y_zero_offset))
+        add_to_log("Curve #" + str(idx), end="    ")
+        new_peaks, peak_log = pp.peak_finder(
+            data.time(idx), data.value(idx), **params)
+        peaks.append(new_peaks)
+        add_to_log(peak_log, end="")
 
-        # max_peaks = max([len(x) for x in peaks])
-        # for pk in range(max_peaks):
-        #     for wf in range(len(peaks)):
-        #         try:
-        #             s = str(peaks[wf][pk].time)
-        #         except IndexError:
-        #             s = "---------"
-        #         print(s, end="\t")
-        #     print()
-        # print()
+    # max_peaks = max([len(x) for x in peaks])
+    # for pk in range(max_peaks):
+    #     for wf in range(len(peaks)):
+    #         try:
+    #             s = str(peaks[wf][pk].time)
+    #         except IndexError:
+    #             s = "---------"
+    #         print(s, end="\t")
+    #     print()
+    # print()
 
-        # GROUP PEAKS
-        peak_data, peak_map = pp.group_peaks(peaks, group_diff)
-        # for gr in range(len(peak_map[0])):
-        #     for wf in range(len(peak_map)):
-        #         print(peak_map[wf][gr], end="\t")
-        #     print()
+    # GROUP PEAKS
+    peak_data, peak_map = pp.group_peaks(peaks, group_diff)
+    # for gr in range(len(peak_map[0])):
+    #     for wf in range(len(peak_map)):
+    #         print(peak_map[wf][gr], end="\t")
+    #     print()
 
-        # GRAPH ALL PEAKS
-        add_to_log("Saving peaks and plots...")
-        peaks_filename = os.path.join(data_folder, "Peaks_all",
+    # GRAPH ALL PEAKS
+    add_to_log("Saving peaks and plots...")
+    peaks_filename = os.path.join(data_folder, "Peaks_all",
+                                  os.path.basename(filename))
+    save_peaks_csv(peaks_filename, peak_data)
+    # plt.show()
+    plot_filename = os.path.join(data_folder, "Peaks_all",
+                                 os.path.basename(filename))
+    if plot_filename.upper().endswith('.CSV'):
+        plot_filename = plot_filename[:-4]
+    plot_filename += ".plot.png"
+    plot_peaks_all(data, peak_data, curves_list,
+                   params.get("time_bounds", None),
+                   save=True, save_as=plot_filename, show=True)
+    add_to_log("Saving all peaks as " + plot_filename)
+    for idx in range(len(curves_list)):
+        curve_filename = os.path.join(data_folder, "Peaks_single")
+        if not os.path.isdir(curve_filename):
+            os.makedirs(curve_filename)
+        curve_filename = os.path.join(curve_filename,
                                       os.path.basename(filename))
-        save_peaks_csv(peaks_filename, peak_data)
-        # plt.show()
-        plot_filename = os.path.join(data_folder, "Peaks_all",
-                                     os.path.basename(filename))
-        if plot_filename.upper().endswith('.CSV'):
-            plot_filename = plot_filename[:-4]
-        plot_filename += ".plot.png"
-        plot_peaks_all(data, peak_data, curves_list,
-                       params.get("time_bounds", None),
-                       save=True, save_as=plot_filename, show=True)
-        add_to_log("Saving all peaks as " + plot_filename)
-        for idx in range(len(curves_list)):
-            curve_filename = os.path.join(data_folder, "Peaks_single")
-            if not os.path.isdir(curve_filename):
-                os.makedirs(curve_filename)
-            curve_filename = os.path.join(curve_filename,
-                                          os.path.basename(filename))
-            if curve_filename.upper().endswith('.CSV'):
-                curve_filename = curve_filename[:-4]
-            curve_filename += "_curve" + str(curves_list[idx]) + ".png"
-            plot_single_curve(data.curves[curves_list[idx]], peak_data[idx],
-                              params.get("time_bounds", None),
-                              save=True, save_as=curve_filename)
-        add_to_log("Done!\n")
-        if single_file_name is not None:
-            break
+        if curve_filename.upper().endswith('.CSV'):
+            curve_filename = curve_filename[:-4]
+        curve_filename += "_curve" + str(curves_list[idx]) + ".png"
+        plot_single_curve(data.curves[curves_list[idx]], peak_data[idx],
+                          params.get("time_bounds", None),
+                          save=True, save_as=curve_filename)
 
-    print("Saving log...")
-    log_filename = os.path.join(data_folder, "PeakProcess.log")
-    with open(log_filename, 'w') as f:
-        f.write(log)
-    print("Done!")
-    # input("Press Enter...")
-    # break
+    # print("Saving log...")
+    # log_filename = os.path.join(data_folder, "PeakProcess.log")
+    # with open(log_filename, 'w') as f:
+    #     f.write(log)
+    # print("Done!")
+    add_to_log("Done!\n")
 
 
 def save_peaks_csv(filename, peaks):
@@ -623,7 +616,7 @@ def save_curve_for_test(file_idx, curve_idx):
     print("Done!\n")
 
 
-def read_peaks_group(filename):
+def read_peak_group(filename):
     data = np.genfromtxt(filename, delimiter=',')
     sh = data.shape
     peaks = []
@@ -637,30 +630,62 @@ def read_peaks_group(filename):
     return peaks
 
 
+# def peak_gr_file_list(data_file, folder):
+#     data_file_name = os.path.basename(data_file)
+#     data_file_name = data_file_name[0:-4]
+#     peak_file_list = []
+#     for name in sp.get_file_list_by_ext(folder, '.csv', sort=True):
+#         if os.path.basename(name).startswith(data_file_name):
+#             peak_file_list.append(name)
+#     return peak_file_list
+
+
+def get_peak_files(data_file, peak_folder=None, peak_dir_name='Peaks_all'):
+    '''
+    Returns the list of the peak files for specified data file.
+    If peak files are not found or the folder containing 
+    peak data is not found, returns [].
+    
+    data_file       -- the path to the file with SignalsData
+                       The extension of the file must be '.csv'
+                       (case insensitive).
+    peaks_folder    -- the path to the files with peaks data
+                       The default is None, which means: 
+                       <data_file_path>/<peak_dir_name>
+    peak_dir_name   -- the name of the folder containing peak data
+                       Default == 'Peaks_all'
+    '''
+    assert os.path.isfile(data_file), \
+        "Error! Can not find file '{}'.".format(data_file)
+    path = os.path.dirname(data_file)
+    if peak_folder is None:
+        peak_folder = os.path.join(path, peak_dir_name)
+    if os.path.isdir(peak_folder):
+        data_file_name = os.path.basename(data_file)
+        data_file_name = data_file_name[0:-4]
+        peak_file_list = []
+        for name in sp.get_file_list_by_ext(peak_folder, '.csv', sort=True):
+            if os.path.basename(name).startswith(data_file_name):
+                peak_file_list.append(name)
+        return peak_file_list
+    return []
+
+
 def read_all_groups(file_list):
     if file_list is None or len(file_list) == 0:
         return None
     else:
-        groups = read_peaks_group(file_list[0])
+        groups = read_peak_group(file_list[0])
         curves_number = len(groups)
         for file_idx in range(1, len(file_list)):
-            new_group = read_peaks_group(file_list[file_idx])
+            new_group = read_peak_group(file_list[file_idx])
             for wf in range(curves_number):     # wavefrorm number
                 groups[wf].append(new_group[wf][0])
         return groups
 
 
-def peak_gr_file_list(data_file, folder):
-    data_file_name = os.path.basename(data_file)
-    data_file_name = data_file_name[0:-4]
-    peak_file_list = []
-    for name in sp.get_file_list_by_ext(folder, '.csv', sort=True):
-        if os.path.basename(name).startswith(data_file_name):
-            peak_file_list.append(name)
-    return peak_file_list
-
 def plot_peaks_from_file(data_file, peaks_folder, curves_list, params):
-    peak_file_list = peak_gr_file_list(data_file, peaks_folder)
+    peak_file_list = get_peak_files(data_file, peaks_folder)
     peaks = read_all_groups(peak_file_list)
     if peaks is None:
         print("No peaks.")
@@ -694,6 +719,68 @@ def replot_peaks(path, curves_list, params, filename=None):
             print("Done!\n")
 
 
+def get_y_zero_offset(signal, start_x, stop_x):
+    '''
+    Returns the Y zero level offset value.
+    Use it for zero level correction before PeakProcess.
+    
+    signal -- SingleCurve instance
+    start_x and stop_x -- define the limits of the 
+            X interval where Y is filled with noise only.
+    '''
+    if start_x < signal.time[0]:
+        start_x = signal.time[0]
+    if stop_x > signal.time[-1]:
+        stop_x = signal.time[-1]
+    assert stop_x > start_x, \
+        "Error! start_x value must be lower than stop_x value."
+    if start_x > signal.time[-1] or stop_x < signal.time[0]:
+        return 0
+
+    start_idx = pp.find_nearest_idx(signal.time, start_x, side='right')
+    stop_idx = pp.find_nearest_idx(signal.time, stop_x, side='left')
+    sum = 0.0
+    for val in signal.val[start_idx:stop_idx]:
+        sum += val
+    return sum / (stop_idx - start_idx + 1)
+
+
+def get_all_y_zero_offset(signals_data, curves_list, start_stop_tuples):
+    '''
+    Return delays list for all columns in SignalsData stored 
+    in filename_or_list. 
+    Delays for Y-columns will be filled with 
+    the Y zero level offset values for only specified curves.
+    For all other Y columns and for all X columns delay will be 0.
+    
+    Use it for zero level correction before PeakProcess.
+    
+    filename_or_list    -- file with data or list of files, 
+                           if the data stored in several files
+    curves_list         -- zero-based indices of curves for which 
+                           you want to find the zero level offset
+    start_stop_tuples   -- list of (start_x, stop_x) tuples for each 
+                           curves in curves list 
+    file_type           -- file type (Default = 'CSV')
+    delimiter           -- delimiter for csv files
+    '''
+
+    assert len(curves_list) == len(start_stop_tuples), \
+        "Error! The number of (start_x, stop_x) tuples ({}) " \
+        "does not match the number of specified curves " \
+        "({}).".format(len(start_stop_tuples), len(curves_list))
+
+    delays = [0 for _ in range(2 * data.count)]
+    for curve_idx in curves_list:
+        y_data_idx = curve_idx * 2 + 1
+        delays[y_data_idx] = get_y_zero_offset(signals_data.curves[curve_idx],
+                                               *start_stop_tuples[curve_idx])
+    # print("Delays = ")
+    # for i in range(0, len(delays), 2):
+    #     print("{}, {},".format(delays[i], delays[i + 1]))
+    return delays
+
+
 
 if __name__ == '__main__':
     # =================================================================
@@ -715,35 +802,16 @@ if __name__ == '__main__':
     # filename = ("H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\"
     #             "2015 06 25 UnitedData\\ERG_002.csv")
 
-    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
-                "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_003.csv")
-
-    data_folder = os.path.dirname(filename)
-    peaks_folder = os.path.join(data_folder, "Peaks_all")
-
-    params = {"level": -0.44, "diff_time":12, "tnoise": 40, "graph": True,
-              "time_bounds": [-100, 500], "noise_attenuation": 0.87}
-    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    group_params = 20
-    curve_idx = 8
-
-    go_peak_process(data_folder, curves_list, params, group_params, filename)
-    try:
-        input("Press enter >> ")
-    except:
-        pass
-
-    replot_peaks(data_folder, curves_list, params, filename)
-    raise Exception("STOP HERE!")
-
-    # go_peak_process(data_folder, curves_list, params, group_params,)
-    # replot_peaks(data_folder, curves_list, params)
-
-    # plot_one_curve_peaks(filename, curve_idx, params)
-    # test_peak_process(filename, curves_list, params)
-
-    # CORR DATA
-    # single file
+    start_stop_tuples = [(-100, 0),  # 0 grad
+                         (-100, 0),  # 10 grad
+                         (-100, 0),  # 20 grad
+                         (-100, 0),  # 30 grad
+                         (-100, 0),  # 40 grad
+                         (-100, 0),  # 50 grad
+                         (-100, 0),  # 60 grad
+                         (-100, 0),  # 70 grad
+                         (-100, 0),  # 80 grad
+                         (-100, 0), ]  # 90 grad
     multipliers = None
     delays = [0, 0,  # 0 grad
               0, 0,  # 10 grad
@@ -755,14 +823,75 @@ if __name__ == '__main__':
               -19, 0,  # 70 grad
               0, 0,  # 80 grad
               0, 0,  # 90 grad
-              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
+                "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_050.csv")
+
+    data_folder = os.path.dirname(filename)
+
+    params = {"level": -0.34, "diff_time": 9, "tnoise": 50, "graph": False,
+              "time_bounds": [-100, 500], "noise_attenuation": 0.75}
+    curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    group_params = 20
+    curve_idx = 8
 
     print("Reading " + filename)
     data = read_signals([filename], file_type='csv', delimiter=",")
+    for idx, new_val in enumerate(get_all_y_zero_offset(data, curves_list,
+                                                        start_stop_tuples)):
+        if new_val:
+            delays[idx] = new_val
+    print()
+    for idx in range(0, len(delays), 2):
+        if delays[idx]:
+            print("Col[{}] Curve[{}].X += {:.2f},"
+                  " ".format(idx, idx // 2, delays[idx]))
+    print()
+    for idx in range(0, len(delays), 2):
+        if delays[idx + 1]:
+            print("Col[{}] Curve[{}].Y += {:.2f},"
+                  " ".format(idx + 1, idx // 2, delays[idx + 1]))
+    print()
     print("Applying multipliers and delays...", )
     data = sp.multiplier_and_delay(data, multipliers, delays)
-    print("Saving...")
-    sp.save_ndarray_csv(filename, data.get_array())
+
+    # go_peak_process(data, curves_list, params, group_params, filename)
+    try:
+        input("Re-plot subplots? >> ")
+    except:
+        pass
+
+    # read peaks from files and re-plot subplots
+    peak_file_list = get_peak_files(filename)
+    peaks = read_all_groups(peak_file_list)
+
+    plot_name = os.path.basename(filename)
+    plot_name = plot_name[0:-4] + ".plot.png"
+    peaks_folder = os.path.join(data_folder, "Peaks_all")
+    plot_name = os.path.join(peaks_folder, plot_name)
+    plot_peaks_all(data, peaks, curves_list,
+                   xlim=params.get("time_bounds", None),
+                   show=True, save=True, save_as=plot_name)
+
+    # replot_peaks(data_folder, curves_list, params, filename)
+    # raise Exception("STOP HERE!")
+
+    # go_peak_process(data_folder, curves_list, params, group_params,)
+    # replot_peaks(data_folder, curves_list, params)
+
+    # plot_one_curve_peaks(filename, curve_idx, params)
+    # test_peak_process(filename, curves_list, params)
+
+    # CORR DATA
+    # single file
+    if input("Save corr data? >> "):
+        # print("Applying multipliers and delays...", )
+        # data = sp.multiplier_and_delay(data, multipliers, delays)
+        print("Saving...")
+        sp.save_ndarray_csv(filename, data.get_array())
     print("Done.")
 
     # OLD---------------------------------------------------------------------
