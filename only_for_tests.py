@@ -471,8 +471,6 @@ def go_peak_process(data, curves_list, params, group_diff,
     peaks = []
     for idx in curves_list:
         # sp.save_ndarray_csv("neg_peaks.csv", data.curves[idx].data)
-        y_zero_offset = get_y_zero_offset(data.curves[idx], -100, 0)
-        print("Curve #{} Y zero offset = {}".format(idx, y_zero_offset))
         add_to_log("Curve #" + str(idx), end="    ")
         new_peaks, peak_log = pp.peak_finder(
             data.time(idx), data.value(idx), **params)
@@ -616,7 +614,7 @@ def save_curve_for_test(file_idx, curve_idx):
     print("Done!\n")
 
 
-def read_peak_group(filename):
+def read_single_peak(filename):
     data = np.genfromtxt(filename, delimiter=',')
     sh = data.shape
     peaks = []
@@ -671,14 +669,14 @@ def get_peak_files(data_file, peak_folder=None, peak_dir_name='Peaks_all'):
     return []
 
 
-def read_all_groups(file_list):
+def read_peaks(file_list):
     if file_list is None or len(file_list) == 0:
         return None
     else:
-        groups = read_peak_group(file_list[0])
+        groups = read_single_peak(file_list[0])
         curves_number = len(groups)
         for file_idx in range(1, len(file_list)):
-            new_group = read_peak_group(file_list[file_idx])
+            new_group = read_single_peak(file_list[file_idx])
             for wf in range(curves_number):     # wavefrorm number
                 groups[wf].append(new_group[wf][0])
         return groups
@@ -686,7 +684,7 @@ def read_all_groups(file_list):
 
 def plot_peaks_from_file(data_file, peaks_folder, curves_list, params):
     peak_file_list = get_peak_files(data_file, peaks_folder)
-    peaks = read_all_groups(peak_file_list)
+    peaks = read_peaks(peak_file_list)
     if peaks is None:
         print("No peaks.")
     elif isinstance(peaks, list):
@@ -760,7 +758,9 @@ def get_all_y_zero_offset(signals_data, curves_list, start_stop_tuples):
     curves_list         -- zero-based indices of curves for which 
                            you want to find the zero level offset
     start_stop_tuples   -- list of (start_x, stop_x) tuples for each 
-                           curves in curves list 
+                           curves in curves list.
+                           You can specify one tuple or list and
+                           it will be applied to all the curves.
     file_type           -- file type (Default = 'CSV')
     delimiter           -- delimiter for csv files
     '''
@@ -780,6 +780,31 @@ def get_all_y_zero_offset(signals_data, curves_list, start_stop_tuples):
     #     print("{}, {},".format(delays[i], delays[i + 1]))
     return delays
 
+
+def pretty_print_nums(data, prefix='', postfix='', s=u'{pref}{val:.2f}{postf}'):
+    '''
+    Prints template 's' filled with values from 'data',
+    'prefix' and 'postfix' arrays for all numbers in data.
+    
+    data    -- array of float or int
+    prefix  -- array of prefixes for all values in 'data'
+               or single prefix string for all elements. 
+    postfix -- array of postfixes for all values in 'data'
+               or single postfix string for all elements. 
+    s       -- template string.
+    '''
+    if not prefix:
+        prefix = ("" for _ in data)
+    elif isinstance(prefix, str):
+        prefix = [prefix for _ in data]
+    if not postfix:
+        postfix = ("" for _ in data)
+    elif isinstance(postfix, str):
+        postfix = [postfix for _ in data]
+    for pref, val, postf in zip(prefix, data, postfix):
+        if val > 0:
+            pref += "+"
+        print(s.format(pref=pref, val=val, postf=postf))
 
 
 if __name__ == '__main__':
@@ -802,90 +827,101 @@ if __name__ == '__main__':
     # filename = ("H:\\WORK\\ERG\\2015\\2015 06 25 ERG\\"
     #             "2015 06 25 UnitedData\\ERG_002.csv")
 
-    start_stop_tuples = [(-100, 0),  # 0 grad
-                         (-100, 0),  # 10 grad
-                         (-100, 0),  # 20 grad
-                         (-100, 0),  # 30 grad
-                         (-100, 0),  # 40 grad
-                         (-100, 0),  # 50 grad
-                         (-100, 0),  # 60 grad
-                         (-100, 0),  # 70 grad
-                         (-100, 0),  # 80 grad
-                         (-100, 0), ]  # 90 grad
+    # step 1 - set parameters
+    start_stop_tuples = [(-350, -100),  # 0 grad
+                         (-350, -100),  # 10 grad
+                         (-350, -100),  # 20 grad
+                         (-350, -100),  # 30 grad
+                         (-350, -100),  # 40 grad
+                         (-350, -100),  # 50 grad
+                         (-350, -100),  # 60 grad
+                         (-350, -100),  # 70 grad
+                         (-350, -100),  # 80 grad
+                         (-350, -100), ]  # 90 grad
     multipliers = None
     delays = [0, 0,  # 0 grad
               0, 0,  # 10 grad
               0, 0,  # 20 grad
               0, 0,  # 30 grad
-              -19, 0,  # 40 grad
-              -19, 0,  # 50 grad
-              -19, 0,  # 60 grad
-              -19, 0,  # 70 grad
+              0, 0,  # 40 grad
+              0, 0,  # 50 grad
+              0, 0,  # 60 grad
+              0, 0,  # 70 grad
               0, 0,  # 80 grad
               0, 0,  # 90 grad
               0, 0,
               0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
-                "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_050.csv")
+                "2015 06 25 ERG/2015 06 25 UnitedData/ERG_027.csv")
+
+    # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
+    #             "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_051.csv")
 
     data_folder = os.path.dirname(filename)
 
-    params = {"level": -0.34, "diff_time": 9, "tnoise": 50, "graph": False,
+    params = {"level": -0.34, "diff_time": 12, "tnoise": 50, "graph": False,
               "time_bounds": [-100, 500], "noise_attenuation": 0.75}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    curves_labels = [u'0\xb0: ', u'10\xb0: ', u'20\xb0: ', u'30\xb0: ', u'40\xb0: ',
+                     u'50\xb0: ', u'60\xb0: ', u'70\xb0: ', u'80\xb0: ', u'90\xb0: ']
 
     group_params = 20
     curve_idx = 8
 
+    # step 2 - read data
     print("Reading " + filename)
     data = read_signals([filename], file_type='csv', delimiter=",")
-    for idx, new_val in enumerate(get_all_y_zero_offset(data, curves_list,
-                                                        start_stop_tuples)):
-        if new_val:
-            delays[idx] = new_val
+
+    # step 3 - update delays with accordance to Y zero offset
+    if False:
+        for idx, new_val in enumerate(get_all_y_zero_offset(data, curves_list,
+                                                            start_stop_tuples)):
+            if new_val:
+                delays[idx] += new_val
+
+    pretty_print_nums([delays[idx] for idx in range(0, len(delays), 2)],
+                      curves_labels, " V")
     print()
-    for idx in range(0, len(delays), 2):
-        if delays[idx]:
-            print("Col[{}] Curve[{}].X += {:.2f},"
-                  " ".format(idx, idx // 2, delays[idx]))
-    print()
-    for idx in range(0, len(delays), 2):
-        if delays[idx + 1]:
-            print("Col[{}] Curve[{}].Y += {:.2f},"
-                  " ".format(idx + 1, idx // 2, delays[idx + 1]))
-    print()
+    pretty_print_nums([delays[idx] for idx in range(1, len(delays), 2)],
+                      curves_labels, " ns")
+
+    # step 4 - update delays whith accordance to voltage front
+
+    # step 5 - apply multipliers and delays
     print("Applying multipliers and delays...", )
     data = sp.multiplier_and_delay(data, multipliers, delays)
 
-    # go_peak_process(data, curves_list, params, group_params, filename)
-    try:
-        input("Re-plot subplots? >> ")
-    except:
-        pass
+    # step 6 - find peaks [and plot single graphs]
+    go_peak_process(data, curves_list, params, group_params, filename)
 
-    # read peaks from files and re-plot subplots
-    peak_file_list = get_peak_files(filename)
-    peaks = read_all_groups(peak_file_list)
+    # step 7 - group peaks [and plot all curves with peaks]
 
-    plot_name = os.path.basename(filename)
-    plot_name = plot_name[0:-4] + ".plot.png"
-    peaks_folder = os.path.join(data_folder, "Peaks_all")
-    plot_name = os.path.join(peaks_folder, plot_name)
-    plot_peaks_all(data, peaks, curves_list,
-                   xlim=params.get("time_bounds", None),
-                   show=True, save=True, save_as=plot_name)
+    # step 8 - replot all curves with peaks from files
+    if input("Re-plot subplots? >> "):
+        peak_file_list = get_peak_files(filename)
+        peaks = read_peaks(peak_file_list)
 
-    # replot_peaks(data_folder, curves_list, params, filename)
-    # raise Exception("STOP HERE!")
+        # # swap the peaks of curves #0 and #2 (0 grad and 20 grad)
+        # # and save them
+        # tmp = peaks[0]
+        # peaks[0] = peaks[2]
+        # peaks[2] = tmp
+        # peak_file_name = os.path.basename(filename)[0:-4]
+        # peak_file_name = os.path.join(data_folder, "Peaks_all", peak_file_name)
+        # print(peak_file_name)
+        # input("Continue? >> ")
+        # save_peaks_csv(peak_file_name, peaks)
 
-    # go_peak_process(data_folder, curves_list, params, group_params,)
-    # replot_peaks(data_folder, curves_list, params)
+        plot_name = os.path.basename(filename)
+        plot_name = plot_name[0:-4] + ".plot.png"
+        peaks_folder = os.path.join(data_folder, "Peaks_all")
+        plot_name = os.path.join(peaks_folder, plot_name)
+        plot_peaks_all(data, peaks, curves_list,
+                       xlim=params.get("time_bounds", None),
+                       show=True, save=True, save_as=plot_name)
 
-    # plot_one_curve_peaks(filename, curve_idx, params)
-    # test_peak_process(filename, curves_list, params)
-
-    # CORR DATA
+    # step 9 - save changed signals data
     # single file
     if input("Save corr data? >> "):
         # print("Applying multipliers and delays...", )
