@@ -853,7 +853,7 @@ if __name__ == '__main__':
               0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
-                "2015 06 25 ERG/2015 06 25 UnitedData/ERG_027.csv")
+                "2015 05 15 ERG/2015 05 15 UnitedData/ERG_027.csv")
 
     # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
     #             "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_051.csv")
@@ -871,11 +871,11 @@ if __name__ == '__main__':
 
     # step 2 - read data
     print("Reading " + filename)
-    data = read_signals([filename], file_type='csv', delimiter=",")
+    signals_data = read_signals([filename], file_type='csv', delimiter=",")
 
     # step 3 - update delays with accordance to Y zero offset
     if False:
-        for idx, new_val in enumerate(get_all_y_zero_offset(data, curves_list,
+        for idx, new_val in enumerate(get_all_y_zero_offset(signals_data, curves_list,
                                                             start_stop_tuples)):
             if new_val:
                 delays[idx] += new_val
@@ -890,10 +890,10 @@ if __name__ == '__main__':
 
     # step 5 - apply multipliers and delays
     print("Applying multipliers and delays...", )
-    data = sp.multiplier_and_delay(data, multipliers, delays)
+    signals_data = sp.multiplier_and_delay(signals_data, multipliers, delays)
 
     # step 6 - find peaks [and plot single graphs]
-    go_peak_process(data, curves_list, params, group_params, filename)
+    go_peak_process(signals_data, curves_list, params, group_params, filename)
 
     # step 7 - group peaks [and plot all curves with peaks]
 
@@ -917,7 +917,7 @@ if __name__ == '__main__':
         plot_name = plot_name[0:-4] + ".plot.png"
         peaks_folder = os.path.join(data_folder, "Peaks_all")
         plot_name = os.path.join(peaks_folder, plot_name)
-        plot_peaks_all(data, peaks, curves_list,
+        plot_peaks_all(signals_data, peaks, curves_list,
                        xlim=params.get("time_bounds", None),
                        show=True, save=True, save_as=plot_name)
 
@@ -927,7 +927,7 @@ if __name__ == '__main__':
         # print("Applying multipliers and delays...", )
         # data = sp.multiplier_and_delay(data, multipliers, delays)
         print("Saving...")
-        sp.save_ndarray_csv(filename, data.get_array())
+        sp.save_ndarray_csv(filename, signals_data.get_array())
     print("Done.")
 
     # OLD---------------------------------------------------------------------
