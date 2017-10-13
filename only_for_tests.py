@@ -115,7 +115,7 @@ def zero_and_save(filename, file_type="CSV", curves=None, length=30):
     add_to_log("Done!\n")
 
 
-def offset_by_voltage(voltage, level,
+def get_voltage_front(voltage, level,
                       time_multiplier=1, polarity='auto',
                       save_plot=False, plot_name="voltage_plot.png"):
     '''
@@ -155,6 +155,27 @@ def offset_by_voltage(voltage, level,
     # plt.plot([front_x], [front_y], '*g')
     # plt.show()
     return front_x
+
+
+def get_offset_by_front(curve, level, polarity, time_multiplier=1, time_delay=0,
+                        save=False, save_name='voltage_plot.png'):
+    level_raw = ((voltage_front_level +
+                  delays[volt_cr_idx * 2 + 1]) /
+                 multipliers[volt_cr_idx * 2 + 1])
+    if not isinstance(curve, sp.SingleCurve):
+        raise TypeError("voltage_curve must be an instance "
+                        "of SingleCurve class")
+    # smooth voltage curve to improve accuracy of front search
+    smoothed_voltage = sp.smooth_voltage(curve.get_x(),
+                                         curve.get_y(),
+                                         time_multiplier)
+    smoothed_voltage_curve = sp.SingleCurve(curve.time, smoothed_voltage)
+    front_x, front_y = pp.find_voltage_front(smoothed_voltage_curve,
+                                             level, polarity,
+                                             save_plot=save,
+                                             plot_name=save_name)
+    time_offset = (front_raw * time_multiplier - time_delay)
+    return time_offset
 
 
 def make_final():
@@ -311,7 +332,7 @@ def make_final():
             level_raw = ((voltage_front_level +
                           all_delays[voltage_idx * 2 + 1]) /
                          all_multipliers[voltage_idx * 2 + 1])
-            front_raw = offset_by_voltage(data.curves[voltage_idx], level_raw,
+            front_raw = get_voltage_front(data.curves[voltage_idx], level_raw,
                                           save_plot=True, polarity=polarity,
                                           plot_name=volt_plot_name)
 
@@ -770,7 +791,7 @@ def get_all_y_zero_offset(signals_data, curves_list, start_stop_tuples):
         "does not match the number of specified curves " \
         "({}).".format(len(start_stop_tuples), len(curves_list))
 
-    delays = [0 for _ in range(2 * data.count)]
+    delays = [0 for _ in range(2 * signals_data.count)]
     for curve_idx in curves_list:
         y_data_idx = curve_idx * 2 + 1
         delays[y_data_idx] = get_y_zero_offset(signals_data.curves[curve_idx],
@@ -781,30 +802,44 @@ def get_all_y_zero_offset(signals_data, curves_list, start_stop_tuples):
     return delays
 
 
-def pretty_print_nums(data, prefix='', postfix='', s=u'{pref}{val:.2f}{postf}'):
+def pretty_print_nums(nums, prefix='', postfix='',
+                      s=u'{pref}{val:.2f}{postf}', show=True):
     '''
-    Prints template 's' filled with values from 'data',
-    'prefix' and 'postfix' arrays for all numbers in data.
+    Prints template 's' filled with values from 'nums',
+    'prefix' and 'postfix' arrays for all numbers in 'nums'.
     
-    data    -- array of float or int
-    prefix  -- array of prefixes for all values in 'data'
+    nums    -- array of float or int
+    prefix  -- array of prefixes for all values in 'nums'
                or single prefix string for all elements. 
-    postfix -- array of postfixes for all values in 'data'
+    postfix -- array of postfixes for all values in 'nums'
                or single postfix string for all elements. 
     s       -- template string.
     '''
     if not prefix:
-        prefix = ("" for _ in data)
+        prefix = ("" for _ in nums)
     elif isinstance(prefix, str):
-        prefix = [prefix for _ in data]
+        prefix = [prefix for _ in nums]
     if not postfix:
-        postfix = ("" for _ in data)
+        postfix = ("" for _ in nums)
     elif isinstance(postfix, str):
-        postfix = [postfix for _ in data]
-    for pref, val, postf in zip(prefix, data, postfix):
+        postfix = [postfix for _ in nums]
+    message = ""
+    for pref, val, postf in zip(prefix, nums, postfix):
         if val > 0:
             pref += "+"
-        print(s.format(pref=pref, val=val, postf=postf))
+        message += s.format(pref=pref, val=val, postf=postf) + "\n"
+    if show:
+        print(message)
+    return message
+
+
+def save_all_single_plots(signals, peaks, time_bounds, curves_list,
+                          fileprefix, dir_name="./Peaks_single"):
+    for idx in range(len(curves_list)):
+        fname = fileprefix + "_curve" + str(curves_list[idx]) + ".png"
+        plot_single_curve(signals.curves[curves_list[idx]],
+                          peaks[idx], time_bounds,
+                          save=True, save_as=fname)
 
 
 if __name__ == '__main__':
@@ -843,64 +878,126 @@ if __name__ == '__main__':
               0, 0,  # 10 grad
               0, 0,  # 20 grad
               0, 0,  # 30 grad
-              0, 0,  # 40 grad
-              0, 0,  # 50 grad
-              0, 0,  # 60 grad
-              0, 0,  # 70 grad
-              0, 0,  # 80 grad
-              0, 0,  # 90 grad
-              0, 0,
-              0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              -19, 0,  # 40 grad
+              -19, 0,  # 50 grad
+              -19, 0,  # 60 grad
+              -19, 0,  # 70 grad
+              -11, 0,  # 80 grad
+              -11, 0,  # 90 grad
+              -11, 0,
+              -11, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    need_corr_by_voltage = False
+    save_changed_data = False
+    Y_zero_offset = True
+    save_single_plots = True
 
     filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
-                "2015 05 15 ERG/2015 05 15 UnitedData/ERG_027.csv")
-
-    # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
-    #             "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_051.csv")
+                "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_055.csv")
 
     data_folder = os.path.dirname(filename)
+    save_dir = data_folder
 
-    params = {"level": -0.34, "diff_time": 12, "tnoise": 50, "graph": False,
+    params = {"level": -0.34, "diff_time": 9, "tnoise": 50, "graph": False,
               "time_bounds": [-100, 500], "noise_attenuation": 0.75}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     curves_labels = [u'0\xb0: ', u'10\xb0: ', u'20\xb0: ', u'30\xb0: ', u'40\xb0: ',
                      u'50\xb0: ', u'60\xb0: ', u'70\xb0: ', u'80\xb0: ', u'90\xb0: ']
 
-    group_params = 20
+    pk_group_diff = 20
     curve_idx = 8
 
     # step 2 - read data
-    print("Reading " + filename)
+    add_to_log("Reading " + filename)
     signals_data = read_signals([filename], file_type='csv', delimiter=",")
+    add_to_log("Curves count = " + str(signals_data.count) + "\n")
+    shot_name = os.path.basename(filename)[0:-4]
 
     # step 3 - update delays with accordance to Y zero offset
-    if False:
-        for idx, new_val in enumerate(get_all_y_zero_offset(signals_data, curves_list,
+    if Y_zero_offset:
+        for idx, new_val in enumerate(get_all_y_zero_offset(signals_data,
+                                                            curves_list,
                                                             start_stop_tuples)):
-            if new_val:
-                delays[idx] += new_val
+            delays[idx] += new_val
 
-    pretty_print_nums([delays[idx] for idx in range(0, len(delays), 2)],
-                      curves_labels, " V")
-    print()
-    pretty_print_nums([delays[idx] for idx in range(1, len(delays), 2)],
-                      curves_labels, " ns")
-
+    add_to_log(pretty_print_nums([delays[idx] for idx in
+                                  range(0, len(delays), 2)],
+                                 curves_labels, " ns", show=False))
+    add_to_log()
+    add_to_log(pretty_print_nums([delays[idx] for idx in
+                                  range(1, len(delays), 2)],
+                                 curves_labels, " V", show=False))
+    add_to_log()
     # step 4 - update delays whith accordance to voltage front
+    if need_corr_by_voltage:
+        voltage_front_level = 0.2
+        volt_cr_idx = 12
+        polarity = pp.check_polarity(signals_data.curves[volt_cr_idx])
+        add_to_log(str(polarity) + "  (autodetect)")
+
+        volt_plot_name = shot_name + "_voltage.png"
+        volt_plot_name = os.path.join(save_dir, "voltage_front", volt_plot_name)
+        if pp.is_pos(polarity):
+            voltage_front_level = abs(voltage_front_level)
+        else:
+            voltage_front_level = -abs(voltage_front_level)
+
+        add_to_log("Searching voltage front at level = " +
+                   str(voltage_front_level))
+
+        level_raw = ((voltage_front_level +
+                      delays[volt_cr_idx * 2 + 1]) /
+                      multipliers[volt_cr_idx * 2 + 1])
+        front_raw = get_voltage_front(signals_data.curves[volt_cr_idx], level_raw,
+                                      save_plot=True, polarity=polarity,
+                                      plot_name=volt_plot_name)
+        if front_raw:
+            add_to_log("Raw_voltage_front_level = " + str(level_raw))
+            # apply multiplier and compensate voltage delay
+            time_offset = (front_raw * multipliers[volt_cr_idx * 2] -
+                           delays[volt_cr_idx * 2])
+            add_to_log("Time_offset_by_voltage = " +
+                       str(time_offset))
+            for idx in range(0, len(delays), 2):
+                delays[idx] += time_offset
 
     # step 5 - apply multipliers and delays
-    print("Applying multipliers and delays...", )
+    add_to_log("Applying multipliers and delays...", )
     signals_data = sp.multiplier_and_delay(signals_data, multipliers, delays)
 
     # step 6 - find peaks [and plot single graphs]
-    go_peak_process(signals_data, curves_list, params, group_params, filename)
+    unsorted_peaks = []
+    for idx in curves_list:
+        add_to_log("Curve #" + str(idx), end="    ")
+        new_peaks, peak_log = pp.peak_finder(
+            signals_data.time(idx), signals_data.value(idx), **params)
+        unsorted_peaks.append(new_peaks)
+        add_to_log(peak_log, end="")
 
     # step 7 - group peaks [and plot all curves with peaks]
+    peak_data, peak_map = pp.group_peaks(unsorted_peaks, pk_group_diff)
 
-    # step 8 - replot all curves with peaks from files
+    # step 8 - save peaks data
+    add_to_log("Saving peak data...")
+    peaks_filename = os.path.join(data_folder, "Peaks_all",
+                                  os.path.basename(filename))
+    save_peaks_csv(peaks_filename, peak_data)
+
+    # step 9 - save multicurve plot
+    multiplot_name = os.path.basename(filename)
+    multiplot_name = multiplot_name[0:-4] + ".plot.png"
+    peaks_folder = os.path.join(data_folder, "Peaks_all")
+    multiplot_name = os.path.join(peaks_folder, multiplot_name)
+    add_to_log("Saving all peaks as " + multiplot_name)
+    plot_peaks_all(signals_data, peak_data, curves_list,
+                   xlim=params.get("time_bounds", None),
+                   show=True, save=True, save_as=multiplot_name)
+
+
+
+    # step 10 - replot all curves with peaks from files
     if input("Re-plot subplots? >> "):
         peak_file_list = get_peak_files(filename)
-        peaks = read_peaks(peak_file_list)
+        peak_data = read_peaks(peak_file_list)
 
         # # swap the peaks of curves #0 and #2 (0 grad and 20 grad)
         # # and save them
@@ -913,22 +1010,36 @@ if __name__ == '__main__':
         # input("Continue? >> ")
         # save_peaks_csv(peak_file_name, peaks)
 
-        plot_name = os.path.basename(filename)
-        plot_name = plot_name[0:-4] + ".plot.png"
-        peaks_folder = os.path.join(data_folder, "Peaks_all")
-        plot_name = os.path.join(peaks_folder, plot_name)
-        plot_peaks_all(signals_data, peaks, curves_list,
+        add_to_log("Saving all peaks as " + multiplot_name)
+        plot_peaks_all(signals_data, peak_data, curves_list,
                        xlim=params.get("time_bounds", None),
-                       show=True, save=True, save_as=plot_name)
+                       show=True, save=True, save_as=multiplot_name)
 
-    # step 9 - save changed signals data
-    # single file
-    if input("Save corr data? >> "):
-        # print("Applying multipliers and delays...", )
-        # data = sp.multiplier_and_delay(data, multipliers, delays)
-        print("Saving...")
-        sp.save_ndarray_csv(filename, signals_data.get_array())
-    print("Done.")
+    # step 11 - save single plots with peaks
+    single_plot_name = os.path.join(data_folder, "Peaks_single")
+    if not os.path.isdir(single_plot_name):
+        os.makedirs(single_plot_name)
+    single_plt_file_prefix = os.path.join(single_plot_name, shot_name)
+    if save_single_plots:
+        add_to_log("Saving single plots with peaks...")
+        save_all_single_plots(signals_data, peak_data,
+                              params.get("time_bounds", None),
+                              curves_list,
+                              single_plt_file_prefix,
+                              dir_name="./Peaks_single")
+
+    # step 12 - save changed signals data
+    if save_changed_data:
+        add_to_log("Saving...")
+        if False:
+            # save with rewrite
+            sp.save_ndarray_csv(filename, signals_data.get_array())
+        elif False:
+            # save as
+            new_filename = ""
+            sp.save_ndarray_csv(new_filename, signals_data.get_array())
+
+    add_to_log("Done.")
 
     # OLD---------------------------------------------------------------------
     # data_file_list = sp.get_file_list_by_ext(data_folder, ".csv", sort=True)
