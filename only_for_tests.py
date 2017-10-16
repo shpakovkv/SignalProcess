@@ -878,26 +878,28 @@ if __name__ == '__main__':
               0, 0,  # 10 grad
               0, 0,  # 20 grad
               0, 0,  # 30 grad
-              -19, 0,  # 40 grad
-              -19, 0,  # 50 grad
-              -19, 0,  # 60 grad
-              -19, 0,  # 70 grad
-              -11, 0,  # 80 grad
-              -11, 0,  # 90 grad
-              -11, 0,
-              -11, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              -21, 0,  # 40 grad
+              -21, 0,  # 50 grad
+              -21, 0,  # 60 grad
+              -21, 0,  # 70 grad
+              -10, 0,  # 80 grad
+              -10, 0,  # 90 grad
+              -10, 0,
+              -10, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     need_corr_by_voltage = False
     save_changed_data = False
     Y_zero_offset = True
     save_single_plots = True
 
-    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
-                "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_055.csv")
+    # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
+    #             "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_055.csv")
+    filename = ("H:\\WORK\\ERG\\2015\\2015 05 15 ERG VNIIA\\"
+                "2015 05 15 UnitedData\\ERG_096.csv")
 
     data_folder = os.path.dirname(filename)
     save_dir = data_folder
 
-    params = {"level": -0.34, "diff_time": 9, "tnoise": 50, "graph": False,
+    params = {"level": -0.34, "diff_time": 5, "tnoise": 50, "graph": False,
               "time_bounds": [-100, 500], "noise_attenuation": 0.75}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     curves_labels = [u'0\xb0: ', u'10\xb0: ', u'20\xb0: ', u'30\xb0: ', u'40\xb0: ',
@@ -905,6 +907,11 @@ if __name__ == '__main__':
 
     pk_group_diff = 20
     curve_idx = 8
+
+    multiplot_name = os.path.basename(filename)
+    multiplot_name = multiplot_name[0:-4] + ".plot.png"
+    peaks_folder = os.path.join(data_folder, "Peaks_all")
+    multiplot_name = os.path.join(peaks_folder, multiplot_name)
 
     # step 2 - read data
     add_to_log("Reading " + filename)
@@ -927,6 +934,7 @@ if __name__ == '__main__':
                                   range(1, len(delays), 2)],
                                  curves_labels, " V", show=False))
     add_to_log()
+
     # step 4 - update delays whith accordance to voltage front
     if need_corr_by_voltage:
         voltage_front_level = 0.2
@@ -965,37 +973,32 @@ if __name__ == '__main__':
     signals_data = sp.multiplier_and_delay(signals_data, multipliers, delays)
 
     # step 6 - find peaks [and plot single graphs]
-    unsorted_peaks = []
-    for idx in curves_list:
-        add_to_log("Curve #" + str(idx), end="    ")
-        new_peaks, peak_log = pp.peak_finder(
-            signals_data.time(idx), signals_data.value(idx), **params)
-        unsorted_peaks.append(new_peaks)
-        add_to_log(peak_log, end="")
+    if True:
+        unsorted_peaks = []
+        for idx in curves_list:
+            add_to_log("Curve #" + str(idx), end="    ")
+            new_peaks, peak_log = pp.peak_finder(
+                signals_data.time(idx), signals_data.value(idx), **params)
+            unsorted_peaks.append(new_peaks)
+            add_to_log(peak_log, end="")
 
-    # step 7 - group peaks [and plot all curves with peaks]
-    peak_data, peak_map = pp.group_peaks(unsorted_peaks, pk_group_diff)
+        # step 7 - group peaks [and plot all curves with peaks]
+        peak_data, peak_map = pp.group_peaks(unsorted_peaks, pk_group_diff)
 
-    # step 8 - save peaks data
-    add_to_log("Saving peak data...")
-    peaks_filename = os.path.join(data_folder, "Peaks_all",
-                                  os.path.basename(filename))
-    save_peaks_csv(peaks_filename, peak_data)
+        # step 8 - save peaks data
+        add_to_log("Saving peak data...")
+        peaks_filename = os.path.join(data_folder, "Peaks_all",
+                                      os.path.basename(filename))
+        save_peaks_csv(peaks_filename, peak_data)
 
-    # step 9 - save multicurve plot
-    multiplot_name = os.path.basename(filename)
-    multiplot_name = multiplot_name[0:-4] + ".plot.png"
-    peaks_folder = os.path.join(data_folder, "Peaks_all")
-    multiplot_name = os.path.join(peaks_folder, multiplot_name)
-    add_to_log("Saving all peaks as " + multiplot_name)
-    plot_peaks_all(signals_data, peak_data, curves_list,
-                   xlim=params.get("time_bounds", None),
-                   show=True, save=True, save_as=multiplot_name)
-
-
+        # step 9 - save multicurve plot
+        add_to_log("Saving all peaks as " + multiplot_name)
+        plot_peaks_all(signals_data, peak_data, curves_list,
+                       xlim=params.get("time_bounds", None),
+                       show=True, save=True, save_as=multiplot_name)
 
     # step 10 - replot all curves with peaks from files
-    if input("Re-plot subplots? >> "):
+    if input("Re-plot subplots from files? >> "):
         peak_file_list = get_peak_files(filename)
         peak_data = read_peaks(peak_file_list)
 
