@@ -878,29 +878,33 @@ if __name__ == '__main__':
               0, 0,  # 10 grad
               0, 0,  # 20 grad
               0, 0,  # 30 grad
-              -21, 0,  # 40 grad
-              -21, 0,  # 50 grad
-              -21, 0,  # 60 grad
-              -21, 0,  # 70 grad
-              -10, 0,  # 80 grad
-              -10, 0,  # 90 grad
-              -10, 0,
-              -10, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              0, 0,  # 40 grad
+              0, 0,  # 50 grad
+              0, 0,  # 60 grad
+              0, 0,  # 70 grad
+              0, 0,  # 80 grad
+              0, 0,  # 90 grad
+              0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     need_corr_by_voltage = False
     save_changed_data = False
-    Y_zero_offset = True
+    Y_zero_offset = False
     save_single_plots = True
 
-    # filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
-    #             "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_055.csv")
-    filename = ("H:\\WORK\\ERG\\2015\\2015 05 15 ERG VNIIA\\"
-                "2015 05 15 UnitedData\\ERG_096.csv")
+    find_peaks = True
+    print_single_plots = False
+
+    filename = ("/media/shpakovkv/6ADA8899DA886365/WORK/2015/"
+                "2015 05 15 ERG VNIIA/2015 05 15 UnitedData/ERG_108.csv")
+    # filename = ("H:\\WORK\\ERG\\2015\\2015 05 15 ERG VNIIA\\"
+    #             "2015 05 15 UnitedData\\ERG_096.csv")
 
     data_folder = os.path.dirname(filename)
     save_dir = data_folder
 
-    params = {"level": -0.34, "diff_time": 5, "tnoise": 50, "graph": False,
-              "time_bounds": [-100, 500], "noise_attenuation": 0.75}
+    params = {"level": -0.25, "diff_time": 5, "tnoise": 50,
+              "graph": print_single_plots, "time_bounds": [-100, 500],
+              "noise_attenuation": 0.75}
     curves_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     curves_labels = [u'0\xb0: ', u'10\xb0: ', u'20\xb0: ', u'30\xb0: ', u'40\xb0: ',
                      u'50\xb0: ', u'60\xb0: ', u'70\xb0: ', u'80\xb0: ', u'90\xb0: ']
@@ -973,10 +977,10 @@ if __name__ == '__main__':
     signals_data = sp.multiplier_and_delay(signals_data, multipliers, delays)
 
     # step 6 - find peaks [and plot single graphs]
-    if True:
+    if find_peaks:
         unsorted_peaks = []
         for idx in curves_list:
-            add_to_log("Curve #" + str(idx), end="    ")
+            add_to_log("Curve #" + str(idx))
             new_peaks, peak_log = pp.peak_finder(
                 signals_data.time(idx), signals_data.value(idx), **params)
             unsorted_peaks.append(new_peaks)
