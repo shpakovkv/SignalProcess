@@ -797,157 +797,136 @@ def parse_filename(name):
 # --------------   MAIN    ----------------------------------------
 # ======================================================
 if __name__ == "__main__":
-    # ----------  INPUT PARAMETERS   ---------------------------------------------
-    # ==================================================================================================
-    # ----------     DPO7054     -----------------------------------------------------------------------
-    # =======================================
-    dir_dpo7054 = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/DPO7054/2017 05 13"
-    save_dpo7054_to_path = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/DPO7054_CSV/"
+    import argparse
 
-    files_in_group_dpo7054 = 4                          # number of files of the DPO7054 (default 4)
-    read_dpo7054 = False                                # read files and convert to csv
-    max_min_log_dpo7054 = False                         # read converted csv and find max and min for all files
-    log_cols_dpo7054 = [1, 3, 5, 7]                     # search max and min only for this columns (zero-based indexes)
-    corr_cols_dpo7054 = [1.216, 0.991, 1.000, 0.994]    # correction multiplyer for each column (for max-min log)
-    log_filename_dpo7054 = 'max_min_dpo7054.log'    # max-min filename postfix (containing dir name will be the prefix)
+    parser = argparse.ArgumentParser(prog='Process Signals',
+                                     description='', epilog='', fromfile_prefix_chars='@')
 
-    # ==================================================================================================
-    # ----------     TDS2024C     ----------------------------------------------------------------------
-    # =======================================
-    dir_tds2024 = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/TDS2024C"
-    save_tds2024_to_path = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/TDS2024C_CSV"
+    # input files ------------------------------------------------------------
+    parser.add_argument('-d', '--scr', '--source-dir',
+                        action='store',
+                        metavar='SOURCE_DIR',
+                        dest='src_dir',
+                        help='specify the directory containing data files '
+                             'after the flag.'
+                        )
+    parser.add_argument('-i', '--input-files',
+                        action='store',
+                        nargs='+',
+                        metavar='INPUT_FILES',
+                        dest='input_files',
+                        help='specify one or more (space separated) input '
+                             'file names after the flag. '
+                             'It is assumed that the files belong '
+                             'to the same shot. '
+                             'You may specify as many \'-i\' flags as you '
+                             'want.'
+                        )
+    parser.add_argument('-g', '--grouped-by',
+                        action='store',
+                        type=int,
+                        metavar='GROUPED_BY',
+                        dest='group',
+                        default=1,
+                        help='specify the size of groups after the flag. '
+                             'A group is a set of files, corresponding '
+                             'to one shot. Default=1.'
+                        )
+    parser.add_argument('-c', '--ch',  '--sorted-by-channel',
+                        action='store_true',
+                        dest='sorted_by_ch',
+                        help='this options tells the program that the files '
+                             'are sorted by the oscilloscope/channel '
+                             '(firstly) and by the shot number (secondly). '
+                             'By default, the program considers that the '
+                             'files are sorted by the shot number (firstly) '
+                             'and by the oscilloscope/channel (secondly).\n'
+                             'ATTENTION: files from all oscilloscopes must '
+                             'be in the same folder and be sorted '
+                             'in one style.'
+                        )
 
-    files_in_group_tds2024 = 4                          # number of files of the TDS2024C (default 4)
-    read_tds2024 = False                                # read files and convert to csv
-    max_min_log_tds2024 = False                         # read converted csv and find max and min for all files
-    log_cols_tds2024 = [1, 3, 5, 7]                     # search max and min only for this columns (zero-based indexes)
-    corr_cols_tds2024 = [1.261, 1.094, 1.222, 1.590]    # correction multiplyer for each column (for max-min log)
-    log_filename_tds2024 = 'max_min_tds2024c.log'   # max-min filename postfix (containing dir name will be the prefix)
+    # process parameters and options -----------------------------------------
 
-    # ==================================================================================================
-    # ----------     HMO3004     -----------------------------------------------------------------------
-    # =======================================
-    dir_hmo3004 = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/HMO 3004"
-    save_hmo3004_to_path = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/HMO3004_CSV"
+    # output settings --------------------------------------------------------
+    parser.add_argument('-t', '--save-to', '--target-dir',
+                        action='store',
+                        metavar='SAVE_TO',
+                        dest='save_to',
+                        help='specify the output directory after the flag.'
+                        )
+    parser.add_argument('--prefix',
+                        action='store',
+                        metavar='FILE_PREFIX',
+                        dest='prefix',
+                        help='specify the prefix after the flag. This prefix '
+                             'will be added to the output file names during '
+                             'the automatic generation of file names. '
+                             'Default=\'\'.'
+                        )
+    parser.add_argument('--postfix',
+                        action='store',
+                        metavar='FILE_POSTFIX',
+                        dest='postfix',
+                        help='specify the postfix after the flag. This '
+                             'postfix will be added to the output file '
+                             'names during the automatic generation '
+                             'of file names. '
+                             'Default=\'\'.'
+                        )
+    parser.add_argument('-o', '--output-files',
+                        action='store',
+                        nargs='*',
+                        metavar='OUTPUT_FILES',
+                        dest='out_names',
+                        help='specify the list of file names after the flag. '
+                             'The output files with data will be save with '
+                             'the names from this list. '
+                             'This will override the automatic generation '
+                             'of file names.'
+                        )
+    parser.add_argument('-p', '--save-plots-to',
+                        action='store',
+                        dest='save_plots_to',
+                        metavar='SAVE_PLOTS_TO',
+                        help='specify the directory after the flag. Each '
+                             'curve from data will be plotted ans saved '
+                             'as a single plot.png.'
+                        )
+    parser.add_argument('-m', '--multiplot',
+                        action='append',
+                        dest='multiplot',
+                        nargs='+',
+                        help='specify the indexes of curves to be added to '
+                             'plot after \'-m\' flag. You may use as many '
+                             '\'-m\' flags (with different lists of curves)'
+                             ' as you want.'
+                        )
+    parser.add_argument('-s', '--save-multiplot-as',
+                        action='append',
+                        dest='save_mp_as',
+                        metavar='SAVE_MULTIPLOT_AS',
+                        nargs=1,
+                        help='the postfix to the multiplot file names. '
+                             'The prefix will be equal to the output data '
+                             'file.\n'
+                             'If this flag is omitted the multiplots '
+                             'will not be saved.\n'
+                             'NOTE: if you use \'-s\' flags, then you must '
+                             'use as many \'-s\' flags as '
+                             'you used \'-m\' flags.'
+                        )
+    parser.add_argument('-h', '--hide-multiplot',
+                        action='store_true',
+                        dest='hide_mplt',
+                        metavar='HIDE_MULTIPLOT',
+                        help='if the flag is specified the multiplots '
+                             'will be saved (if the \'-s\' flag was '
+                             'specified as well) but not shown. This '
+                             'option can reduce the runtime of the program.'
+                        )
 
-    files_in_group_hmo3004 = 1                          # number of files of the HMO3004 (default 1)
-    read_hmo3004 = False                                # read files and convert to csv
-    max_min_log_hmo3004 = False                         # read converted csv and find max and min for all files
-    log_cols_hmo3004 = [1, 3, 5, 7]                     # search max and min only for this columns (zero-based indexes)
-    corr_cols_hmo3004 = [0.272, 0.951, 1.138, 1.592]    # correction multiplyer for each column (for max-min log)
-    log_filename_hmo3004 = 'max_min_hmo3004.log'    # max-min filename postfix (containing dir name will be the prefix)
 
-    # ==================================================================================================
-    # ----------     LeCroy     ------------------------------------------------------------------------
-    # =======================================
-    dir_lecroy = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/LeCroy"
-    save_lecroy_to_path = "/media/shpakovkv/6ADA8899DA886365/WORK/2017/2017 05 12-19 ERG/LeCroy_CSV"
+    args = parser.parse_args()
 
-    files_in_group_lecroy = 3                           # number of files of the LeCroy (default 4)
-    read_LeCroy = False                                 # read files and convert to csv
-    max_min_log_lecroy = False                          # read converted csv and find max and min for all files
-    log_cols_lecroy = [1, 3, 5]                         # search max and min only for this columns (zero-based indexes)
-    corr_cols_lecroy = [0.62791, 4.554, 4.0]            # correction multiplyer for each column (for max-min log)
-    log_filename_lecroy = 'max_min_lecroy.log'      # max-min filename postfix (containing dir name will be the prefix)
-
-    # ==================================================================================================
-    # ----------     PROCESS     -----------------------------------------------------------------------
-    # =======================================
-    # READ WFM from DPO7054
-    if read_dpo7054:
-        if os.path.isdir(dir_dpo7054):
-            dir_dpo7054 = os.path.abspath(dir_dpo7054)
-            save_lecroy_to_path = os.path.abspath(save_dpo7054_to_path)
-            for old_path in get_subdir_list(dir_dpo7054):
-                new_path = add_new_dir_to_path(old_path, save_dpo7054_to_path)
-                combine_wfm_to_csv(old_path, new_path, files_in_group=files_in_group_dpo7054)
-        else:
-            print("Path " + dir_dpo7054 + "\n does not exist!")
-    # FIND MAX & MIN from DPO7054
-    if max_min_log_dpo7054:
-        if os.path.isdir(save_dpo7054_to_path):
-            save_dpo7054_to_path = os.path.abspath(save_dpo7054_to_path)
-            for path in get_subdir_list(save_dpo7054_to_path):
-                get_max_min_from_dir(path, log_cols_dpo7054, corr_cols_dpo7054,
-                                     ext='.CSV',
-                                     log_file_name=log_filename_dpo7054)
-        else:
-            print("Path " + save_dpo7054_to_path + "\n does not exist!")
-
-    # ====================================================================================
-    # READ CSV from Tektronix TDS2024C
-    if read_tds2024:
-        if os.path.isdir(dir_tds2024):
-            dir_tds2024 = os.path.abspath(dir_tds2024)
-            save_tds2024_to_path = os.path.abspath(save_tds2024_to_path)
-            for old_path in get_subdir_list(dir_tds2024):
-                new_path = add_new_dir_to_path(old_path, save_tds2024_to_path)
-                combine_tds2024c_csv(old_path, new_path, files_in_group=files_in_group_tds2024)
-        else:
-            print("Path " + save_tds2024_to_path + "\n does not exist!")
-    # FIND MAX & MIN from TDS2024C
-    if max_min_log_tds2024:
-        if os.path.isdir(save_tds2024_to_path):
-            save_tds2024_to_path = os.path.abspath(save_tds2024_to_path)
-            for path in get_subdir_list(save_tds2024_to_path):
-                get_max_min_from_dir(path, log_cols_tds2024, corr_cols_tds2024,
-                                     ext='.CSV',
-                                     log_file_name=log_filename_tds2024)
-        else:
-            print("Path " + save_tds2024_to_path + "\n does not exist!")
-
-    # =====================================================================================
-    # READ CSV from Rohde&Schwarz HMO 3004
-    if read_hmo3004:
-        if os.path.isdir(dir_hmo3004):
-            dir_hmo3004 = os.path.abspath(dir_hmo3004)
-            save_hmo3004_to_path = os.path.abspath(save_hmo3004_to_path)
-            for old_path in get_subdir_list(dir_hmo3004):
-                new_path = add_new_dir_to_path(old_path, save_hmo3004_to_path)
-                combine_hmo3004_csv(old_path, new_path)
-        else:
-            print("Path " + dir_hmo3004 + "\n does not exist!")
-    # FIND MAX & MIN from HMO3004
-    if max_min_log_hmo3004:
-        if os.path.isdir(save_hmo3004_to_path):
-            save_hmo3004_to_path = os.path.abspath(save_hmo3004_to_path)
-            for path in get_subdir_list(save_hmo3004_to_path):
-                get_max_min_from_dir(path, log_cols_hmo3004, corr_cols_hmo3004,
-                                     ext='.CSV',
-                                     log_file_name=log_filename_hmo3004)
-        else:
-            print("Path " + save_hmo3004_to_path + "\n does not exist!")
-
-    # =====================================================================================
-    # READ TXT from LeCroy
-    if read_LeCroy:
-        if os.path.isdir(dir_lecroy):
-            dir_lecroy = os.path.abspath(dir_lecroy)
-            save_hmo3004_to_path = os.path.abspath(save_hmo3004_to_path)
-            for old_path in get_subdir_list(dir_lecroy):
-                new_path = add_new_dir_to_path(old_path, save_lecroy_to_path)
-                combine_lecroy_csv(old_path, new_path, files_in_group=files_in_group_lecroy)
-        else:
-            print("Path " + dir_lecroy + "\n does not exist!")
-
-    # FIND MAX & MIN from LeCroy
-    if max_min_log_lecroy:
-        if os.path.isdir(save_lecroy_to_path):
-            save_lecroy_to_path = os.path.abspath(save_lecroy_to_path)
-            for path in get_subdir_list(save_lecroy_to_path):
-                get_max_min_from_dir(path, log_cols_lecroy, corr_cols_lecroy,
-                                     ext='.CSV',
-                                     log_file_name=log_filename_lecroy)
-        else:
-            print("Path " + save_lecroy_to_path + "\n does not exist!")
-
-    # =======================================================================================
-    # FIND DUPLACATES
-    compare_files_in_subfolders(save_dpo7054_to_path)
-    compare_files_in_subfolders(save_tds2024_to_path)
-    compare_files_in_subfolders(save_hmo3004_to_path)
-    compare_files_in_subfolders(save_lecroy_to_path)
-    # import matplotlib.pyplot as mplt
-    # data = np.genfromtxt('F0009CH1.CSV', delimiter=",", skip_header=18, usecols=tuple())
-    # mplt.plot(data[:,0], data[:,1])
-    # mplt.show()
+    print(args)
