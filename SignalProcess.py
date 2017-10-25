@@ -140,7 +140,7 @@ def get_subdir_list(path):
     return [os.path.join(path, x) for x in os.listdir(path) if os.path.isdir(os.path.join(path, x))]
 
 
-def get_file_list_by_ext(path, ext, sort=False):
+def get_file_list_by_ext(path, ext, sort=True):
     # return a list of files (with the specified extension) contained in the folder (path)
     # each element of the returned list is a full path to the file
     file_list = [os.path.join(path, x) for x in os.listdir(path)
@@ -807,30 +807,33 @@ if __name__ == "__main__":
                         action='store',
                         metavar='SOURCE_DIR',
                         dest='src_dir',
-                        help='specify the directory containing data files '
-                             'after the flag.'
+                        default='',
+                        help='sets the directory containing data files '
+                             '(default=current folder).'
                         )
-    parser.add_argument('-i', '--input-files',
-                        action='store',
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-f', '--input-files',
+                        action='append',
                         nargs='+',
                         metavar='INPUT_FILES',
-                        dest='input_files',
+                        dest='files',
                         help='specify one or more (space separated) input '
                              'file names after the flag. '
                              'It is assumed that the files belong '
                              'to the same shot. '
-                             'You may specify as many \'-i\' flags as you '
-                             'want.'
+                             'In order to process multiple shots enter '
+                             'multiple \'-i\' parameters. '
                         )
-    parser.add_argument('-g', '--grouped-by',
+    group.add_argument('-g', '--grouped-by',
                         action='store',
                         type=int,
                         metavar='GROUPED_BY',
-                        dest='group',
-                        default=1,
-                        help='specify the size of groups after the flag. '
+                        dest='group_size',
+                        help='sets the size of the groups (default=1). '
                              'A group is a set of files, corresponding '
-                             'to one shot. Default=1.'
+                             'to one shot. \nNOTE: if \'-g\' parameter'
+                             'is specified, then all the files in the '
+                             'specified directory will be processed.'
                         )
     parser.add_argument('-c', '--ch',  '--sorted-by-channel',
                         action='store_true',
@@ -847,6 +850,51 @@ if __name__ == "__main__":
                         )
 
     # process parameters and options -----------------------------------------
+    parser.add_argument('--multiplier',
+                        action='store',
+                        type=float,
+                        metavar='MULTIPLIER',
+                        nargs='+',
+                        dest='multiplier',
+                        default=None,
+                        help='the list of multipliers data file(s). '
+                             'NOTE: you must enter values for all the '
+                             'columns in data file(s). Two columns (X and Y) '
+                             'expected for each curve.'
+                        )
+    parser.add_argument('--delay',
+                        action='store',
+                        type=float,
+                        metavar='DELAY',
+                        nargs='+',
+                        dest='delay',
+                        default=None,
+                        help=''
+                        )
+    parser.add_argument('--offset-by-voltage',
+                        action='store',
+                        metavar=('CURVE_IDX', 'LEVEL'),
+                        nargs=2,
+                        dest='voltage_idx',
+                        default=None,
+                        help=''
+                        )
+    parser.add_argument('--y-offset',
+                        action='append',
+                        metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
+                        nargs=3,
+                        dest='delay',
+                        help=''
+                        )
+    parser.add_argument('-s', '--save',
+                        action='store_true',
+                        dest='save_data',
+                        help='saves data files.\n'
+                             'NOTE: If in the input data one '
+                             'shot corresponds to one file and output '
+                             'directory is not specified, input files '
+                             'will be overwritten!'
+                        )
 
     # output settings --------------------------------------------------------
     parser.add_argument('-t', '--save-to', '--target-dir',
@@ -902,7 +950,7 @@ if __name__ == "__main__":
                              '\'-m\' flags (with different lists of curves)'
                              ' as you want.'
                         )
-    parser.add_argument('-s', '--save-multiplot-as',
+    parser.add_argument('--save-multiplot-as',
                         action='append',
                         dest='save_mp_as',
                         metavar='SAVE_MULTIPLOT_AS',
@@ -916,17 +964,78 @@ if __name__ == "__main__":
                              'use as many \'-s\' flags as '
                              'you used \'-m\' flags.'
                         )
-    parser.add_argument('-h', '--hide-multiplot',
+    parser.add_argument('--hide', '--hide-multiplot',
                         action='store_true',
                         dest='hide_mplt',
-                        metavar='HIDE_MULTIPLOT',
                         help='if the flag is specified the multiplots '
                              'will be saved (if the \'-s\' flag was '
                              'specified as well) but not shown. This '
                              'option can reduce the runtime of the program.'
                         )
 
-
     args = parser.parse_args()
+
+    # input files configuration check
+    if args.src_dir:
+        assert os.path.isdir(args.src_dir), \
+            "Can not find directory {}".format(args.src_dir)
+    if args.files:
+        args.group_size = len(args.files[0])
+        for idx, shot_files in enumerate(args.files):
+            assert len(shot_files) == args.group_size, \
+                ("The number of files in each shot must be the same.\n"
+                 "Shot[1] = {} files ({})\nShot[{}] = {} files ({})"
+                 "".format(args.group_size, ", ".join(args.files[0]),
+                           idx + 1, len(shot_files), ", ".join(shot_files))
+                )
+            for filename in shot_files:
+                assert os.path.isfile(os.path.join(args.src_dir, filename)), \
+                    "Can not find file {}".format(filename)
+    else:
+        # user input: directory, group_size and sorted_by
+        assert args.src_dir, ("Specify the directory (-d) containing the "
+                              "data files. See help for more details.")
+        file_list = get_file_list_by_ext(args.src_dir, ".csv", sort=True)
+        assert len(file_list) % args.group_size == 0, \
+            ("The number of .csv files ({}) in the specified folder "
+             "is not a multiple of group size ({})."
+             "".format(len(file_list), args.group_size))
+        args.files = []
+        if args.sorted_by_ch:
+            shots_count = len(file_list) // args.group_size
+            for shot in range(shots_count):
+                args.files.append([file_list[idx] for idx in
+                                     range(shot, len(file_list), shots_count)])
+        else:
+            for idx in range(0, len(file_list), args.group_size):
+                args.files.append(file_list[idx: idx + args.group_size])
+
+    # raw check offset_by_voltage parameters (types)
+    
+    # raw check y_zero_offset parameters (types)
+
+    # MAIN LOOP starts with file read
+    for shot_idx, group in enumerate(args.files):
+        pass
+
+    # check multiplier and delay
+
+    # check offset_by_voltage parameters (if idx out of range)
+
+    # check y_zero_offset parameters (if idx out of range)
+
+    # updates delay values with accordance to voltage front
+
+    # updates delays with accordance to Y zero offset
+
+    # multiplier and delay
+
+    # TODO: check len(multiplier, delay) == len(columns)
+    # TODO: process fake files (not recorded)
+    # TODO: file duplicates check
+    # TODO: check for different number of columns in data files
+    # TODO: user interactive input checker
+    # TODO: partial import
+
 
     print(args)
