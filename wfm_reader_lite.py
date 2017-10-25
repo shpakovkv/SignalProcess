@@ -445,7 +445,7 @@ if __name__ == "__main__":
         '-d',  # 0 input dir path
         '-u',  # 1 setup filename
         '-o',  # 2 output file name
-        '-i',  # 3 input file names (Do not change index of this parameter)
+        '-f',  # 3 input file names (Do not change index of this parameter)
         '-g',  # 4 number of files in group (one shot)
         '-b',  # 5 sorted by (num-first/ch-first) (num/ch)
         '-t',  # 6 save to dir
@@ -467,7 +467,7 @@ if __name__ == "__main__":
     num_first_sort = ('num', 'number', 'num-first', 'number-first')
     ch_first_sort = ('ch', 'channel', 'ch-first', 'channel-first')
     # some keys should not be used together:
-    #                (u, i); (u, o); (u, g); (u, p); (o, g); (o, p); (i, g)
+    #                (u, f); (u, o); (u, g); (u, p); (o, g); (o, p); (f, g)
     key_conflicts = ((1, 3), (1, 2), (1, 4), (1, 7), (2, 4), (2, 7), (3, 4))
 
     # checks input parameters and gets values
@@ -502,7 +502,7 @@ if __name__ == "__main__":
              long_keys[k2] + '\') can not be used together.')
 
     # assign parameters values
-    file_list = params.get('-i', [])
+    file_list = params.get('-f', [])
     setup_file = params.get('-u', False)
     save_as = params.get('-o', '')
     path = params.get('-d', '')
