@@ -86,21 +86,33 @@ class SignalsData:
     def append(self, input_data, curve_labels=None):
         # appends new SingleCurves to the self.curves list
         data = np.array(input_data, dtype=float, order='F')  # convert input data to numpy.ndarray
-        self.check_input(data)                               # check inputs
-        for curve_idx in range(0, data.shape[1], 2):
-            self.curves.append(SingleCurve(data[:, curve_idx], data[:, curve_idx + 1]))  # adds new SingleCurve
-            self.count += 1                                                              # updates the number of curves
-            if curve_labels:
-                self.labels[curve_labels[curve_idx]] = self.count - 1                 # adds label-index pair to dict
-            else:
-                self.labels[str(self.count - 1)] = self.count - 1                     # adds 'index'-index pair to dict
+        self.check_input(data)
+        if data.shape[1] % 2 != 0:
+            new_curves = data.shape[1] - 1
+            for curve_idx in range(0, new_curves):
+                self.curves.append(SingleCurve(data[:, 0], data[:, curve_idx]))  # adds new SingleCurve
+                self.count += 1  # updates the number of curves
+                if curve_labels:
+                    self.labels[curve_labels[curve_idx]] = self.count - 1  # adds label-index pair to dict
+                else:
+                    self.labels[str(self.count - 1)] = self.count - 1  # adds 'index'-index pair to dict
+        else:
+            for curve_idx in range(0, data.shape[1], 2):
+                self.curves.append(SingleCurve(data[:, curve_idx], data[:, curve_idx + 1]))
+                self.count += 1
+                if curve_labels:
+                    self.labels[curve_labels[curve_idx]] = self.count - 1
+                else:
+                    self.labels[str(self.count - 1)] = self.count - 1
 
     def check_input(self, data, curve_labels=None):
         # CHECK INPUT DATA
         if np.ndim(data) != 2:                              # number of dimension of the input array check
             raise ValueError("Input array must have 2 dimensions.")
         if data.shape[1] % 2 != 0:                          # number of columns of the input array check
-            raise IndexError("Input array must have even number of columns.")
+            print("Input array have odd number of columns.\n "
+                  "Consider the first column as X columnn and the others as Y columns.\n"
+                  "First column will be duplicated for all Y columns")
         if curve_labels:
             if not isinstance(curve_labels, list):          # labels array type checck
                 raise TypeError("Variable curve_labels must be an instance of the list class.")
@@ -1011,7 +1023,7 @@ if __name__ == "__main__":
                 args.files.append(file_list[idx: idx + args.group_size])
 
     # raw check offset_by_voltage parameters (types)
-    
+
     # raw check y_zero_offset parameters (types)
 
     # MAIN LOOP starts with file read
@@ -1036,6 +1048,7 @@ if __name__ == "__main__":
     # TODO: check for different number of columns in data files
     # TODO: user interactive input checker
     # TODO: partial import
+    # TODO: header lines handle
 
 
     print(args)
