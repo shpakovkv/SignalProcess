@@ -10,6 +10,9 @@ from scipy.signal import savgol_filter
 import wfm_reader_lite as wfm
 
 
+debug = True
+
+
 class SingleCurve:
     def __init__(self, in_x=None, in_y=None):
         self.data = np.empty([0, 2], dtype=float, order='F')
@@ -449,8 +452,14 @@ def combine_lecroy_csv(dir_path,
 
 
 def add_zeros_to_filename(full_path, count):
-    # adds zeros to number in filename
-    # Example: f("shoot22.csv", 4) => "shoot0022.csv"
+    '''
+    Adds zeros to number in filename.
+    Example: f("shot22.csv", 4) => "shot0022.csv"
+    
+    full_path -- filename or full path to file
+    count -- number of digits
+    '''
+    #
 
     name = os.path.basename(full_path)
     folder_path = os.path.dirname(full_path)
@@ -475,27 +484,154 @@ def add_zeros_to_filename(full_path, count):
     return os.path.join(folder_path, name)
 
 
-def read_csv_group(group_of_files,
-                   delimiter=",",       # Default = ","
-                   skip_header=18,      # Defaults: TDS2024C = 18  |  HMO3004 = 1  |  LeCroy = 5  |  EasyScope = 0
-                   usecols=tuple()):    # Default:  tuple()   |   TDS2024C = (3.4)
+def read_signals(file_list, start=0, step=1, points=-1):
+    '''
+    Function returns one SignalsData object filled with
+    data from files in file_list.
+    Do not forget to sort the list of files
+    for the correct order of curves.
+    
+    Can handle different type of files.
+    Supported formats: CSV, WFM
+    For more information about the supported formats, 
+    see the help of the function load_from_file().
 
-    # READS a number of wfm files, UNITES columns to 1 table and RETURNS it as 2-dimensional ndarray
+    file_list -- list of full paths or 1 path (str)
+    start -- start read data points from this index
+    step -- read data points with this step
+    points -- data points to read (-1 == all)
+    '''
 
-    data = np.genfromtxt(group_of_files[0], delimiter=delimiter, skip_header=skip_header, usecols=usecols)
-    for i in range(1, len(group_of_files), 1):
-        new_data = np.genfromtxt(group_of_files[i], delimiter=delimiter, skip_header=skip_header, usecols=usecols)
-        data = np.c_[data, new_data]  # adds data to the array
+    # check inputs
+    if isinstance(file_list, str):
+        file_list = [file_list]
+    elif not isinstance(file_list, list):
+        raise TypeError("file_list must be an instance of str or list of str")
+
+    # read
+    data = SignalsData()
+    for filename in file_list:
+        data.append(load_from_file(filename, start, step, points))
     return data
 
 
-def add_new_dir_to_path(old_leaf_dir, new_parent_dir):
-    # adds last dir name from old_leaf_dir to new_parent_dir path
-    # dir_name = re.search(r'[^/]+/$', old_leaf_dir).group(0)
-    if old_leaf_dir.endswith("/") or old_leaf_dir.endswith("\\"):
-        old_leaf_dir = old_leaf_dir[0:-1]
-    dir_name = os.path.basename(old_leaf_dir)
-    return os.path.join(new_parent_dir, dir_name)    # new leaf dir
+def origin_to_csv(readed_lines):
+    '''
+    Replaces ',' with '.' and then ';' with ',' in the
+    given list of lines of a .csv file.
+
+    Use it for OriginPro ascii export format with ';' as delimiter 
+    and ',' as decimal separator.
+
+    read_lines -- array of a .csv file lines (array of string)
+    '''
+    import re
+    converted = [re.sub(r',', '.', line) for line in readed_lines]
+    converted = [re.sub(r';', ',', line) for line in converted]
+    # print("CONVERTED from OriginPro!")
+    return converted
+
+
+def valid_cols(read_lines, skip_header, delimiter=','):
+    '''
+    Returns the list of valid (non empty) columns
+    for the given list of lines of a .csv file.
+
+    read_lines -- array of a .csv file lines (array of string)
+    skip_header -- the number of header lines
+    delimiter -- .csv data delimiter
+    :return: 
+    '''
+    cols = read_lines[skip_header].strip().split(delimiter)
+    valid_col_list = []
+    for idx, val in enumerate(cols):
+        if val != '':
+            valid_col_list.append(idx)
+    if debug and len(cols) != len(valid_col_list):
+        print("The columns ", end = '')
+        print(", ".join([str(idx) for idx in range(0, len(cols))
+                         if idx not in valid_col_list]), end=' ')
+        print(" is empty!")
+    return tuple(valid_col_list)
+
+
+def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
+    '''
+    Returns the number of header lines 
+    for the given list of lines of a .csv file.
+
+    read_lines -- array of a .csv file lines (array of string)
+    delimiter -- .csv data delimiter
+    except_list -- the list of special strings, that can not be converted
+                   to numeric with the float() function, but the csv reader
+                   may considered it as a valid value.
+    '''
+    cols_count = len(read_lines[-1].strip().split(delimiter))
+    headers = 0
+    idx = 0
+    lines = len(read_lines)
+
+    # column number difference
+    while (len(read_lines[-1].strip().split(delimiter)) !=
+               cols_count and idx < lines and idx < lines):
+        idx += 1
+        headers += 1
+
+    # non numeric value check
+    for idx in range(headers, lines):
+        try:
+            [float(val) for val in read_lines[idx].strip().split(delimiter) if val not in except_list]
+        except ValueError:
+            headers += 1
+        else:
+            break
+    if debug:
+        print("Columns count = {}".format(cols_count))
+        print("Header lines = {}".format(headers))
+    return headers
+
+
+def load_from_file(filename, start=0, step=1, points=-1):
+    '''
+    Return ndarray instance filled with data from csv or wfm file.
+    
+    filename -- file name (full/relative path)
+    start -- start read data points from this index
+    step -- read data points with this step
+    points -- data points to read (-1 == all)
+     '''
+
+    valid_delimiters = [',', ';', ' ', '\t']
+
+    import csv
+
+    if filename[-3:].upper() != 'WFM':
+        with open(filename, "r") as datafile:
+            dialect = csv.Sniffer().sniff(datafile.read(2048))
+            datafile.seek(0)
+            if dialect.delimiter not in valid_delimiters:
+                dialect.delimiter = ','
+            if debug:
+                print("Delimiter = {}".format(dialect.delimiter))
+            text_data = datafile.readlines()
+            if dialect.delimiter == ";":
+                text_data = origin_to_csv(text_data)
+                dialect.delimiter = ','
+            skip_header = get_csv_headers(text_data)
+            usecols = valid_cols(text_data, skip_header,
+                                 delimiter=dialect.delimiter)
+            if debug:
+                print("Valid columns = {}".format(usecols))
+            data = np.genfromtxt(text_data,
+                                 delimiter=dialect.delimiter,
+                                 skip_header=skip_header,
+                                 usecols=usecols)
+
+    else:
+        data = wfm.read_wfm_group([filename], start_index=start,
+                                  number_of_points=points,
+                                  read_step=step)
+    return data
 
 
 def compare_2_files(first_file_name, second_file_name, lines=30):
