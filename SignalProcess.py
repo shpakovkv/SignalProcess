@@ -10,7 +10,7 @@ from scipy.signal import savgol_filter
 import wfm_reader_lite as wfm
 
 
-debug = True
+verbose = True
 
 
 class SingleCurve:
@@ -23,7 +23,8 @@ class SingleCurve:
         # INPUT DATA CHECK
         x_data = x_in
         y_data = y_in
-        if not isinstance(x_data, np.ndarray) or not isinstance(y_data, np.ndarray):
+        if (not isinstance(x_data, np.ndarray) or
+                not isinstance(y_data, np.ndarray)):
             raise TypeError("Input time and value arrays must be "
                             "instances of numpy.ndarray class.")
         if len(x_data) != len(y_data):
@@ -31,20 +32,19 @@ class SingleCurve:
                              "have same length.")
         # self.points = len(x_data)
 
-        if np.ndim(x_data) == 1:  # check if X array has 2 dimensions
-            x_data = np.expand_dims(x_in, axis=1)  # add dimension to the array
-        if np.ndim(y_data) == 1:  # check if Y array has 2 dimensions
-            y_data = np.expand_dims(y_in, axis=1)  # add dimension to the array
+        # dimension check
+        if np.ndim(x_data) == 1:
+            x_data = np.expand_dims(x_in, axis=1)
+        if np.ndim(y_data) == 1:
+            y_data = np.expand_dims(y_in, axis=1)
 
-        if x_data.shape[1] != 1 or y_data.shape[1] != 1:  # check if X and Y arrays have 1 column
+        if x_data.shape[1] != 1 or y_data.shape[1] != 1:
             raise ValueError("Input time and value arrays must "
                              "have 1 column and any number of rows.")
 
         start_idx = None
         stop_idx = None
         for i in range(len(x_data) - 1, 0, -1):
-            tmp_x = x_data[i]
-            tmp_y= y_data[i]
             if not np.isnan(x_data[i]) and not np.isnan(y_data[i]):
                 stop_idx = i
                 break
@@ -52,12 +52,12 @@ class SingleCurve:
             if not np.isnan(x_data[i]) and not np.isnan(y_data[i]):
                 start_idx = i
                 break
-        if start_idx == None or stop_idx == None:
+        if start_idx is None or stop_idx is None:
             raise ValueError("Can not append array of empty "
                              "values to SingleCurve's data.")
         # CONVERT TO NDARRAY
-        temp = np.append(x_data[start_idx:stop_idx + 1],
-                         y_data[start_idx:stop_idx + 1],
+        temp = np.append(x_data[start_idx: stop_idx + 1],
+                         y_data[start_idx: stop_idx + 1],
                          axis=1)
         self.data = np.append(self.data, temp, axis=0)
 
@@ -78,9 +78,12 @@ class SingleCurve:
 class SignalsData:
     def __init__(self, input_data=None, curve_labels=None):
         # EMPTY INSTANCE
-        self.count = 0          # number of curves
-        self.curves = []        # list of curves data (SingleCurve instances)
-        self.labels = dict()    # dict with curve labels as keys and curve indexes as values
+        # number of curves:
+        self.count = 0
+        # list of curves data (SingleCurve instances):
+        self.curves = []
+        # dict with curve labels as keys and curve indexes as values:
+        self.labels = dict()
 
         # FILL WITH VALUES
         if input_data is not None:
@@ -88,20 +91,22 @@ class SignalsData:
 
     def append(self, input_data, curve_labels=None):
         # appends new SingleCurves to the self.curves list
-        data = np.array(input_data, dtype=float, order='F')  # convert input data to numpy.ndarray
+        data = np.array(input_data, dtype=float, order='F')
         self.check_input(data)
         if data.shape[1] % 2 != 0:
             new_curves = data.shape[1] - 1
             for curve_idx in range(0, new_curves):
-                self.curves.append(SingleCurve(data[:, 0], data[:, curve_idx]))  # adds new SingleCurve
-                self.count += 1  # updates the number of curves
+                self.curves.append(SingleCurve(data[:, 0],
+                                               data[:, curve_idx]))
+                self.count += 1
                 if curve_labels:
-                    self.labels[curve_labels[curve_idx]] = self.count - 1  # adds label-index pair to dict
+                    self.labels[curve_labels[curve_idx]] = self.count - 1
                 else:
-                    self.labels[str(self.count - 1)] = self.count - 1  # adds 'index'-index pair to dict
+                    self.labels[str(self.count - 1)] = self.count - 1
         else:
             for curve_idx in range(0, data.shape[1], 2):
-                self.curves.append(SingleCurve(data[:, curve_idx], data[:, curve_idx + 1]))
+                self.curves.append(SingleCurve(data[:, curve_idx],
+                                               data[:, curve_idx + 1]))
                 self.count += 1
                 if curve_labels:
                     self.labels[curve_labels[curve_idx]] = self.count - 1
@@ -109,37 +114,56 @@ class SignalsData:
                     self.labels[str(self.count - 1)] = self.count - 1
 
     def check_input(self, data, curve_labels=None):
+        '''
+        Checks the correctness of input data.
+        Raises exception if data check fails.
+        
+        data -- ndarray with data to add to a SignlsData instance
+        curve_labels -- the list of labels for new curves
+        '''
         # CHECK INPUT DATA
-        if np.ndim(data) != 2:                              # number of dimension of the input array check
+        if np.ndim(data) != 2:
             raise ValueError("Input array must have 2 dimensions.")
-        if data.shape[1] % 2 != 0:                          # number of columns of the input array check
-            print("Input array have odd number of columns.\n "
-                  "Consider the first column as X columnn and the others as Y columns.\n"
-                  "First column will be duplicated for all Y columns")
+        if data.shape[1] % 2 != 0:
+            if verbose:
+                print("The input array has an odd number of columns! "
+                      "The first column is considered as X column, "
+                      "and the rest as Y columns.")
         if curve_labels:
-            if not isinstance(curve_labels, list):          # labels array type checck
-                raise TypeError("Variable curve_labels must be an instance of the list class.")
-            if data.shape[1] // 2 != len(curve_labels):     # number of labels check
-                raise IndexError("Number of curves (pair of time-value columns) in data "
+            if not isinstance(curve_labels, list):
+                raise TypeError("Variable curve_labels must be "
+                                "an instance of the list class.")
+            if data.shape[1] // 2 != len(curve_labels):
+                raise IndexError("Number of curves (pair of "
+                                 "time-value columns) in data "
                                  "and number of labels must be the same.")
-            for label in curve_labels:                      # label duplicate check
+            for label in curve_labels:
                 if label in self.labels:
-                    raise ValueError("Label \"" + label + "\" is already exist.")
+                    raise ValueError("Label \"{}\" is already exist."
+                                     "".format(label))
 
     def get_array(self):
-        # return all curves data as united 2D array
-        # short curve arrays are supplemented with required amount of rows (filled with 'nan')
-        return align_and_append_ndarray(*[curve.data for curve in self.curves])
+        '''Returns all curves data as united 2D array
+        short curve arrays are supplemented with 
+        required amount of rows (filled with 'nan')
+        
+        return -- 2d ndarray 
+        '''
+        return align_and_append_ndarray(*[curve.data for
+                                          curve in self.curves])
 
-    def by_label(self, label):   # returns SingleCurve by name
+    def by_label(self, label):
+        # returns SingleCurve by name
         return self.curves[self.labels[label]]
 
-    def get_label(self, idx):    # return label of the SingelCurve by index
+    def get_label(self, idx):
+        # return label of the SingelCurve by index
         for key, value in self.labels.items():
             if value == idx:
                 return key
 
-    def get_idx(self, label):    # returns index of the SingelCurve by label
+    def get_idx(self, label):
+        # returns index of the SingelCurve by label
         if label in self.labels:
             return self.labels[label]
 
@@ -151,316 +175,42 @@ class SignalsData:
 
 
 def get_subdir_list(path):
-    # return list of subdirectories
-    return [os.path.join(path, x) for x in os.listdir(path) if os.path.isdir(os.path.join(path, x))]
+    '''Returns list of subdirectories for the given directory.
+    
+    path -- path to the target directory 
+    '''
+    return [os.path.join(path, x) for x in os.listdir(path)
+            if os.path.isdir(os.path.join(path, x))]
 
 
-def get_file_list_by_ext(path, ext, sort=True):
-    # return a list of files (with the specified extension) contained in the folder (path)
-    # each element of the returned list is a full path to the file
+def get_file_list_by_ext(path, ext_list, sort=True):
+    '''Returns a list of files (with the specified extensions) 
+    contained in the folder (path).
+    Each element of the returned list is a full path to the file
+    
+    path -- target directory.
+    ext -- the list of file extensions or one extension (str).
+    sort -- by default, the list of results is sorted
+            in lexicographical order.
+    '''
+    if isinstance(ext_list, str):
+        ext_list = [ext_list]
     file_list = [os.path.join(path, x) for x in os.listdir(path)
-                 if os.path.isfile(os.path.join(path, x)) and x.upper().endswith(ext.upper())]
+                 if os.path.isfile(os.path.join(path, x)) and
+                 any(x.upper().endswith(ext.upper()) for
+                 ext in ext_list)]
     if sort:
         file_list.sort()
     return file_list
 
 
-def group_files_by_count(file_list, files_in_group=4):
-    # group files for DPO7054 / TDS2024
-    # (first 4(default) files form first group, second 4 files form second group, etc.)
-    # files in group mus have equal prefix, equal number and different postfix
-    # example: "erg_001_Ch1.wfm", "erg_001_Ch2.wfm", "erg_001_Ch3.wfm", "erg_001_Ch4.wfm"
-    groups_list = []
-    if len(file_list) % files_in_group != 0:
-        raise IndexError("Not enough files in file_list. Or wrong value of variable files_in_group.")
-    for i in range(0, len(file_list), files_in_group):
-        new_group = []
-        for j in range(files_in_group):  # makes new group of files
-            new_group.append(file_list[i + j])
-        # print("Group[" + str(int(i / files_in_group + 1)) + "] : " + str(new_group))
-        groups_list.append(new_group)   # adds new group to the list
-    return groups_list
-
-
-def group_files_lecroy(file_list, files_in_group=4):
-    # group files for LeCroy
-    # Every N files in the file_list contains single channel data,
-    # where N is shoots count (N = len(file_list) / files_in_group)
-    #
-    # files in group mus have equal postfix, equal number and different prefix ("C1_", "C2_", "C3_" or "C4_")
-    # example: "C1_LeCroy_0001.txt", "C2_LeCroy_0001.txt", "C3_LeCroy_0001.txt", "C4_LeCroy_0001.txt"
-    if len(file_list) % files_in_group != 0:
-        raise IndexError("Not enough files in file_list. Or wrong value of variable files_in_group.")
-
-    groups_list = []
-    shoots_count = int(len(file_list) / files_in_group)
-    for i in range(0, shoots_count):
-        new_group = []
-        for j in range(files_in_group):  # makes new group of files
-            new_group.append(file_list[i + j * shoots_count])
-        # print("Group[" + str(i) + "] : " + str(new_group))    # shows group's content
-        groups_list.append(new_group)  # adds new group to the list
-    return groups_list
-
-
-def get_name_from_group(group, ch_postfix_len=8, ch_prefix_len=0):
-    # INPUT
-    # group:            list of files corresponding to one shoot
-    #                   each file is a single channel record from the oscilloscope
-    # DEFAULT:
-    # ch_postfix_len:   DPO7054: 8  |  TDS2024C: 7  | HMO3004: 4 |   LeCroy: 4
-    # ch_prefix_len:    DPO7054: 0  |  TDS2024C: 0  | HMO3004: 0 |   LeCroy: 3
-    #
-    # OUTPUT:   name of the shoot
-
-    path = os.path.abspath(group[0])
-    name = os.path.basename(path)
-    if ch_postfix_len > 0:
-        return name[ch_prefix_len:-ch_postfix_len]
-    return name[ch_prefix_len:]
-
-
-def combine_wfm_to_csv(dir_path,
-                       save_to=None,
-                       files_in_group=4,
-                       ch_postfix_len=8,
-                       delimiter=", ",
-                       target_ext=".wfm",
-                       save_with_ext=".CSV",
-                       silent_mode=False):
-    # READS a group of wfm files (from DPO7054) with single shoot data (each file contains single channel data)
-    # COMBINES all data to one table (each 2 columns [time, value] represent 1 file )
-    # SAVES data to one csv file
-    # REPEATS first 3 action
-    #
-    # dir_path          - folder containing target files
-    # save_to           - folder to save files to
-    # target_ext        - target files extension
-    # files_in_group    = number of channels(records/files) of the oscilloscope corresponding to one shoot
-    # ch_postfix_len    - DPO7054 wfm filename postfix length (default = 8) Example of postfix: "_Ch1.wfm"
-    # delimiter         - delimiter for csv file
-    # save_with_ext     - The data will be saved to a file with specified extension
-
-    # CHECK PATH
-    if save_to and not os.path.isdir(save_to):
-        os.makedirs(save_to)
-
-    if not silent_mode:
-        print("Working directory: \n" + dir_path)
-
-    # GET LIST OF FILES---------------------------------------------
-    file_list = get_file_list_by_ext(dir_path, target_ext)
-    file_list.sort()
-
-    # GROUP FILES for DPO7054 --------------------------------------
-    groups_list = group_files_by_count(file_list, files_in_group)
-
-    # READ & SAVE
-    for group in groups_list:
-        # READ WFM
-        data = wfm.read_wfm_group(group)
-
-        if save_to:
-            # SAVE CSV
-            file_name = get_name_from_group(group, ch_postfix_len)
-            file_name += save_with_ext
-            # file_full_name = save_to + file_name
-            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-            if not silent_mode:
-                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
-
-    if not silent_mode:
-        print()
-
-
-def combine_tds2024c_csv(dir_path,
-                         save_to=None,
-                         files_in_group=4,
-                         ch_postfix_len=7,
-                         skip_header=18,
-                         usecols=(3, 4),
-                         delimiter=", ",
-                         target_ext=".CSV",
-                         save_with_ext=".CSV",
-                         silent_mode=False):
-    # READS a group of csv files (from TDS2024C) with single shoot data (each file contains single channel data)
-    # COMBINES all data to one table (each 2 columns [time, value] represent 1 file )
-    # SAVES data to one csv file
-    # REPEATS first 3 action
-    #
-    # dir_path          - folder containing target files
-    # save_to           - folder to save files to
-    # target_ext        - target files extension
-    # files_in_group    = number of channels(records/files) of the oscilloscope corresponding to one shoot
-    # ch_postfix_len    - TDS2024C filename postfix length (default = 7) Example of postfix: "CH1.CSV"
-    # delimiter         - delimiter for csv file
-    # save_with_ext     - The data will be saved to a file with specified extension
-
-    # CHECK PATH
-    if save_to and not os.path.isdir(save_to):
-        os.makedirs(save_to)
-
-    if not silent_mode:
-        print("Working directory: " + dir_path)
-
-    # GET LIST OF FILES---------------------------------------------
-    file_list = get_file_list_by_ext(dir_path, target_ext)
-    file_list.sort()
-    data = None
-
-    # GROUP FILES for DPO7054 --------------------------------------
-    groups_list = group_files_by_count(file_list, files_in_group)
-
-    # READ & SAVE
-    for group in groups_list:
-        # READ SINGLE CSVs
-        data = read_csv_group(group, skip_header=skip_header, usecols=usecols)
-
-        if save_to:
-            # SAVE 'ALL-IN' CSV
-            file_name = get_name_from_group(group, ch_postfix_len)
-            file_name += save_with_ext
-            # file_full_name = save_to + file_name
-            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-            if not silent_mode:
-                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
-
-    if not silent_mode:
-        print()
-    return data
-
-
-def combine_hmo3004_csv(dir_path,
-                        save_to=None,           # save to filename (don't save if None)
-                        files_in_group=1,
-                        ch_postfix_len=4,
-                        skip_header=1,
-                        usecols=tuple(),
-                        delimiter=", ",
-                        target_ext=".CSV",
-                        save_with_ext=".CSV",
-                        silent_mode=False):
-    # READS a csv file (from HMO3004) with single shoot data (one time column and several value columns)
-    # COMBINES all data to default-shape table (each 2 columns [time, value] represent 1 channel )
-    # SAVES data to one csv file
-    # REPEATS first 3 action for all files in dir
-    #
-    # dir_path          - folder containing target files
-    # save_to           - folder to save files to
-    # target_ext        - target files extension
-    # files_in_group    = number of channels(records/files) of the oscilloscope corresponding to one shoot
-    # ch_postfix_len    - HMO3004 filename postfix length (default = 4) Example of postfix: ".CSV"
-    # delimiter         - delimiter for csv file
-    # save_with_ext     - The data will be saved to a file with specified extension
-
-    # CHECK PATH
-    if save_to and not os.path.isdir(save_to):
-        os.makedirs(save_to)
-
-    if not silent_mode:
-        print("Working directory: " + dir_path)
-
-    # GET LIST OF FILES---------------------------------------------
-    file_list = get_file_list_by_ext(dir_path, target_ext)
-    file_list.sort()
-    data = None
-
-    # GROUP FILES for DPO7054 --------------------------------------
-    groups_list = group_files_by_count(file_list, files_in_group)
-
-    # READ & SAVE
-    for group in groups_list:
-        # READ SINGLE CSVs
-        old_format_data = read_csv_group(group, skip_header=skip_header, usecols=usecols)
-
-        # ADD "time" column to each "value" column
-        data = np.c_[old_format_data[:, 0:2],      # 0:2 means [0:2) and includes only columns 0 and 1
-                     old_format_data[:, 0], old_format_data[:, 2],
-                     old_format_data[:, 0], old_format_data[:, 3],
-                     old_format_data[:, 0], old_format_data[:, 4]]
-
-        if save_to:
-            # SAVE 'ALL-IN' CSV
-            file_name = get_name_from_group(group, ch_postfix_len)
-            file_name = add_zeros_to_filename(file_name, 4)
-            file_name += save_with_ext
-            # file_full_name = save_to + file_name
-            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-            if not silent_mode:
-                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
-    if not silent_mode:
-        print()
-    return data
-
-
-def combine_lecroy_csv(dir_path,
-                       save_to=None,           # save to filename (don't save if None)
-                       files_in_group=4,
-                       ch_postfix_len=4,
-                       ch_prefix_len=3,
-                       skip_header=5,
-                       usecols=tuple(),
-                       delimiter=", ",
-                       target_ext=".txt",
-                       save_with_ext=".CSV",
-                       silent_mode=False):
-    # READS a group of wfm files (from LeCroy) with single shoot data (each file contains single channel data)
-    # COMBINES all data to one table (each 2 columns [time, value] represent 1 file )
-    # SAVES data to one csv file
-    # REPEATS first 3 action
-    #
-    # dir_path          - folder containing target files
-    # save_to           - folder to save files to
-    # target_ext        - target files extension
-    # files_in_group    = number of channels(records/files) of the oscilloscope corresponding to one shoot
-    # ch_postfix_len    - LeCroy csv filename postfix length (default = 4) Example of postfix: ".txt"
-    # ch_prefix_len     - LeCroy csv filename prefix length (default = 3) Example of prefix: "C4_"
-    # delimiter         - delimiter for csv file
-    # save_with_ext     - The data will be saved to a file with specified extension
-
-    # CHECK PATH
-    if save_to and not os.path.isdir(save_to):
-        os.makedirs(save_to)
-
-    if not silent_mode:
-        print("Working directory: " + dir_path)
-
-    # GET LIST OF FILES---------------------------------------------
-    file_list = get_file_list_by_ext(dir_path, target_ext)
-    file_list.sort()
-    data = None
-
-    # GROUP FILES for LeCroy --------------------------------------
-    groups_list = group_files_lecroy(file_list, files_in_group)
-
-    # READ & SAVE
-    for group in groups_list:
-        # READ SINGLE CSVs
-        data = read_csv_group(group, skip_header=skip_header, usecols=usecols)
-
-        if save_to:
-            # SAVE CSV
-            file_name = get_name_from_group(group, ch_postfix_len, ch_prefix_len=ch_prefix_len)
-            file_name += save_with_ext
-            # file_full_name = save_to + file_name
-            np.savetxt(os.path.join(save_to, file_name), data, delimiter=delimiter)
-            if not silent_mode:
-                print("File \"" + file_name + "\" saved to " + os.path.join(save_to, file_name))
-    if not silent_mode:
-        print()
-    return data
-
-
 def add_zeros_to_filename(full_path, count):
-    '''
-    Adds zeros to number in filename.
+    '''Adds zeros to number in filename.
     Example: f("shot22.csv", 4) => "shot0022.csv"
     
     full_path -- filename or full path to file
     count -- number of digits
     '''
-    #
-
     name = os.path.basename(full_path)
     folder_path = os.path.dirname(full_path)
 
@@ -511,7 +261,11 @@ def read_signals(file_list, start=0, step=1, points=-1):
     # read
     data = SignalsData()
     for filename in file_list:
+        if verbose:
+            print("Loading \"{}\"".format(filename))
         data.append(load_from_file(filename, start, step, points))
+        if verbose:
+            print()
     return data
 
 
@@ -528,7 +282,8 @@ def origin_to_csv(readed_lines):
     import re
     converted = [re.sub(r',', '.', line) for line in readed_lines]
     converted = [re.sub(r';', ',', line) for line in converted]
-    # print("CONVERTED from OriginPro!")
+    # if verbose:
+    #     print("OriginPro ascii format detected.")
     return converted
 
 
@@ -547,11 +302,11 @@ def valid_cols(read_lines, skip_header, delimiter=','):
     for idx, val in enumerate(cols):
         if val != '':
             valid_col_list.append(idx)
-    if debug and len(cols) != len(valid_col_list):
-        print("The columns ", end = '')
-        print(", ".join([str(idx) for idx in range(0, len(cols))
-                         if idx not in valid_col_list]), end=' ')
-        print(" is empty!")
+    # if verbose and len(cols) != len(valid_col_list):
+    #     print("\nThe columns ", end = '')
+    #     print(", ".join([str(idx) for idx in range(0, len(cols))
+    #                      if idx not in valid_col_list]), end=' ')
+    #     print(" is empty!", end='')
     return tuple(valid_col_list)
 
 
@@ -580,14 +335,15 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
     # non numeric value check
     for idx in range(headers, lines):
         try:
-            [float(val) for val in read_lines[idx].strip().split(delimiter) if val not in except_list]
+            [float(val) for val in read_lines[idx].strip().split(delimiter) if
+             val not in except_list]
         except ValueError:
             headers += 1
         else:
             break
-    if debug:
-        print("Columns count = {}".format(cols_count))
-        print("Header lines = {}".format(headers))
+    if verbose:
+        print("Header lines = {}   |   ".format(headers), end="")
+        # print("Columns count = {}  |  ".format(cols_count), end="")
     return headers
 
 
@@ -611,8 +367,9 @@ def load_from_file(filename, start=0, step=1, points=-1):
             datafile.seek(0)
             if dialect.delimiter not in valid_delimiters:
                 dialect.delimiter = ','
-            if debug:
-                print("Delimiter = {}".format(dialect.delimiter))
+            if verbose:
+                print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
+                      end="")
             text_data = datafile.readlines()
             if dialect.delimiter == ";":
                 text_data = origin_to_csv(text_data)
@@ -620,8 +377,8 @@ def load_from_file(filename, start=0, step=1, points=-1):
             skip_header = get_csv_headers(text_data)
             usecols = valid_cols(text_data, skip_header,
                                  delimiter=dialect.delimiter)
-            if debug:
-                print("Valid columns = {}".format(usecols))
+            if verbose:
+                print("Valid columns = {}   |   ".format(usecols), end="")
             data = np.genfromtxt(text_data,
                                  delimiter=dialect.delimiter,
                                  skip_header=skip_header,
@@ -631,6 +388,12 @@ def load_from_file(filename, start=0, step=1, points=-1):
         data = wfm.read_wfm_group([filename], start_index=start,
                                   number_of_points=points,
                                   read_step=step)
+    if verbose:
+        if data.shape[1] % 2 ==0:
+            curves_count = data.shape[1] // 2
+        else:
+            curves_count = data.shape[1] - 1
+        print("Curves count = {}".format(curves_count))
     return data
 
 
@@ -646,7 +409,7 @@ def compare_2_files(first_file_name, second_file_name, lines=30):
 
 
 def compare_files_in_folder(path, ext=".CSV"):
-    file_list = get_file_list_by_ext(path, ext=ext, sort=True)
+    file_list = get_file_list_by_ext(path, ext, sort=True)
     print("Current PATH = " + path)
     for idx in range(len(file_list) - 1):
         if compare_2_files(file_list[idx], file_list[idx + 1]):
@@ -741,25 +504,19 @@ def get_max_min_from_dir(dir_path,        # target folder
     return log
 
 
-def col_and_param_number_check(data, *arg):
-    for param_list in arg:
-        if isinstance(data, np.ndarray):
-            cols = data.shape[1]
-        elif isinstance(data, SignalsData):
-            cols = data.count
-        else:
-            raise TypeError("Can not check columns count. Data must be an instance of numpy.ndarray or SignalsData")
+def multiplier_and_delay(data, multiplier, delay):
+    '''Returns the modified data.
+    Each column of the data is first multiplied by 
+    the corresponding multiplier value and
+    then the corresponding delay value is subtracted from it.
+    
+    data -- an instance of the SignalsData class OR 2D numpy.ndarray
+    multiplier -- the list of multipliers for each columns in the input data.
+    delay -- the list of delays (subtrahend) for each columns in the input data.
+    '''
+    if multiplier is None and delay is None:
+        return data
 
-        if cols > len(param_list):
-            raise IndexError("The number of columns exceeds the number of parameters.")
-        elif cols < len(param_list):
-            raise IndexError("The number of parameters exceeds the number of columns.")
-    return True
-
-
-def multiplier_and_delay(data,          # an instance of SignalsData class OR 2D numpy.ndarray
-                         multiplier,    # list of multipliers for each columns in data.curves
-                         delay):        # list of delays (subtrahend) for each columns in data.curves
     if isinstance(data, np.ndarray):
         row_number = data.shape[0]
         col_number = data.shape[1]
@@ -768,26 +525,30 @@ def multiplier_and_delay(data,          # an instance of SignalsData class OR 2D
             multiplier = [1 for _ in range(col_number)]
         if not delay:
             delay = [0 for _ in range(col_number)]
-
-        if col_and_param_number_check(data, multiplier, delay):
-            for col_idx in range(col_number):
-                for row_idx in range(row_number):
-                    data[row_idx][col_idx] = data[row_idx][col_idx] * multiplier[col_idx] - delay[col_idx]
-            return data
+        # check_coeffs_number(col_number, ["multiplier", "delay"],
+        #                     multiplier, delay)
+        for col_idx in range(col_number):
+            for row_idx in range(row_number):
+                data[row_idx][col_idx] = (data[row_idx][col_idx] *
+                                          multiplier[col_idx] -
+                                          delay[col_idx])
+        return data
     elif isinstance(data, SignalsData):
         if not multiplier:
             multiplier = [1 for _ in range(data.count * 2)]
         if not delay:
             delay = [0 for _ in range(data.count * 2)]
 
-        if len(multiplier) != data.count * 2:
-            raise IndexError("List of multipliers must contain values for each time and value columns in data.curves.")
+        # check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+        #                     multiplier, delay)
         for curve_idx in range(data.count):
             col_idx = curve_idx * 2             # index of time-column of current curve
             data.curves[curve_idx].data = multiplier_and_delay(data.curves[curve_idx].data,
                                                                multiplier[col_idx:col_idx + 2],
                                                                delay[col_idx:col_idx + 2])
         return data
+    else:
+        raise TypeError("Data must be an instance of numpy.ndarray or SignalsData.")
 
 
 def smooth_voltage(x, y, x_multiplier=1):
@@ -801,24 +562,29 @@ def smooth_voltage(x, y, x_multiplier=1):
     
     return -- smoothed curve (1D numpy.ndarray)
     '''
-    poly_order = 3       # 3 is optimal polyorder value for speed and accuracy
-    window_len = 101    # value 101 is optimal for 1 ns (1e9 multiplier) resolution of voltage waveform
-    #                     for 25 kV charging voltage of ERG installation
+    # 3 is optimal polyorder value for speed and accuracy
+    poly_order = 3
 
-    # window_len correction
-    time_step = (x[1] - x[0]) * 1e9 / x_multiplier      # calc time_step and converts to nanoseconds
-    window_len = int(window_len / time_step)            # calc savgol filter window
+    # value 101 is optimal for 1 ns (1e9 multiplier) resolution
+    # of voltage waveform for 25 kV charging voltage of ERG installation
+    window_len = 101
+
+    # calc time_step and converts to nanoseconds
+    time_step = (x[1] - x[0]) * 1e9 / x_multiplier
+    window_len = int(window_len / time_step)
     if len(y) < window_len:
         window_len = len(y) - 1
     if window_len % 2 == 0:
-        window_len += 1     # window must be even number
+        # window must be even number
+        window_len += 1
     if window_len < 5:
+        # lowest possible value
         window_len = 5
 
-    # smooth
     if len(y) >= 5:
         y_smoothed = savgol_filter(y, window_len, poly_order)
         return y_smoothed
+    # too short array to be processed
     return y
 
 
@@ -844,32 +610,39 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
     with open(filename, 'w') as fid:
         lines = []
         for row in range(data.shape[0]):
-            s = delimiter.join([value_format % data[row, col] for col in range(data.shape[1])]) + "\n"
+            s = delimiter.join([value_format % data[row, col] for
+                                col in range(data.shape[1])]) + "\n"
             s = re.sub(r'nan', '', s)
             lines.append(s)
         fid.writelines(lines)
 
-def align_and_append_ndarray(*args):
-    # returns 2D numpy.ndarray containing all input 2D numpy.ndarrays
-    # if input arrays have different number of rows, fills missing values with 'nan'
 
+def align_and_append_ndarray(*args):
+    '''Returns 2D numpy.ndarray containing all input 2D numpy.ndarrays.
+    If input arrays have different number of rows, 
+    fills missing values with 'nan'.
+    
+    args -- 2d ndarrays
+    '''
     # CHECK TYPE & LENGTH
     for arr in args:
         if not isinstance(arr, np.ndarray):
-            raise TypeError("Input arrays must be instances of numpy.ndarray class.")
+            raise TypeError("Input arrays must be instances "
+                            "of numpy.ndarray class.")
         if np.ndim(arr) != 2:
             raise ValueError("Input arrays must have 2 dimensions.")
 
     # ALIGN & APPEND
-    max_rows = max([arr.shape[0] for arr in args])                   # output array's rows number == max rows number
-    data = np.empty(shape=(max_rows, 0), dtype=float, order='F')     # empty 2-dim array
+    max_rows = max([arr.shape[0] for arr in args])
+    data = np.empty(shape=(max_rows, 0), dtype=float, order='F')
     for arr in args:
-        miss_rows = max_rows - arr.shape[0]                                         # number of missing rows
-        nan_arr = np.empty(shape=(miss_rows, arr.shape[1]), dtype=float, order='F') # array with missing rows...
-        nan_arr = nan_arr * np.nan                                                  # ...filled with 'nan'
+        miss_rows = max_rows - arr.shape[0]
+        nan_arr = np.empty(shape=(miss_rows, arr.shape[1]),
+                           dtype=float, order='F')
+        nan_arr = nan_arr * np.nan
 
-        aligned_arr = np.append(arr, nan_arr, axis=0)                               # combine existing & missing rows
-        data = np.append(data, aligned_arr, axis=1)                                 # append arr to the data
+        aligned_arr = np.append(arr, nan_arr, axis=0)
+        data = np.append(data, aligned_arr, axis=1)
     return data
 
 
@@ -907,7 +680,9 @@ def numbering_parser(group):
             for name_idx in range(len(names)):
                 start = numbers[num][match_idx]['start']
                 end = numbers[num][match_idx]['end']
-                if num != name_idx and numbers[num][match_idx]['num'] == names[name_idx][start:end]:
+                if (num != name_idx and
+                            numbers[num][match_idx]['num'] ==
+                            names[name_idx][start:end]):
                     unique = False
                     break
             if not unique:
@@ -941,14 +716,150 @@ def parse_filename(name):
     return match_list
 
 
-# ================================================================================================
+def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
+    '''Return the list of files grouped by shots.
+    
+    dir -- the directory containing the target files
+    group_size -- the size of the groups (number of files for each shot)
+    sorted_by_ch -- this options tells the program that the files
+                    are sorted by the oscilloscope/channel
+                    (firstly) and by the shot number (secondly).
+                    By default, the program considers that the
+                    files are sorted by the shot number (firstly)
+                    and by the oscilloscope/channel (secondly).
+    '''
+    assert dir, ("Specify the directory (-d) containing the "
+                          "data files. See help for more details.")
+    file_list = get_file_list_by_ext(dir, ext_list, sort=True)
+    assert len(file_list) % group_size == 0, \
+        ("The number of .csv files ({}) in the specified folder "
+         "is not a multiple of group size ({})."
+         "".format(len(file_list), group_size))
+    grouped_files = []
+    if sorted_by_ch:
+        shots_count = len(file_list) // group_size
+        for shot in range(shots_count):
+            grouped_files.append([file_list[idx] for idx in
+                               range(shot, len(file_list), shots_count)])
+    else:
+        for idx in range(0, len(file_list), group_size):
+            grouped_files.append(file_list[idx: idx + group_size])
+    return grouped_files
+
+
+def check_front_params(params):
+    '''Parses user input of offset_by_curve_level parameter.
+    Returns (idx, level), where:
+        idx -- [int] the index of the curve, inputted by user
+        level -- [float] the curve front level (amplitude),
+                 which will be found and set as time zero
+
+    params -- user input (list of two strings)
+    '''
+    try:
+        idx = int(params[0])
+    except ValueError:
+        raise ValueError("Unsupported value for curve index ({})\n"
+                         "Only integer values are allowed.".format(params[0]))
+    try:
+        level = float(params[1])
+    except ValueError:
+        raise ValueError("Unsupported value for curve front level ({})\n"
+                         "Only float values are allowed.".format(params[0]))
+    return idx, level
+
+
+def check_file_list(dir, grouped_files):
+    '''Checks the list of file names, inputted by user.
+    The file names must be grouped by shots.
+    Raises an exception if any test fails.
+    
+    Returns the list of full paths, grouped by shots. 
+    
+    grouped_files -- the list of the files, grouped by shots 
+    '''
+    group_size = len(grouped_files[0])
+    for shot_idx, shot_files in enumerate(grouped_files):
+        assert len(shot_files) == group_size, \
+            ("The number of files in each shot must be the same.\n"
+             "Shot[1] = {} files ({})\nShot[{}] = {} files ({})"
+             "".format(group_size, ", ".join(grouped_files[0]),
+                       shot_idx + 1, len(shot_files), ", ".join(shot_files))
+             )
+        for file_idx, filename in enumerate(shot_files):
+            full_path = os.path.join(dir, filename.strip())
+            grouped_files[shot_idx][file_idx] = full_path
+            assert os.path.isfile(full_path), \
+                "Can not find file \"{}\"".format(full_path)
+    return grouped_files
+
+def check_y_offset_params(curve_params):
+    '''The function checks y zero offset parameters inputted by user,
+    converts string values to numeric and returns it.
+    
+    The structure of input/output parameters list:
+        [
+            [curve_idx, bg_start, bg_stop]
+            [curve_idx, bg_start, bg_stop]
+            ...etc.
+        ]
+    
+    curve_params -- the list of --y-offset parameters inputted by user:
+    '''
+    # 'CURVE_IDX', 'BG_START', 'BG_STOP'
+    output = []
+    for params in curve_params:
+        try:
+            idx = int(params[0])
+        except ValueError:
+            raise ValueError("Unsupported value for curve index ({}) in "
+                             "--y-offset parameter\n"
+                             "Only integer values are allowed."
+                             "".format(params[0]))
+        try:
+            start = float(params[1])
+            stop = float(params[2])
+        except ValueError:
+            raise ValueError("Unsupported value for background start or stop "
+                             "time ({}, {}) in --y-offset parameter\n"
+                             "Only float values are allowed."
+                             "".format(params[1], params[2]))
+        output.append([idx, start, stop])
+    return output
+
+
+def check_coeffs_number(need_count, coeff_names, *coeffs):
+    '''Checks the needed and the actual number of the coefficients.
+    Raises an exception if they are not equal.
+    
+    need_count -- the number of needed coefficients
+    coeff_names -- the list of the coefficient names
+    coeffs -- the list of coefficients to check (multiplier, delay, etc.)
+    '''
+    for idx, coeff_list in enumerate(coeffs):
+        if coeff_list is not None:
+            coeffs_count = len(coeff_list)
+            if coeffs_count < need_count:
+                raise IndexError("Not enough {} values.\n"
+                                 "Expected ({}), got ({})."
+                                 "".format(coeff_names[idx],
+                                           coeffs_count, need_count))
+            elif coeffs_count > need_count:
+                raise IndexError("Too many {} values.\n"
+                                 "Expected ({}), got ({})."
+                                 "".format(coeff_names[idx],
+                                           coeffs_count, need_count))
+
+
+# ============================================================================
 # --------------   MAIN    ----------------------------------------
 # ======================================================
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(prog='Process Signals',
-                                     description='', epilog='', fromfile_prefix_chars='@')
+                                     description='', epilog='',
+                                     fromfile_prefix_chars='@')
 
     # input files ------------------------------------------------------------
     parser.add_argument('-d', '--scr', '--source-dir',
@@ -972,11 +883,20 @@ if __name__ == "__main__":
                              'In order to process multiple shots enter '
                              'multiple \'-i\' parameters. '
                         )
-    group.add_argument('-g', '--grouped-by',
+    group.add_argument('-e', '--ext', '--extension',
+                        action='store',
+                        nargs='+',
+                        metavar='EXT',
+                        dest='ext_list',
+                        help='specify one or more (space separated) '
+                             'extensions of the files with data.'
+                        )
+    parser.add_argument('-g', '--grouped-by',
                         action='store',
                         type=int,
                         metavar='GROUPED_BY',
                         dest='group_size',
+                        default=1,
                         help='sets the size of the groups (default=1). '
                              'A group is a set of files, corresponding '
                              'to one shot. \nNOTE: if \'-g\' parameter'
@@ -996,19 +916,29 @@ if __name__ == "__main__":
                              'be in the same folder and be sorted '
                              'in one style.'
                         )
+    parser.add_argument('--labels',
+                        action='store',
+                        nargs='+',
+                        metavar='LABEL',
+                        dest='labels',
+                        help='the labels for the data curves.\n'
+                             'NOTE: the number of entered labels should be '
+                             'equal to the number of curves in '
+                             'the input files.'
+                        )
 
     # process parameters and options -----------------------------------------
     parser.add_argument('--multiplier',
                         action='store',
                         type=float,
-                        metavar='MULTIPLIER',
+                        metavar='MULT',
                         nargs='+',
                         dest='multiplier',
                         default=None,
-                        help='the list of multipliers data file(s). '
-                             'NOTE: you must enter values for all the '
+                        help='the list of multipliers for each data columns.'
+                             '\nNOTE: you must enter values for all the '
                              'columns in data file(s). Two columns (X and Y) '
-                             'expected for each curve.'
+                             'are expected for each curve.'
                         )
     parser.add_argument('--delay',
                         action='store',
@@ -1017,13 +947,17 @@ if __name__ == "__main__":
                         nargs='+',
                         dest='delay',
                         default=None,
-                        help=''
+                        help='the list of delays (subtrahend) for each data '
+                             'columns.\n'
+                             'NOTE: the data is first multiplied by '
+                             'a multiplier and then the delay '
+                             'is subtracted from them.'
                         )
-    parser.add_argument('--offset-by-voltage',
+    parser.add_argument('--offset-by-curve_level',
                         action='store',
                         metavar=('CURVE_IDX', 'LEVEL'),
                         nargs=2,
-                        dest='voltage_idx',
+                        dest='offset_by_front',
                         default=None,
                         help=''
                         )
@@ -1031,7 +965,7 @@ if __name__ == "__main__":
                         action='append',
                         metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
                         nargs=3,
-                        dest='delay',
+                        dest='y_offset_list',
                         help=''
                         )
     parser.add_argument('-s', '--save',
@@ -1123,68 +1057,71 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # input files configuration check
+    # input directory and files check
     if args.src_dir:
+        args.src_dir = args.src_dir.strip()
         assert os.path.isdir(args.src_dir), \
             "Can not find directory {}".format(args.src_dir)
     if args.files:
-        args.group_size = len(args.files[0])
-        for idx, shot_files in enumerate(args.files):
-            assert len(shot_files) == args.group_size, \
-                ("The number of files in each shot must be the same.\n"
-                 "Shot[1] = {} files ({})\nShot[{}] = {} files ({})"
-                 "".format(args.group_size, ", ".join(args.files[0]),
-                           idx + 1, len(shot_files), ", ".join(shot_files))
-                )
-            for filename in shot_files:
-                assert os.path.isfile(os.path.join(args.src_dir, filename)), \
-                    "Can not find file {}".format(filename)
+        grouped_files = check_file_list(args.src_dir, args.files)
     else:
-        # user input: directory, group_size and sorted_by
-        assert args.src_dir, ("Specify the directory (-d) containing the "
-                              "data files. See help for more details.")
-        file_list = get_file_list_by_ext(args.src_dir, ".csv", sort=True)
-        assert len(file_list) % args.group_size == 0, \
-            ("The number of .csv files ({}) in the specified folder "
-             "is not a multiple of group size ({})."
-             "".format(len(file_list), args.group_size))
-        args.files = []
-        if args.sorted_by_ch:
-            shots_count = len(file_list) // args.group_size
-            for shot in range(shots_count):
-                args.files.append([file_list[idx] for idx in
-                                     range(shot, len(file_list), shots_count)])
-        else:
-            for idx in range(0, len(file_list), args.group_size):
-                args.files.append(file_list[idx: idx + args.group_size])
+        grouped_files = get_grouped_file_list(args.src_dir, args.ext_list,
+                                           args.group_size, args.sorted_by_ch)
+
+    # Now we have the list of files, grouped by shots:
+    # grouped_files == [
+    #                    ['shot001_osc01.wfm', 'shot001_osc02.csv', ...],
+    #                    ['shot002_osc01.wfm', 'shot002_osc02.csv', ...],
+    #                    ...etc.
+    #                  ]
 
     # raw check offset_by_voltage parameters (types)
+    if args.offset_by_front:
+        offset_by_idx, offset_by_level = \
+            check_front_params(args.offset_by_front)
 
     # raw check y_zero_offset parameters (types)
+    if args.y_offset_list:
+        y_zero_offset_list = check_y_offset_params(args.y_offset_list)
 
-    # MAIN LOOP starts with file read
-    for shot_idx, group in enumerate(args.files):
-        pass
+    # raw check multiplier and delay
+    if args.multiplier is not None and args.delay is not None:
+        assert len(args.multiplier) == len(args.delay), \
+            "The number of multipliers ({}) is not equal to the number of " \
+            "delays ({}).".format(len(args.multiplier), len(args.delay))
 
-    # check multiplier and delay
+    # MAIN LOOP
+    for shot_idx, file_list in enumerate(grouped_files):
+        data = read_signals(file_list, start=0, step=1, points=-1)
+        print("The number of curves = {}".format(data.count))
 
-    # check offset_by_voltage parameters (if idx out of range)
+        # checks multipliers, delays and labels numbers
+        check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+                            args.multiplier, args.delay)
+        check_coeffs_number(data.count, ["label"],  args.labels)
 
-    # check y_zero_offset parameters (if idx out of range)
+        # check offset_by_voltage parameters (if idx out of range)
 
-    # updates delay values with accordance to voltage front
+        # updates delay values with accordance to voltage front
 
-    # updates delays with accordance to Y zero offset
+        # check y_zero_offset parameters (if idx out of range)
 
-    # multiplier and delay
+        # updates delays with accordance to Y zero offset
 
-    # TODO: check len(multiplier, delay) == len(columns)
+        # multiplier and delay
+        data = multiplier_and_delay(data, args.multiplier, args.delay)
+
+        # DEBUG
+        from only_for_tests import plot_peaks_all
+        plot_peaks_all(data, None, [12, 13, 0, 11], show=True)
+
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
-    # TODO: check for different number of columns in data files
-    # TODO: user interactive input checker
-    # TODO: partial import
-    # TODO: header lines handle
+    # TODO: user interactive input commands?
+    # TODO: partial import (start, step, points)
+    # TODO: add labels to plots
+    # TODO: add labels to CSV files
+    # TODO: add log file with multipliers and delays applied to data saved to CSV
 
-
+    print()
     print(args)
