@@ -193,8 +193,8 @@ def read_wfm_group(group_of_files, start_index=0, number_of_points=-1,
     # reads a number of wfm files, unites columns to 1 table
     # returns data as 2-dimensional ndarray
 
-    print("start = {}  |  count = {}  |  step ="
-          " {}".format(start_index, number_of_points, read_step))
+    # print("start = {}  |  count = {}  |  step ="
+    #       " {}".format(start_index, number_of_points, read_step))
     t, y, info, over_i, under_i = \
         read_wfm(group_of_files[0],
                  start_index=start_index,
@@ -553,7 +553,7 @@ if __name__ == "__main__":
         The folder with the files was specified.
         
         Needed to group them by shots. 
-        The output of this section should be so:
+        The output of this section should be:
         file_list == [
                         ['file01_ch1.wfm', 'file01_ch2.wfm', ...], 
                         ['file02_ch1.wfm', 'file02_ch2.wfm', ...],
