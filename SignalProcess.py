@@ -583,6 +583,7 @@ def smooth_voltage(x, y, x_multiplier=1):
         window_len = 5
 
     if len(y) >= 5:
+        print("WINDOW LEN = {}  |  POLY ORDER = {}".format(window_len, poly_order))
         y_smoothed = savgol_filter(y, window_len, poly_order)
         return y_smoothed
     # too short array to be processed
@@ -749,7 +750,7 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
     return grouped_files
 
 
-def check_front_params(params):
+def global_check_front_params(params):
     '''Parses user input of offset_by_curve_level parameter.
     Returns (idx, level), where:
         idx -- [int] the index of the curve, inputted by user
@@ -760,15 +761,26 @@ def check_front_params(params):
     '''
     try:
         idx = int(params[0])
+        if idx < 0:
+            raise ValueError
     except ValueError:
-        raise ValueError("Unsupported value for curve index ({})\n"
-                         "Only integer values are allowed.".format(params[0]))
+        raise ValueError("Unsupported value for curve index ({}) at "
+                         "--offset_by_curve_level parameters\n"
+                         "Only positive integer values are allowed."
+                         "".format(params[0]))
     try:
         level = float(params[1])
     except ValueError:
-        raise ValueError("Unsupported value for curve front level ({})\n"
+        raise ValueError("Unsupported value for curve front level ({}) at "
+                         "--offset_by_curve_level parameters\n"
                          "Only float values are allowed.".format(params[0]))
-    return idx, level
+    try:
+        time_multiplier = float(params[2])
+    except ValueError:
+        raise ValueError("Unsupported value for time multiplier ({}) at "
+                         "--offset_by_curve_level parameters\n"
+                         "Only float values are allowed.".format(params[0]))
+    return idx, level, time_multiplier
 
 
 def check_file_list(dir, grouped_files):
@@ -830,6 +842,20 @@ def global_check_y_auto_zero_params(y_auto_zero_params):
                              "".format(params[1], params[2]))
         output.append([idx, start, stop])
     return output
+
+
+def check_y_auto_zero_params(data, y_auto_zero_params):
+    '''Checks if the curve indexes of y auto zero parameters list
+     is out of range. Raises an exception if true. 
+
+    data                -- SignalsData instance
+    y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
+                           argument's hep for more detail)
+    '''
+    for params in y_auto_zero_params:
+        assert params[0] < data.count, ("Index ({}) is out of range in "
+                                        "--y-auto-zero parameters."
+                                        "".format(params[0]))
 
 
 def check_coeffs_number(need_count, coeff_names, *coeffs):
@@ -989,20 +1015,6 @@ def raw_y_auto_zero(params, multiplier, delay):
     return raw_params
 
 
-def check_y_auto_zero_params(data, y_auto_zero_params):
-    '''Checks if the curve indexes of y auto zero parameters list
-     is out of range. Raises an exception if true. 
-    
-    data                -- SignalsData instance
-    y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
-                           argument's hep for more detail)
-    '''
-    for params in y_auto_zero_params:
-        assert params[0] < data.count, ("Index ({}) is out of range in "
-                                        "--y-auto-zero parameters."
-                                        "".format(params[0]))
-
-
 def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
                                  multiplier, delay, verbose=True):
     '''The function analyzes the mean amplitude in 
@@ -1047,6 +1059,123 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
         print(pretty_print_nums([new_delay[idx] for idx in
                                  range(1, len(new_delay), 2)],
                                 curves_labels, show=False))
+    return new_delay
+
+
+def plot_multiple_curve(curve_list, peaks=None, xlim=None,
+                        save=False, show=False, save_as=""):
+    '''
+    
+    :param curve_list: 
+    :param peaks: 
+    :param xlim: 
+    :param save: 
+    :param show: 
+    :param save_as: 
+    :return: 
+    '''
+    from matplotlib import pyplot as plt
+    plt.close('all')
+    if xlim is not None:
+        plt.xlim(xlim)
+    colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
+              '#8c564b', '#17becf', '#bcbd22', '#e377c2']
+    color_idx = 0
+    if isinstance(curve_list, SingleCurve):
+        curve_list = [curve_list]
+    for curve in curve_list:
+        plt.plot(curve.time, curve.val, '-', color=colors[color_idx], linewidth=0.5)
+        color_idx += 1
+        if color_idx == len(colors):
+            color_idx = 0
+
+    if peaks is not None:
+        peak_x = [peak.time for peak in peaks if peak is not None]
+        peak_y = [peak.val for peak in peaks if peak is not None]
+        # plt.plot(peak_x, peak_y, 'or')
+        plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e', facecolors='none', linewidths=2)
+        plt.scatter(peak_x, peak_y, s=80, edgecolors='#dd3328', facecolors='none', linewidths=3)
+        # plt.plot(peak_x, peak_y, '*g')
+    if save:
+        # print("Saveing " + save_as)
+        plt.savefig(save_as)
+    if show:
+        plt.show()
+    plt.close('all')
+
+
+def apdate_delays_by_curve_front(data, offset_by_curve_params,
+                                 multiplier, delay, smooth=True,
+                                 show_plot=False):
+    '''This function finds the time point of the selected curve front on level
+    'level', recalculates input delays of all time columns (odd 
+    elements of the input delay list) to make that time point be zero.
+
+    NOTE: the curve is not multiplied yet, so the 'level' 
+    value must be in raw data units
+
+    data                    -- an instance of SingleCurve
+    offset_by_curve_params  -- level of voltage front
+    multiplier              -- the list of multipliers for all the curves
+                               in the SignalsData
+    delay                   -- the list of delays for all the curves
+                               in the SignalsData
+    smooth                  -- smooth curve before front detection
+                               NOTE: the smooth process is optimized for 
+                               Voltage pulse of ERG installation 
+                               (~500 ns width)
+
+    return -- list of recalculated delays (floats)
+    '''
+
+    curve_idx = offset_by_curve_params[0]
+    level = offset_by_curve_params[1]
+    time_multiplier = offset_by_curve_params[2]
+
+    polarity = pp.check_polarity(data.curves[curve_idx])
+
+    if pp.is_pos(polarity):
+        level = abs(level)
+    else:
+        level = -abs(level)
+
+    print("Time offset by curve front process.")
+    print("Searching curve[{}] front at level = {}".format(curve_idx, level))
+
+    level_raw = ((level + delay[curve_idx * 2 + 1]) /
+                 multiplier[curve_idx * 2 + 1])
+    # smooth curve to improve accuracy of front search
+    if smooth:
+        print("Smoothing is turned ON.")
+        smoothed_y = smooth_voltage(data.curves[curve_idx].get_x(),
+                                    data.curves[curve_idx].get_y(),
+                                    time_multiplier)
+        smoothed_curve = SingleCurve(data.curves[curve_idx].get_x(),
+                                     smoothed_y)
+    else:
+        print("Smoothing is turned OFF.")
+        smoothed_curve = data.curves[curve_idx]
+    front_x, front_y = pp.find_curve_front(smoothed_curve,
+                                           level, polarity)
+    if show_plot:
+        if front_x:
+            front_point = [pp.SinglePeak(front_x, front_y, 0)]
+        else:
+            front_point = None
+        plot_multiple_curve([data.curves[curve_idx], smoothed_curve],
+                            front_point, show=True)
+
+    new_delay = delay[:]
+    if front_x:
+        # add_to_log("Raw_voltage_front_level = " + str(level_raw))
+
+        # apply multiplier and compensate voltage delay
+        time_offset = (front_x * multiplier[curve_idx * 2] -
+                       delay[curve_idx * 2])
+        print("Time offset by curve front = " + str(time_offset))
+        print()
+        for idx in range(0, len(delay), 2):
+            new_delay[idx] += time_offset
     return new_delay
 
 
@@ -1153,8 +1282,8 @@ if __name__ == "__main__":
                         )
     parser.add_argument('--offset-by-curve_level',
                         action='store',
-                        metavar=('CURVE_IDX', 'LEVEL'),
-                        nargs=2,
+                        metavar=('CURVE_IDX', 'LEVEL', 'MULTIPLIER'),
+                        nargs=3,
                         dest='offset_by_front',
                         default=None,
                         help=''
@@ -1275,8 +1404,7 @@ if __name__ == "__main__":
 
     # raw check offset_by_voltage parameters (types)
     if args.offset_by_front:
-        offset_by_idx, offset_by_level = \
-            check_front_params(args.offset_by_front)
+        args.offset_by_front = global_check_front_params(args.offset_by_front)
 
     # raw check y_auto_zero parameters (types)
     if args.y_auto_zero:
@@ -1298,10 +1426,6 @@ if __name__ == "__main__":
                             args.multiplier, args.delay)
         check_coeffs_number(data.count, ["label"],  args.labels)
 
-        # check offset_by_voltage parameters (if idx out of range)
-
-        # updates delay values with accordance to voltage front
-
         # check y_zero_offset parameters (if idx out of range)
         check_y_auto_zero_params(data, args.y_auto_zero)
 
@@ -1310,16 +1434,27 @@ if __name__ == "__main__":
                                                   args.multiplier, args.delay,
                                                   verbose=True)
 
+        # check offset_by_voltage parameters (if idx out of range)
+        assert args.offset_by_front[0] < data.count, \
+            "Index ({}) is out of range in --y-offset-by-curve-level " \
+            "parameters.\nCurves count = {}" \
+            "".format(args.offset_by_front[0], data.count)
+
+        # updates delay values with accordance to voltage front
+        args.delay = apdate_delays_by_curve_front(data, args.offset_by_front,
+                                                  args.multiplier, args.delay,
+                                                  smooth=True, show_plot=True)
+
         # multiplier and delay
         data = multiplier_and_delay(data, args.multiplier, args.delay)
 
         # DEBUG
         from only_for_tests import plot_peaks_all
-        plot_peaks_all(data, None, [0, 4, 8, 11], show=True)
+        # plot_peaks_all(data, None, [0, 4, 8, 11], show=True)
 
         from only_for_tests import plot_single_curve
-        plot_single_curve(data.curves[4], show=True)
-        plot_single_curve(data.curves[11], show=True)
+        # plot_single_curve(data.curves[12], show=True)
+        # plot_single_curve(data.curves[11], show=True)
 
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
