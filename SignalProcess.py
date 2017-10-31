@@ -8,6 +8,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 
 import wfm_reader_lite as wfm
+import PeakProcess as pp
 
 
 verbose = True
@@ -97,7 +98,7 @@ class SignalsData:
             new_curves = data.shape[1] - 1
             for curve_idx in range(0, new_curves):
                 self.curves.append(SingleCurve(data[:, 0],
-                                               data[:, curve_idx]))
+                                               data[:, curve_idx + 1]))
                 self.count += 1
                 if curve_labels:
                     self.labels[curve_labels[curve_idx]] = self.count - 1
@@ -702,8 +703,8 @@ def parse_filename(name):
     return -- list of dicts. [{...}, {...}, ...]
         where each dict contains info about one founded number:
         'start' -- index of the first digit of the found number in the string
-        'end' -- index of the last digit of the found number in the string
-        'num' -- string representation of the number
+        'end'   -- index of the last digit of the found number in the string
+        'num'   -- string representation of the number
     '''
     import re
     matches = re.finditer(r'\d+', name)
@@ -719,14 +720,15 @@ def parse_filename(name):
 def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
     '''Return the list of files grouped by shots.
     
-    dir -- the directory containing the target files
-    group_size -- the size of the groups (number of files for each shot)
-    sorted_by_ch -- this options tells the program that the files
-                    are sorted by the oscilloscope/channel
-                    (firstly) and by the shot number (secondly).
-                    By default, the program considers that the
-                    files are sorted by the shot number (firstly)
-                    and by the oscilloscope/channel (secondly).
+    dir             -- the directory containing the target files
+    group_size      -- the size of the groups (number of 
+                       files for each shot)
+    sorted_by_ch    -- this options tells the program that the files
+                       are sorted by the oscilloscope/channel
+                       (firstly) and by the shot number (secondly).
+                       By default, the program considers that the
+                       files are sorted by the shot number (firstly)
+                       and by the oscilloscope/channel (secondly).
     '''
     assert dir, ("Specify the directory (-d) containing the "
                           "data files. See help for more details.")
@@ -793,7 +795,7 @@ def check_file_list(dir, grouped_files):
                 "Can not find file \"{}\"".format(full_path)
     return grouped_files
 
-def check_y_offset_params(curve_params):
+def global_check_y_auto_zero_params(y_auto_zero_params):
     '''The function checks y zero offset parameters inputted by user,
     converts string values to numeric and returns it.
     
@@ -804,17 +806,19 @@ def check_y_offset_params(curve_params):
             ...etc.
         ]
     
-    curve_params -- the list of --y-offset parameters inputted by user:
+    y_auto_zero_params -- the list of --y-offset parameters inputted by user:
     '''
     # 'CURVE_IDX', 'BG_START', 'BG_STOP'
     output = []
-    for params in curve_params:
+    for params in y_auto_zero_params:
         try:
             idx = int(params[0])
+            if idx < 0:
+                raise ValueError
         except ValueError:
             raise ValueError("Unsupported value for curve index ({}) in "
                              "--y-offset parameter\n"
-                             "Only integer values are allowed."
+                             "Only positive integer values are allowed."
                              "".format(params[0]))
         try:
             start = float(params[1])
@@ -832,9 +836,10 @@ def check_coeffs_number(need_count, coeff_names, *coeffs):
     '''Checks the needed and the actual number of the coefficients.
     Raises an exception if they are not equal.
     
-    need_count -- the number of needed coefficients
+    need_count  -- the number of needed coefficients
     coeff_names -- the list of the coefficient names
-    coeffs -- the list of coefficients to check (multiplier, delay, etc.)
+    coeffs      -- the list of coefficients to check 
+                   (multiplier, delay, etc.)
     '''
     for idx, coeff_list in enumerate(coeffs):
         if coeff_list is not None:
@@ -849,6 +854,200 @@ def check_coeffs_number(need_count, coeff_names, *coeffs):
                                  "Expected ({}), got ({})."
                                  "".format(coeff_names[idx],
                                            coeffs_count, need_count))
+
+def y_zero_offset(curve, start_x, stop_x):
+    '''
+    Returns the Y zero level offset value.
+    Use it for zero level correction before PeakProcess.
+
+    curve               -- SingleCurve instance
+    start_x and stop_x  -- define the limits of the 
+                           X interval where Y is filled with noise only.
+    '''
+    if start_x < curve.time[0]:
+        start_x = curve.time[0]
+    if stop_x > curve.time[-1]:
+        stop_x = curve.time[-1]
+    assert stop_x > start_x, \
+        ("Error! start_x value ({}) must be lower than stop_x({}) value."
+        "".format(start_x, stop_x))
+    if start_x > curve.time[-1] or stop_x < curve.time[0]:
+        return 0
+    start_idx = pp.find_nearest_idx(curve.time, start_x, side='right')
+    stop_idx = pp.find_nearest_idx(curve.time, stop_x, side='left')
+    amp_sum = 0.0
+    DEBUG_VAL = {}
+    for val in curve.val[start_idx:stop_idx + 1]:
+        amp_sum += val
+        DEBUG_VAL[int(val * 100)] = (DEBUG_VAL.setdefault(int(val * 100), 0) +
+                                     1)
+    # DEBUG
+    # print("\n".join("{}: {} : {}".format(float(key) / 100, count, count * float(key) / 100) for
+    #                  key, count in DEBUG_VAL.items()))
+    # print("AMP_SUM = {}  |  stop_idx={}  |  start_idx={}  | result = {}"
+    #       "".format(amp_sum, stop_idx, start_idx, amp_sum / (stop_idx - start_idx + 1)))
+    return amp_sum / (stop_idx - start_idx + 1)
+
+
+def y_zero_offset_all(signals_data, curves_list, start_stop_tuples):
+    '''Return delays list for all columns in SignalsData stored 
+    in filename_or_list. 
+    Delays for Y-columns will be filled with 
+    the Y zero level offset values for only specified curves.
+    For all other Y columns and for all X columns delay will be 0.
+
+    Use it for zero level correction before PeakProcess.
+
+    filename_or_list    -- file with data or list of files, 
+                           if the data stored in several files
+    curves_list         -- zero-based indices of curves for which 
+                           you want to find the zero level offset
+    start_stop_tuples   -- list of (start_x, stop_x) tuples for each 
+                           curves in curves list.
+                           You can specify one tuple or list and
+                           it will be applied to all the curves.
+    file_type           -- file type (Default = 'CSV')
+    delimiter           -- delimiter for csv files
+    '''
+
+    assert len(curves_list) == len(start_stop_tuples), \
+        "Error! The number of (start_x, stop_x) tuples ({}) " \
+        "does not match the number of specified curves " \
+        "({}).".format(len(start_stop_tuples), len(curves_list))
+
+    delays = [0 for _ in range(2 * signals_data.count)]
+    for tuple_idx, curve_idx in enumerate(curves_list):
+        y_data_idx = curve_idx * 2 + 1
+        delays[y_data_idx] = y_zero_offset(signals_data.curves[curve_idx],
+                                           *start_stop_tuples[tuple_idx])
+    # print("Delays = ")
+    # for i in range(0, len(delays), 2):
+    #     print("{}, {},".format(delays[i], delays[i + 1]))
+    return delays
+
+
+def pretty_print_nums(nums, prefix=None, postfix=None,
+                      s=u'{pref}{val:.2f}{postf}', show=True):
+    '''Prints template 's' filled with values from 'nums',
+    'prefix' and 'postfix' arrays for all numbers in 'nums'.
+
+    nums    -- array of float or int
+    prefix  -- array of prefixes for all values in 'nums'
+               or single prefix string for all elements. 
+    postfix -- array of postfixes for all values in 'nums'
+               or single postfix string for all elements. 
+    s       -- template string.
+    '''
+    if not prefix:
+        prefix = ("" for _ in nums)
+    elif isinstance(prefix, str):
+        prefix = [prefix for _ in nums]
+    if not postfix:
+        postfix = ("" for _ in nums)
+    elif isinstance(postfix, str):
+        postfix = [postfix for _ in nums]
+    message = ""
+    for pref, val, postf in zip(prefix, nums, postfix):
+        if val > 0:
+            pref += "+"
+        message += s.format(pref=pref, val=val, postf=postf) + "\n"
+    if show:
+        print(message)
+    return message
+
+def check_labels(labels):
+    '''Checks if all the labels contains only 
+    Latin letters, numbers and underscore.
+    Raises an exception if the test fails.
+    
+    labels -- the list of labels
+    '''
+    import re
+    for label in labels:
+        if re.search(r'[^\w]+', label):
+            raise ValueError("{}\nLatin letters, numbers and underscore"
+                             " are allowed only.".format(label))
+
+
+def raw_y_auto_zero(params, multiplier, delay):
+    '''Returns raw values for y_auto_zero parameters.
+    'Raw values' are values before applying the multiplier.
+    
+    params      -- y auto zero parameters (see --y-auto-zero
+                   argument's hep for more detail)
+    multiplier  -- the list of multipliers for all the curves
+                   in the SignalsData  
+    delay       -- the list of delays for all the curves
+                   in the SignalsData 
+    '''
+    raw_params=[]
+    for item_idx, item in enumerate(params):
+        curve_idx = item[0]
+        start_x = (item[1] + delay[curve_idx * 2]) / multiplier[curve_idx * 2]
+        stop_x = (item[2] + delay[curve_idx * 2]) / multiplier[curve_idx * 2]
+        raw_params.append([curve_idx, start_x, stop_x])
+    return raw_params
+
+
+def check_y_auto_zero_params(data, y_auto_zero_params):
+    '''Checks if the curve indexes of y auto zero parameters list
+     is out of range. Raises an exception if true. 
+    
+    data                -- SignalsData instance
+    y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
+                           argument's hep for more detail)
+    '''
+    for params in y_auto_zero_params:
+        assert params[0] < data.count, ("Index ({}) is out of range in "
+                                        "--y-auto-zero parameters."
+                                        "".format(params[0]))
+
+
+def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
+                                 multiplier, delay, verbose=True):
+    '''The function analyzes the mean amplitude in 
+    the selected X range of the selected curves. 
+    The Y zero offset values obtained are added to 
+    the corresponding items of the original list of delays.
+    The new list of delays is returned.
+    
+    NOTE: adjusting the delay values before applying 
+    the multipliers and the delays to the input data, 
+    decreases the execution time of the code.
+    
+    data                -- SignalsData instance
+    y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
+                           argument's hep for more detail)
+    multiplier          -- the list of multipliers for all the curves
+                           in the SignalsData
+    delay               -- the list of delays for all the curves
+                           in the SignalsData
+    verbose             -- show/hide information during function execution
+    '''
+    new_delay = delay[:]
+    curves_list = [item[0] for item in y_auto_zero_params]
+    start_stop_tuples = [(item[1], item[2]) for item in
+                         raw_y_auto_zero(y_auto_zero_params,
+                                         args.multiplier,
+                                         args.delay)]
+    for idx, new_val in \
+            enumerate(y_zero_offset_all(data,
+                                        curves_list,
+                                        start_stop_tuples)):
+        new_delay[idx] += new_val * multiplier[idx]
+
+    if verbose:
+        print()
+        print("Y auto zero offset results:")
+        curves_labels = ["Curve[{}]: ".format(curve_idx) for
+                         curve_idx in curves_list]
+        # print(pretty_print_nums([new_delay[idx] for idx in
+        #                               range(0, len(new_delay), 2)],
+        #                              curves_labels_DEBUG, " ns", show=False))
+        print(pretty_print_nums([new_delay[idx] for idx in
+                                 range(1, len(new_delay), 2)],
+                                curves_labels, show=False))
+    return new_delay
 
 
 # ============================================================================
@@ -891,6 +1090,15 @@ if __name__ == "__main__":
                         help='specify one or more (space separated) '
                              'extensions of the files with data.'
                         )
+    parser.add_argument('--labels',
+                        action='store',
+                        metavar='LABEL',
+                        nargs='+',
+                        dest='labels',
+                        help='specify the labels for all the curves '
+                             'in data files. Latin letters, numbers and '
+                             'underscore are allowed only.'
+                        )
     parser.add_argument('-g', '--grouped-by',
                         action='store',
                         type=int,
@@ -915,16 +1123,6 @@ if __name__ == "__main__":
                              'ATTENTION: files from all oscilloscopes must '
                              'be in the same folder and be sorted '
                              'in one style.'
-                        )
-    parser.add_argument('--labels',
-                        action='store',
-                        nargs='+',
-                        metavar='LABEL',
-                        dest='labels',
-                        help='the labels for the data curves.\n'
-                             'NOTE: the number of entered labels should be '
-                             'equal to the number of curves in '
-                             'the input files.'
                         )
 
     # process parameters and options -----------------------------------------
@@ -961,11 +1159,11 @@ if __name__ == "__main__":
                         default=None,
                         help=''
                         )
-    parser.add_argument('--y-offset',
+    parser.add_argument('--y-auto-zero',
                         action='append',
                         metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
                         nargs=3,
-                        dest='y_offset_list',
+                        dest='y_auto_zero',
                         help=''
                         )
     parser.add_argument('-s', '--save',
@@ -1080,9 +1278,9 @@ if __name__ == "__main__":
         offset_by_idx, offset_by_level = \
             check_front_params(args.offset_by_front)
 
-    # raw check y_zero_offset parameters (types)
-    if args.y_offset_list:
-        y_zero_offset_list = check_y_offset_params(args.y_offset_list)
+    # raw check y_auto_zero parameters (types)
+    if args.y_auto_zero:
+        args.y_auto_zero = global_check_y_auto_zero_params(args.y_auto_zero)
 
     # raw check multiplier and delay
     if args.multiplier is not None and args.delay is not None:
@@ -1105,15 +1303,23 @@ if __name__ == "__main__":
         # updates delay values with accordance to voltage front
 
         # check y_zero_offset parameters (if idx out of range)
+        check_y_auto_zero_params(data, args.y_auto_zero)
 
         # updates delays with accordance to Y zero offset
+        args.delay = apdate_delays_by_y_auto_zero(data, args.y_auto_zero,
+                                                  args.multiplier, args.delay,
+                                                  verbose=True)
 
         # multiplier and delay
         data = multiplier_and_delay(data, args.multiplier, args.delay)
 
         # DEBUG
         from only_for_tests import plot_peaks_all
-        plot_peaks_all(data, None, [12, 13, 0, 11], show=True)
+        plot_peaks_all(data, None, [0, 4, 8, 11], show=True)
+
+        from only_for_tests import plot_single_curve
+        plot_single_curve(data.curves[4], show=True)
+        plot_single_curve(data.curves[11], show=True)
 
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
@@ -1123,5 +1329,6 @@ if __name__ == "__main__":
     # TODO: add labels to CSV files
     # TODO: add log file with multipliers and delays applied to data saved to CSV
 
+    print(args.y_auto_zero)
     print()
     print(args)
