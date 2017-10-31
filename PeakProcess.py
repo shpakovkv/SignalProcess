@@ -177,7 +177,7 @@ def check_polarity(curve, time_bounds=(None, None)):
     return 'negative'
 
 
-def find_voltage_front(curve,
+def find_curve_front(curve,
                        level=-0.2,
                        polarity='auto',
                        save_plot=False,
