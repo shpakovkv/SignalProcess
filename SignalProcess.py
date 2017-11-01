@@ -717,7 +717,7 @@ def numbering_parser(group):
     group -- list of files (each file must corresponds 
              to different shot)
 
-    return -- (start, digits), where: 
+    return -- (start, end), where: 
         start -- index of the first digit of the serial number
                  in a file name
         end -- index of the last digit of the serial number
@@ -1475,6 +1475,8 @@ if __name__ == "__main__":
             "Can not find directory {}".format(args.src_dir)
     if args.files:
         grouped_files = check_file_list(args.src_dir, args.files)
+        if not args.src_dir:
+            args.src_dir = os.path.dirname(grouped_files[0][0])
     else:
         grouped_files = get_grouped_file_list(args.src_dir, args.ext_list,
                                            args.group_size, args.sorted_by_ch)
@@ -1500,6 +1502,11 @@ if __name__ == "__main__":
             "The number of multipliers ({}) is not equal to the number of " \
             "delays ({}).".format(len(args.multiplier), len(args.delay))
 
+    number_start, number_end = numbering_parser(files[0] for files in grouped_files)
+    print("======================================================")
+    print([number_start, number_end])
+    print(os.path.basename(grouped_files[0][0])[number_start:number_end])
+    print("======================================================")
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
         data = read_signals(file_list, start=0, step=1, points=-1)
@@ -1526,9 +1533,21 @@ if __name__ == "__main__":
             "".format(args.offset_by_front[0], data.count)
 
         # updates delay values with accordance to voltage front
-        args.delay = apdate_delays_by_curve_front(data, args.offset_by_front,
-                                                  args.multiplier, args.delay,
-                                                  smooth=True, show_plot=True)
+        if args.offset_by_front:
+            front_plot_name = os.path.basename(file_list[0])[number_start:number_end]
+            front_plot_name += ("_curve{:03d}_front_level{:.3f}.png"
+                               "".format(args.offset_by_front[0],
+                                         args.offset_by_front[1]))
+            front_plot_name = os.path.join(args.src_dir,
+                                           'FrontBeforeTimeOffset',
+                                           front_plot_name)
+            print("FRONT PLOT NAME = {}".format(front_plot_name))
+            args.delay = apdate_delays_by_curve_front(data,
+                                                      args.offset_by_front,
+                                                      args.multiplier,
+                                                      args.delay,
+                                                      smooth=True,
+                                                      show_plot=True)
 
         # multiplier and delay
         data = multiplier_and_delay(data, args.multiplier, args.delay)
