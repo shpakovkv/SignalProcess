@@ -6,12 +6,74 @@ import os
 
 import numpy as np
 from scipy.signal import savgol_filter
+import colorsys
 
 import wfm_reader_lite as wfm
 import PeakProcess as pp
 
 
 verbose = True
+
+
+class ColorRange():
+    '''Color code iterator. Generates contrast colors.
+    Returns the hexadecimal RGB color code (for example '#ffaa00')
+    '''
+    def __init__(self, start_hue=0, hue_step=140, min_hue_diff=20,
+                  saturation=(90, 90, 60),
+                  luminosity=(55, 30, 50)):
+        self.start = start_hue
+        self.step = hue_step
+        self.window = min_hue_diff
+        self.hue_range = 360
+        self.s_list = saturation
+        self.l_list = luminosity
+
+    def too_close(self, val_list, val, window=10):
+        for item in val_list:
+            if val < item + window and val > item - window:
+                return True
+        return False
+
+    def calc_count(self):
+        start_list = [self.start]
+        count = 0
+        for i in range(0, 361):
+            count += (self.hue_range - start_list[-1]) // self.window
+            remainder = (self.hue_range - start_list[-1]) % self.window
+            new_start = self.step - remainder + 1 if remainder > 0 else 0
+            if self.too_close(start_list, new_start):
+                break
+            else:
+                start_list.append(new_start)
+        return count
+
+    def hsl_to_rgb_code(self, hue, saturation, luminosity):
+        hue = hue / 360.0
+        saturation = saturation / 100.0
+        luminosity = luminosity / 100.0
+        # print([hue, saturation, luminosity])
+        rgb_float = colorsys.hls_to_rgb(hue, luminosity, saturation)
+        # print(rgb_float)
+        rgb = [val * 255 for val in rgb_float]
+        rgb_int = [int(round(val * 255)) for val in rgb_float]
+        # print("{:.2f}, {:.2f}, {:.2f}".format(*rgb), end=" == ")
+        rgb_code = "#{:02x}{:02x}{:02x}".format(*rgb_int)
+        return rgb_code
+
+    def __iter__(self):
+        while True:
+            offset = 0
+            for sat, lum in zip(self.s_list, self.l_list):
+                last = self.start + offset
+                offset += 10
+                yield self.hsl_to_rgb_code(*[0, sat, lum])
+                for i in range(0, self.calc_count()):
+                    new_hue = last + self.step
+                    if new_hue > 360:
+                        new_hue -= 360
+                    last = new_hue
+                    yield self.hsl_to_rgb_code(*[new_hue, sat, lum])
 
 
 class SingleCurve:
@@ -1063,40 +1125,46 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
 
 
 def plot_multiple_curve(curve_list, peaks=None, xlim=None,
-                        save=False, show=False, save_as=""):
-    '''
+                        show=False, save_as=None):
+    '''Draws one or more curves on one graph.
+    Additionally draws peaks on the underlying layer 
+    of the same graph, if the peaks exists.
+    The color of the curves iterates though the list 'corols'.
     
-    :param curve_list: 
-    :param peaks: 
-    :param xlim: 
-    :param save: 
-    :param show: 
-    :param save_as: 
-    :return: 
+    curve_list  -- the list of SingleCurve instances
+                   or SingleCurve instance
+    peaks       -- the list or SinglePeak instances
+    xlim        -- the tuple with the left and the right X bounds
+    show        -- (bool) show/hide the graph window
+    save_as     -- filename (full path) to save the plot as .png
+                   Does not save by default.
     '''
     from matplotlib import pyplot as plt
     plt.close('all')
     if xlim is not None:
         plt.xlim(xlim)
-    colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
-              '#8c564b', '#17becf', '#bcbd22', '#e377c2']
-    color_idx = 0
+    color_iter = iter(ColorRange())
     if isinstance(curve_list, SingleCurve):
         curve_list = [curve_list]
     for curve in curve_list:
-        plt.plot(curve.time, curve.val, '-', color=colors[color_idx], linewidth=0.5)
-        color_idx += 1
-        if color_idx == len(colors):
-            color_idx = 0
+        if len(curve_list) > 1:
+            color = next(color_iter)
+        else:
+            color = '#9595aa'
+        # print("||  COLOR == {} ===================".format(color))
+        plt.plot(curve.time, curve.val, '-',
+                 color=color, linewidth=1)
 
     if peaks is not None:
         peak_x = [peak.time for peak in peaks if peak is not None]
         peak_y = [peak.val for peak in peaks if peak is not None]
-        # plt.plot(peak_x, peak_y, 'or')
         plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e', facecolors='none', linewidths=2)
-        plt.scatter(peak_x, peak_y, s=80, edgecolors='#dd3328', facecolors='none', linewidths=3)
-        # plt.plot(peak_x, peak_y, '*g')
-    if save:
+        plt.scatter(peak_x, peak_y, s=90, edgecolors='#dd3328', facecolors='none', linewidths=2)
+        # plt.scatter(peak_x, peak_y, s=40, edgecolors='#ff5511', facecolors='none', linewidths=2)
+        # plt.scatter(peak_x, peak_y, s=100, edgecolors='#133cac', facecolors='none', linewidths=2)
+        # plt.scatter(peak_x, peak_y, s=160, edgecolors='#62e200', facecolors='none', linewidths=1.5)
+        plt.scatter(peak_x, peak_y, s=150, edgecolors='none', facecolors='#133cac', linewidths=1.5, marker='x')
+    if save_as is not None:
         # print("Saveing " + save_as)
         plt.savefig(save_as)
     if show:
@@ -1255,6 +1323,12 @@ if __name__ == "__main__":
                         )
 
     # process parameters and options -----------------------------------------
+    parser.add_argument('--silent',
+                        action='store',
+                        dest='silent',
+                        help='enables the silent mode, in which only '
+                             'error messages and input prompts '
+                             'are displayed.')
     parser.add_argument('--multiplier',
                         action='store',
                         type=float,
@@ -1293,7 +1367,16 @@ if __name__ == "__main__":
                         metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
                         nargs=3,
                         dest='y_auto_zero',
-                        help=''
+                        help='auto zero level correction for curve. '
+                             'Specify curve_idx, bg_start, bg_stop '
+                             'for the curve whose zero level you want '
+                             'to offset.\n'
+                             'Where curve_idx is the zero-based index '
+                             'of the curve; and the time interval '
+                             '[bg_start: bg_stop] does not contain signals '
+                             'or random bursts (background interval).\n'
+                             'You can specify as many --y-auto-zero '
+                             'parameters as you want.'
                         )
     parser.add_argument('-s', '--save',
                         action='store_true',
@@ -1383,6 +1466,7 @@ if __name__ == "__main__":
                         )
 
     args = parser.parse_args()
+    verbose = not args.silent
 
     # input directory and files check
     if args.src_dir:
@@ -1419,7 +1503,8 @@ if __name__ == "__main__":
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
         data = read_signals(file_list, start=0, step=1, points=-1)
-        print("The number of curves = {}".format(data.count))
+        if verbose:
+            print("The number of curves = {}".format(data.count))
 
         # checks multipliers, delays and labels numbers
         check_coeffs_number(data.count * 2, ["multiplier", "delay"],
