@@ -77,8 +77,12 @@ class ColorRange():
 
 
 class SingleCurve:
-    def __init__(self, in_x=None, in_y=None):
+    def __init__(self, in_x=None, in_y=None,
+                 label=None, unit=None, time_unit=None):
         self.data = np.empty([0, 2], dtype=float, order='F')
+        self.label = label
+        self.unit = unit
+        self.time_unit = time_unit
         if in_x is not None and in_y is not None:
             self.append(in_x, in_y)
 
@@ -139,50 +143,73 @@ class SingleCurve:
 
 
 class SignalsData:
-    def __init__(self, input_data=None, curve_labels=None):
+    def __init__(self, input_data=None, labels=None,
+                 units=None, time_units=None):
         # EMPTY INSTANCE
         # number of curves:
         self.count = 0
-        # list of curves data (SingleCurve instances):
-        self.curves = []
+        # dict of curves data (SingleCurve instances):
+        self.curves = {}
         # dict with curve labels as keys and curve indexes as values:
-        self.labels = dict()
+        self.label_to_idx = dict()
+        self.idx_to_label = dict()
 
         # FILL WITH VALUES
         if input_data is not None:
-            self.append(input_data, curve_labels)
+            self.append(input_data, labels, units, time_units)
 
-    def append(self, input_data, curve_labels=None):
-        # appends new SingleCurves to the self.curves list
+    def append(self, input_data, labels=None, units=None, time_unit=None):
+        # appends one or more new SingleCurves to the self.curves list
+        # and updates the corresponding self parameters
         data = np.array(input_data, dtype=float, order='F')
         self.check_input(data)
         if data.shape[1] % 2 != 0:
-            new_curves = data.shape[1] - 1
-            for curve_idx in range(0, new_curves):
-                self.curves.append(SingleCurve(data[:, 0],
-                                               data[:, curve_idx + 1]))
-                self.count += 1
-                if curve_labels:
-                    self.labels[curve_labels[curve_idx]] = self.count - 1
-                else:
-                    self.labels[str(self.count - 1)] = self.count - 1
+            multiple_X_columns = False
+            add_count = data.shape[1] - 1
         else:
-            for curve_idx in range(0, data.shape[1], 2):
-                self.curves.append(SingleCurve(data[:, curve_idx],
-                                               data[:, curve_idx + 1]))
-                self.count += 1
-                if curve_labels:
-                    self.labels[curve_labels[curve_idx]] = self.count - 1
-                else:
-                    self.labels[str(self.count - 1)] = self.count - 1
+            multiple_X_columns = True
+            add_count = data.shape[1] // 2
 
-    def check_input(self, data, curve_labels=None):
+        for curve_idx in range(0, add_count):
+            if labels:
+                current_label = labels[curve_idx]
+            else:
+                current_label = "Curve[{}]".format(curve_idx)
+            if units:
+                current_unit = units[curve_idx]
+            else:
+                current_unit = "a.u."
+            if time_unit:
+                current_time_unit = time_unit
+            else:
+                current_time_unit = "a.u."
+
+            if multiple_X_columns:
+                self.curves[self.count] = \
+                    SingleCurve(data[:, curve_idx * 2],
+                                data[:, curve_idx * 2 + 1],
+                                current_label, current_unit,
+                                current_time_unit)
+            else:
+                self.curves[self.count] = \
+                    SingleCurve(data[:, 0], data[:, curve_idx + 1],
+                                current_label, current_unit,
+                                current_time_unit)
+            self.curves[current_label] = self.curves[self.count]
+            self.count += 1
+
+            self.label_to_idx[current_label] = curve_idx
+            self.idx_to_label[curve_idx] = current_label
+
+
+    def check_input(self, data, new_labels=None, new_units=None):
         '''
         Checks the correctness of input data.
         Raises exception if data check fails.
         
-        data -- ndarray with data to add to a SignlsData instance
-        curve_labels -- the list of labels for new curves
+        data        -- ndarray with data to add to a SignlsData instance
+        new_labels  -- the list of labels for the new curves
+        new_units   -- the list of units for the new curves
         '''
         # CHECK INPUT DATA
         if np.ndim(data) != 2:
@@ -192,18 +219,37 @@ class SignalsData:
                 print("The input array has an odd number of columns! "
                       "The first column is considered as X column, "
                       "and the rest as Y columns.")
-        if curve_labels:
-            if not isinstance(curve_labels, list):
-                raise TypeError("Variable curve_labels must be "
+
+        if data.shape[1] % 2 != 0:
+            # multiple_X_columns = False
+            curves_count = data.shape[1] - 1
+        else:
+            # multiple_X_columns = True
+            curves_count = data.shape[1] // 2
+        if new_labels:
+            if not isinstance(new_labels, list):
+                raise TypeError("The variable 'labels' must be "
                                 "an instance of the list class.")
-            if data.shape[1] // 2 != len(curve_labels):
-                raise IndexError("Number of curves (pair of "
-                                 "time-value columns) in data "
-                                 "and number of labels must be the same.")
-            for label in curve_labels:
-                if label in self.labels:
+            if len(new_labels) != curves_count:
+                raise IndexError("The number of curves ({}) (the pair "
+                                 "of time-value columns) in the appending "
+                                 "data and tne number of new labels ({}) "
+                                 "must be the same."
+                                 "".format(curves_count, len(new_labels)))
+            for label in new_labels:
+                if label in self.label_to_idx.keys():
                     raise ValueError("Label \"{}\" is already exist."
                                      "".format(label))
+        if new_units:
+            if not isinstance(new_labels, list):
+                raise TypeError("The variable 'units' must be "
+                                "an instance of the list class.")
+            if len(new_labels) != curves_count:
+                raise IndexError("The number of curves ({}) (the pair "
+                                 "of time-value columns) in the appending "
+                                 "data and tne number of new units ({}) "
+                                 "must be the same."
+                                 "".format(curves_count, len(new_labels)))
 
     def get_array(self):
         '''Returns all curves data as united 2D array
@@ -217,24 +263,30 @@ class SignalsData:
 
     def by_label(self, label):
         # returns SingleCurve by name
-        return self.curves[self.labels[label]]
+        return self.curves[self.label_to_idx[label]]
 
     def get_label(self, idx):
         # return label of the SingelCurve by index
-        for key, value in self.labels.items():
+        for key, value in self.label_to_idx.items():
             if value == idx:
                 return key
 
     def get_idx(self, label):
         # returns index of the SingelCurve by label
-        if label in self.labels:
-            return self.labels[label]
+        if label in self.label_to_idx:
+            return self.label_to_idx[label]
 
     def time(self, curve):
         return self.curves[curve].get_x()
 
     def value(self, curve):
         return self.curves[curve].get_y()
+    def label(self, curve):
+        return self.curves[curve].label
+    def unit(self, curve):
+        return self.curves[curve].unit
+    def time_unit(self, curve):
+        return self.curves[curve].time_unit
 
 
 def get_subdir_list(path):
@@ -297,7 +349,8 @@ def add_zeros_to_filename(full_path, count):
     return os.path.join(folder_path, name)
 
 
-def read_signals(file_list, start=0, step=1, points=-1):
+def read_signals(file_list, start=0, step=1, points=-1,
+                 labels=None, units=None, time_unit=None):
     '''
     Function returns one SignalsData object filled with
     data from files in file_list.
@@ -323,12 +376,25 @@ def read_signals(file_list, start=0, step=1, points=-1):
 
     # read
     data = SignalsData()
+    current_count = 0
     for filename in file_list:
         if verbose:
             print("Loading \"{}\"".format(filename))
-        data.append(load_from_file(filename, start, step, points))
+        new_data = load_from_file(filename, start, step, points)
+        if new_data.shape[1] % 2 != 0:
+            # multiple_X_columns = False
+            add_count = new_data.shape[1] - 1
+        else:
+            # multiple_X_columns = True
+            add_count = new_data.shape[1] // 2
+
+        data.append(new_data,
+                    labels[current_count: current_count + add_count],
+                    units[current_count: current_count + add_count],
+                    time_unit)
         if verbose:
             print()
+        current_count += add_count
     return data
 
 
@@ -936,12 +1002,12 @@ def check_coeffs_number(need_count, coeff_names, *coeffs):
                 raise IndexError("Not enough {} values.\n"
                                  "Expected ({}), got ({})."
                                  "".format(coeff_names[idx],
-                                           coeffs_count, need_count))
+                                           need_count, coeffs_count))
             elif coeffs_count > need_count:
                 raise IndexError("Too many {} values.\n"
                                  "Expected ({}), got ({})."
                                  "".format(coeff_names[idx],
-                                           coeffs_count, need_count))
+                                           need_count, coeffs_count))
 
 def y_zero_offset(curve, start_x, stop_x):
     '''
@@ -1117,15 +1183,17 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
                          curve_idx in curves_list]
         # print(pretty_print_nums([new_delay[idx] for idx in
         #                               range(0, len(new_delay), 2)],
-        #                              curves_labels_DEBUG, " ns", show=False))
+        #                               curves_labels_DEBUG, " ns",
+        #                               show=False))
         print(pretty_print_nums([new_delay[idx] for idx in
                                  range(1, len(new_delay), 2)],
                                 curves_labels, show=False))
     return new_delay
 
 
-def plot_multiple_curve(curve_list, peaks=None, xlim=None,
-                        show=False, save_as=None):
+def plot_multiple_curve(curve_list, peaks=None, labels=None,
+                        units=None, time_unit=None, peak_labels=None,
+                        xlim=None, show=False, save_as=None):
     '''Draws one or more curves on one graph.
     Additionally draws peaks on the underlying layer 
     of the same graph, if the peaks exists.
@@ -1134,6 +1202,9 @@ def plot_multiple_curve(curve_list, peaks=None, xlim=None,
     curve_list  -- the list of SingleCurve instances
                    or SingleCurve instance
     peaks       -- the list or SinglePeak instances
+    labels      -- the list of labels for curves
+    units       -- the list of units for curves
+    time_unit   -- the unit for time scale
     xlim        -- the tuple with the left and the right X bounds
     show        -- (bool) show/hide the graph window
     save_as     -- filename (full path) to save the plot as .png
@@ -1150,12 +1221,27 @@ def plot_multiple_curve(curve_list, peaks=None, xlim=None,
         if len(curve_list) > 1:
             color = next(color_iter)
         else:
-            color = '#9595aa'
+            color = '#9999aa'
         # print("||  COLOR == {} ===================".format(color))
         plt.plot(curve.time, curve.val, '-',
                  color=color, linewidth=1)
 
+    time_label = "Time"
+    amp_label = "Amplitude"
+    if time_unit:
+        time_label += ", " + time_unit
+    if (units and
+        all(units[0] == unit for unit in units)):
+        amp_label += ", " + units[0]
+    if len(curve_list) > 1:
+        # LEGEND
+        pass
+
+
+        plt.xlabel("Time")
+
     if peaks is not None:
+
         peak_x = [peak.time for peak in peaks if peak is not None]
         peak_y = [peak.val for peak in peaks if peak is not None]
         plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e', facecolors='none', linewidths=2)
@@ -1172,7 +1258,7 @@ def plot_multiple_curve(curve_list, peaks=None, xlim=None,
     plt.close('all')
 
 
-def apdate_delays_by_curve_front(data, offset_by_curve_params,
+def update_delays_by_curve_front(data, offset_by_curve_params,
                                  multiplier, delay, smooth=True,
                                  show_plot=False):
     '''This function finds the time point of the selected curve front on level
@@ -1247,6 +1333,19 @@ def apdate_delays_by_curve_front(data, offset_by_curve_params,
     return new_delay
 
 
+def global_check_labels(labels):
+    '''Checks if any label contains non alphanumeric character.
+     Underscore are allowed.
+     Returns true if all the labels passed the test.
+    
+    labels -- the list of labels for graph process
+    '''
+    for label in labels:
+        if re.search(r'[\W]', label):
+            return False
+    return True
+
+
 # ============================================================================
 # --------------   MAIN    ----------------------------------------
 # ======================================================
@@ -1293,8 +1392,26 @@ if __name__ == "__main__":
                         nargs='+',
                         dest='labels',
                         help='specify the labels for all the curves '
-                             'in data files. Latin letters, numbers and '
-                             'underscore are allowed only.'
+                             'in the data files. Latin letters, numbers and '
+                             'underscore are allowed only.\n'
+                             'Using of non latin letters and special '
+                             'characters are allowed but may cause '
+                             'an error.'
+                        )
+    parser.add_argument('--units',
+                        action='store',
+                        metavar='UNIT',
+                        nargs='+',
+                        dest='units',
+                        help='specify the units for all the curves '
+                             'in the data files.'
+                        )
+    parser.add_argument('--time-unit',
+                        action='store',
+                        metavar='UNIT',
+                        nargs=1,
+                        dest='time_unit',
+                        help='specify the unit for time scale.'
                         )
     parser.add_argument('-g', '--grouped-by',
                         action='store',
@@ -1492,6 +1609,12 @@ if __name__ == "__main__":
     if args.offset_by_front:
         args.offset_by_front = global_check_front_params(args.offset_by_front)
 
+    # raw check labels
+    # if args.labels:
+    #     assert global_check_labels(args.labels), \
+    #         "Label value error! Only latin letters, " \
+    #         "numbers and underscore are allowed."
+
     # raw check y_auto_zero parameters (types)
     if args.y_auto_zero:
         args.y_auto_zero = global_check_y_auto_zero_params(args.y_auto_zero)
@@ -1507,18 +1630,22 @@ if __name__ == "__main__":
     print([number_start, number_end])
     print(os.path.basename(grouped_files[0][0])[number_start:number_end])
     print("======================================================")
+    labels_dict = {'labels': args.labels, 'units': args.units, 'time': args.time_unit}
+
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
-        data = read_signals(file_list, start=0, step=1, points=-1)
+        data = read_signals(file_list, start=0, step=1, points=-1,
+                            args.labels, args.units, args.time_unit)
         if verbose:
             print("The number of curves = {}".format(data.count))
 
         # checks multipliers, delays and labels numbers
         check_coeffs_number(data.count * 2, ["multiplier", "delay"],
                             args.multiplier, args.delay)
-        check_coeffs_number(data.count, ["label"],  args.labels)
+        check_coeffs_number(data.count, ["label", "unit"],
+                            args.labels, args.units)
 
-        # check y_zero_offset parameters (if idx out of range)
+        # check y_zero_offset parameters (if idx is out of range)
         check_y_auto_zero_params(data, args.y_auto_zero)
 
         # updates delays with accordance to Y zero offset
@@ -1526,7 +1653,7 @@ if __name__ == "__main__":
                                                   args.multiplier, args.delay,
                                                   verbose=True)
 
-        # check offset_by_voltage parameters (if idx out of range)
+        # check offset_by_voltage parameters (if idx is out of range)
         assert args.offset_by_front[0] < data.count, \
             "Index ({}) is out of range in --y-offset-by-curve-level " \
             "parameters.\nCurves count = {}" \
@@ -1542,7 +1669,7 @@ if __name__ == "__main__":
                                            'FrontBeforeTimeOffset',
                                            front_plot_name)
             print("FRONT PLOT NAME = {}".format(front_plot_name))
-            args.delay = apdate_delays_by_curve_front(data,
+            args.delay = update_delays_by_curve_front(data,
                                                       args.offset_by_front,
                                                       args.multiplier,
                                                       args.delay,
