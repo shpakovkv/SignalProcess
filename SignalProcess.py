@@ -387,11 +387,15 @@ def read_signals(file_list, start=0, step=1, points=-1,
         else:
             # multiple_X_columns = True
             add_count = new_data.shape[1] // 2
+        current_labels = None
+        current_units = None
+        if labels:
+            current_labels = labels[current_count: current_count + add_count]
+        if units:
+            current_units = units[current_count: current_count + add_count]
 
-        data.append(new_data,
-                    labels[current_count: current_count + add_count],
-                    units[current_count: current_count + add_count],
-                    time_unit)
+        data.append(new_data, current_labels, current_units, time_unit)
+
         if verbose:
             print()
         current_count += add_count
@@ -1191,9 +1195,9 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
     return new_delay
 
 
-def plot_multiple_curve(curve_list, peaks=None, labels=None,
-                        units=None, time_unit=None, peak_labels=None,
-                        xlim=None, show=False, save_as=None):
+def plot_multiple_curve(curve_list, peaks=None,
+                        xlim=None, show=False, save_as=None,
+                        amp_unit=None, time_unit=None):
     '''Draws one or more curves on one graph.
     Additionally draws peaks on the underlying layer 
     of the same graph, if the peaks exists.
@@ -1228,28 +1232,39 @@ def plot_multiple_curve(curve_list, peaks=None, labels=None,
 
     time_label = "Time"
     amp_label = "Amplitude"
-    if time_unit:
+    if time_unit is not None:
         time_label += ", " + time_unit
-    if (units and
-        all(units[0] == unit for unit in units)):
-        amp_label += ", " + units[0]
+    elif curve_list[0].time_unit:
+        time_label += ", " + curve_list[0].time_unit
+
+    if amp_unit is not None:
+        amp_label += ", " + amp_unit
+    elif all(curve_list[0].unit == curve.unit for curve in curve_list):
+        amp_label += ", " + curve_list[0].unit
+
     if len(curve_list) > 1:
         # LEGEND
         pass
-
-
-        plt.xlabel("Time")
+    else:
+        plt.title(curve_list[0].label)
+    plt.xlabel(time_label)
+    plt.ylabel(amp_label)
 
     if peaks is not None:
-
         peak_x = [peak.time for peak in peaks if peak is not None]
         peak_y = [peak.val for peak in peaks if peak is not None]
-        plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e', facecolors='none', linewidths=2)
-        plt.scatter(peak_x, peak_y, s=90, edgecolors='#dd3328', facecolors='none', linewidths=2)
-        # plt.scatter(peak_x, peak_y, s=40, edgecolors='#ff5511', facecolors='none', linewidths=2)
-        # plt.scatter(peak_x, peak_y, s=100, edgecolors='#133cac', facecolors='none', linewidths=2)
-        # plt.scatter(peak_x, peak_y, s=160, edgecolors='#62e200', facecolors='none', linewidths=1.5)
-        plt.scatter(peak_x, peak_y, s=150, edgecolors='none', facecolors='#133cac', linewidths=1.5, marker='x')
+        plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e',
+                    facecolors='none', linewidths=2)
+        plt.scatter(peak_x, peak_y, s=90, edgecolors='#dd3328',
+                    facecolors='none', linewidths=2)
+        plt.scatter(peak_x, peak_y, s=150, edgecolors='none',
+                    facecolors='#133cac', linewidths=1.5, marker='x')
+        # plt.scatter(peak_x, peak_y, s=40, edgecolors='#ff5511',
+        #           facecolors='none', linewidths=2)
+        # plt.scatter(peak_x, peak_y, s=100, edgecolors='#133cac',
+        #           facecolors='none', linewidths=2)
+        # plt.scatter(peak_x, peak_y, s=160, edgecolors='#62e200',
+        #           facecolors='none', linewidths=1.5)
     if save_as is not None:
         # print("Saveing " + save_as)
         plt.savefig(save_as)
@@ -1317,7 +1332,8 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
         else:
             front_point = None
         plot_multiple_curve([data.curves[curve_idx], smoothed_curve],
-                            front_point, show=True)
+                            front_point, show=True, amp_unit="a.u.",
+                            time_unit="a.u.")
 
     new_delay = delay[:]
     if front_x:
@@ -1409,7 +1425,6 @@ if __name__ == "__main__":
     parser.add_argument('--time-unit',
                         action='store',
                         metavar='UNIT',
-                        nargs=1,
                         dest='time_unit',
                         help='specify the unit for time scale.'
                         )
@@ -1635,7 +1650,8 @@ if __name__ == "__main__":
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
         data = read_signals(file_list, start=0, step=1, points=-1,
-                            args.labels, args.units, args.time_unit)
+                            labels=args.labels, units=args.units,
+                            time_unit=args.time_unit)
         if verbose:
             print("The number of curves = {}".format(data.count))
 
@@ -1683,9 +1699,8 @@ if __name__ == "__main__":
         from only_for_tests import plot_peaks_all
         # plot_peaks_all(data, None, [0, 4, 8, 11], show=True)
 
-        from only_for_tests import plot_single_curve
-        # plot_single_curve(data.curves[12], show=True)
-        # plot_single_curve(data.curves[11], show=True)
+        plot_multiple_curve(data.curves[12], show=True)
+        plot_multiple_curve(data.curves[0], show=True)
 
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
