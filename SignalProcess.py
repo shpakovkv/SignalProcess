@@ -684,7 +684,46 @@ def multiplier_and_delay(data, multiplier, delay):
         raise TypeError("Data must be an instance of numpy.ndarray or SignalsData.")
 
 
-def smooth_voltage(x, y, x_multiplier=1):
+def multiplier_and_delay_peak(peaks, multiplier, delay, curve_idx):
+    '''Returns the modified peaks data.
+    Each time and amplitude of each peak is first multiplied by 
+    the corresponding multiplier value and
+    then the corresponding delay value is subtracted from it.
+    
+    peaks       -- the list of the SinglePeak instance
+    multiplier  -- the list of multipliers for each columns 
+                   in the SignalsData.
+    delay       -- the list of delays (subtrahend) 
+                   for each columns in the SignalsData.
+    curve_idx   -- the index of the curve to which the peaks belong
+    '''
+    for peak in peaks:
+        if not isinstance(peak, pp.SinglePeak):
+            raise ValueError("'peaks' must be a list of "
+                             "the SinglePeak instance.")
+    if not multiplier and not delay:
+        raise ValueError("Specify multipliers or delays.")
+    if not multiplier:
+        multiplier = [1 for _ in range(len(delay))]
+    if not delay:
+        delay = [0 for _ in range(multiplier)]
+    if curve_idx >= len(multiplier):
+        raise IndexError("The curve index({}) is greater than the length "
+                         "({}) of multiplier/delay."
+                         "".format(curve_idx, len(multiplier)))
+    corr_peaks = []
+    time_mult = multiplier[curve_idx * 2]
+    time_del = delay[curve_idx * 2]
+    amp_mult = multiplier[curve_idx * 2 + 1]
+    amp_del = delay[curve_idx * 2 + 1]
+    for peak in peaks:
+        corr_peaks.append(pp.SinglePeak(peak.time * time_mult - time_del,
+                                        peak.val * amp_mult - amp_del,
+                                        peak.idx, peak.sqr_l, peak.sqr_r))
+    return corr_peaks
+
+
+def OLD_smooth_voltage(x, y, x_multiplier=1):
     '''This function returns smoothed copy of 'y'.
     Optimized for voltage pulse of ERG installation.
     
@@ -720,6 +759,42 @@ def smooth_voltage(x, y, x_multiplier=1):
         return y_smoothed
     # too short array to be processed
     return y
+
+
+def smooth_voltage(y_data, window=101, poly_order=3):
+    '''This function returns smoothed copy of 'y_data'.
+
+    y_data      -- 1D numpy.ndarray value points
+    window      -- The length of the filter window 
+                   (i.e. the number of coefficients). 
+                   window_length must be a positive 
+                   odd integer >= 5.
+    poly_order  -- The order of the polynomial used to fit 
+                   the samples. polyorder must be less 
+                   than window_length.
+    The values below are optimal for 1 ns resolution of 
+    voltage waveform of ERG installation:
+    poly_order = 3 
+    window = 101
+    '''
+
+    # calc time_step and converts to nanoseconds
+    if len(y_data) < window:
+        window = len(y_data) - 1
+    if window % 2 == 0:
+        # window must be even number
+        window += 1
+    if window < 5:
+        # lowest possible value
+        window = 5
+
+    if len(y_data) >= 5:
+        # print("WINDOW LEN = {}  |  POLY ORDER = {}".format(window, poly_order))
+        y_smoothed = savgol_filter(y_data, window, poly_order)
+        return y_smoothed
+
+    # too short array to be processed
+    return y_data
 
 
 def save_ndarray_csv(filename, data, delimiter=",", precision=18):
@@ -903,16 +978,32 @@ def global_check_front_params(params):
     try:
         level = float(params[1])
     except ValueError:
-        raise ValueError("Unsupported value for curve front level ({}) at "
+        raise ValueError("Unsupported value for curve front "
+                         "level ({}) at "
                          "--offset_by_curve_level parameters\n"
-                         "Only float values are allowed.".format(params[0]))
+                         "Only float values are allowed."
+                         "".format(params[0]))
     try:
-        time_multiplier = float(params[2])
+        window = int(params[2])
+        if window < 5:
+            raise ValueError
     except ValueError:
-        raise ValueError("Unsupported value for time multiplier ({}) at "
+        raise ValueError("Unsupported value for filter window "
+                         "length ({}) at "
                          "--offset_by_curve_level parameters\n"
-                         "Only float values are allowed.".format(params[0]))
-    return idx, level, time_multiplier
+                         "Only integer values >=5 are allowed."
+                         "".format(params[0]))
+    try:
+        poly_order = int(params[3])
+        if poly_order < 1:
+            raise ValueError
+    except ValueError:
+        raise ValueError("Unsupported value for filter polynomial "
+                         "order ({}) at "
+                         "--offset_by_curve_level parameters\n"
+                         "Only integer values >=1 are allowed."
+                         "".format(params[0]))
+    return idx, level, window, poly_order
 
 
 def check_file_list(dir, grouped_files):
@@ -1197,7 +1288,7 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
 
 def plot_multiple_curve(curve_list, peaks=None,
                         xlim=None, show=False, save_as=None,
-                        amp_unit=None, time_unit=None):
+                        amp_unit=None, time_unit=None, title=None):
     '''Draws one or more curves on one graph.
     Additionally draws peaks on the underlying layer 
     of the same graph, if the peaks exists.
@@ -1242,7 +1333,9 @@ def plot_multiple_curve(curve_list, peaks=None,
     elif all(curve_list[0].unit == curve.unit for curve in curve_list):
         amp_label += ", " + curve_list[0].unit
 
-    if len(curve_list) > 1:
+    if title is not None:
+        plt.title(title)
+    elif len(curve_list) > 1:
         # LEGEND
         pass
     else:
@@ -1266,8 +1359,10 @@ def plot_multiple_curve(curve_list, peaks=None,
         # plt.scatter(peak_x, peak_y, s=160, edgecolors='#62e200',
         #           facecolors='none', linewidths=1.5)
     if save_as is not None:
+        if not os.path.isdir(os.path.dirname(save_as)):
+            os.mkdir(os.path.dirname(save_as))
         # print("Saveing " + save_as)
-        plt.savefig(save_as)
+        plt.savefig(save_as, dpi=400)
     if show:
         plt.show()
     plt.close('all')
@@ -1275,7 +1370,7 @@ def plot_multiple_curve(curve_list, peaks=None,
 
 def update_delays_by_curve_front(data, offset_by_curve_params,
                                  multiplier, delay, smooth=True,
-                                 show_plot=False):
+                                 show_plot=False, save_as=None):
     '''This function finds the time point of the selected curve front on level
     'level', recalculates input delays of all time columns (odd 
     elements of the input delay list) to make that time point be zero.
@@ -1299,7 +1394,8 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
 
     curve_idx = offset_by_curve_params[0]
     level = offset_by_curve_params[1]
-    time_multiplier = offset_by_curve_params[2]
+    window = offset_by_curve_params[2]
+    poly_order = offset_by_curve_params[3]
 
     polarity = pp.check_polarity(data.curves[curve_idx])
 
@@ -1316,9 +1412,8 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
     # smooth curve to improve accuracy of front search
     if smooth:
         print("Smoothing is turned ON.")
-        smoothed_y = smooth_voltage(data.curves[curve_idx].get_x(),
-                                    data.curves[curve_idx].get_y(),
-                                    time_multiplier)
+        smoothed_y = smooth_voltage(data.curves[curve_idx].get_y(),
+                                    window, poly_order)
         smoothed_curve = SingleCurve(data.curves[curve_idx].get_x(),
                                      smoothed_y)
     else:
@@ -1331,9 +1426,11 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
             front_point = [pp.SinglePeak(front_x, front_y, 0)]
         else:
             front_point = None
+        plot_title = "Curve[{}]\nRaw data before applying multipliers and " \
+                     "delays".format(data.curves[curve_idx].label)
         plot_multiple_curve([data.curves[curve_idx], smoothed_curve],
                             front_point, show=True, amp_unit="a.u.",
-                            time_unit="a.u.")
+                            time_unit="a.u.", save_as=save_as, title=plot_title)
 
     new_delay = delay[:]
     if front_x:
@@ -1346,7 +1443,7 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
         print()
         for idx in range(0, len(delay), 2):
             new_delay[idx] += time_offset
-    return new_delay
+    return new_delay, pp.SinglePeak(front_x, front_y, 0)
 
 
 def global_check_labels(labels):
@@ -1488,8 +1585,8 @@ if __name__ == "__main__":
                         )
     parser.add_argument('--offset-by-curve_level',
                         action='store',
-                        metavar=('CURVE_IDX', 'LEVEL', 'MULTIPLIER'),
-                        nargs=3,
+                        metavar=('IDX', 'LEVEL', 'WIN', 'ORDER'),
+                        nargs=4,
                         dest='offset_by_front',
                         default=None,
                         help=''
@@ -1510,6 +1607,8 @@ if __name__ == "__main__":
                              'You can specify as many --y-auto-zero '
                              'parameters as you want.'
                         )
+
+    # output settings --------------------------------------------------------
     parser.add_argument('-s', '--save',
                         action='store_true',
                         dest='save_data',
@@ -1519,8 +1618,6 @@ if __name__ == "__main__":
                              'directory is not specified, input files '
                              'will be overwritten!'
                         )
-
-    # output settings --------------------------------------------------------
     parser.add_argument('-t', '--save-to', '--target-dir',
                         action='store',
                         metavar='SAVE_TO',
@@ -1562,8 +1659,8 @@ if __name__ == "__main__":
                         dest='save_plots_to',
                         metavar='SAVE_PLOTS_TO',
                         help='specify the directory after the flag. Each '
-                             'curve from data will be plotted ans saved '
-                             'as a single plot.png.'
+                             'curve from data will be plotted and saved '
+                             'as a single curve graph (preview.'
                         )
     parser.add_argument('-m', '--multiplot',
                         action='append',
@@ -1676,6 +1773,7 @@ if __name__ == "__main__":
             "".format(args.offset_by_front[0], data.count)
 
         # updates delay values with accordance to voltage front
+        raw_front_point = None
         if args.offset_by_front:
             front_plot_name = os.path.basename(file_list[0])[number_start:number_end]
             front_plot_name += ("_curve{:03d}_front_level{:.3f}.png"
@@ -1685,15 +1783,31 @@ if __name__ == "__main__":
                                            'FrontBeforeTimeOffset',
                                            front_plot_name)
             print("FRONT PLOT NAME = {}".format(front_plot_name))
-            args.delay = update_delays_by_curve_front(data,
-                                                      args.offset_by_front,
-                                                      args.multiplier,
-                                                      args.delay,
-                                                      smooth=True,
-                                                      show_plot=True)
+            args.delay, raw_front_point = \
+                update_delays_by_curve_front(data,
+                                             args.offset_by_front,
+                                             args.multiplier,
+                                             args.delay,
+                                             smooth=True,
+                                             show_plot=True,
+                                             save_as=front_plot_name)
+
 
         # multiplier and delay
         data = multiplier_and_delay(data, args.multiplier, args.delay)
+        # if raw_front_point:
+        #     front_point_list = \
+        #         multiplier_and_delay_peak([raw_front_point],
+        #                                   args.multiplier,
+        #                                   args.delay,
+        #                                   args.offset_by_front[0])
+        #     plot_multiple_curve(data.curves)
+
+        # plot preview
+
+        # plot multi-plots
+
+        # save data
 
         # DEBUG
         from only_for_tests import plot_peaks_all
@@ -1702,11 +1816,13 @@ if __name__ == "__main__":
         plot_multiple_curve(data.curves[12], show=True)
         plot_multiple_curve(data.curves[0], show=True)
 
+    # TODO: interactive offset_by_curve smooth process
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
     # TODO: user interactive input commands?
     # TODO: partial import (start, step, points)
-    # TODO: add labels to plots
+    # TODO: add legend to plots
+    # TODO: add labels to multi-plot
     # TODO: add labels to CSV files
     # TODO: add log file with multipliers and delays applied to data saved to CSV
 
