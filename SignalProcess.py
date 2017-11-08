@@ -4,9 +4,10 @@ from __future__ import print_function, with_statement
 import re
 import os
 
+import colorsys
 import numpy as np
 from scipy.signal import savgol_filter
-import colorsys
+from matplotlib import pyplot as plt
 
 import wfm_reader_lite as wfm
 import PeakProcess as pp
@@ -1218,6 +1219,48 @@ def check_labels(labels):
                              " are allowed only.".format(label))
 
 
+def global_check_plot(args, name, allow_all=False):
+    '''Checks the values of a parameter,
+    converts it to integers and returns it.
+    Returns [-1] if only 'all' is entered (if allow_all==True)
+    
+    args -- the list of str parameters to be converted to integers
+    name -- the name of the parameter (needed for error message)
+    allow_all -- turns on/off support of the value 'all'
+    '''
+    error_text = ("Unsupported curve index ({val}) at {name} parameter."
+                  "\nOnly positive integer values ")
+    if allow_all:
+        error_text += "and string 'all' "
+    error_text += "are allowed."
+
+    if len(args) == 1 and args[0].upper() == 'ALL' and allow_all:
+        args = [-1]
+    else:
+        for idx, _ in enumerate(args):
+            try:
+                args[idx] = int(args[idx])
+                assert args[idx] >= 0, ""
+            except (ValueError, AssertionError):
+                raise ValueError(error_text.format(val=args[idx], name=name))
+    return args
+
+
+def check_plot_param(args, curves_count, param_name):
+    '''Checks if any index from args list is greater than the curves count.
+    
+    args            -- the list of curve indexes
+    curves_count    -- the count of curves
+    param_name      -- the name of the parameter through which 
+                       the value was entered
+    '''
+    error_text = ("The curve index ({idx}) from ({name}) parameters "
+                  "is greater than the number of curves ({count}).")
+    for idx in args:
+        assert idx < curves_count, \
+            (error_text.format(idx=idx, name=param_name, count=curves_count))
+
+
 def raw_y_auto_zero(params, multiplier, delay):
     '''Returns raw values for y_auto_zero parameters.
     'Raw values' are values before applying the multiplier.
@@ -1286,6 +1329,127 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
     return new_delay
 
 
+def calc_ylim(time, y, time_bounds=None, reserve=0.1):
+    '''Returns (min_y, max_y) tuple with y axis bounds.
+    The axis boundaries are calculated in such a way 
+    as to show all points of the curve with a indent 
+    (default = 10% of the span of the curve) from 
+    top and bottom.
+    
+    time        -- the array of time points
+    y           -- the array of amplitude points
+    time_bounds -- the tuple/list with the left and 
+                   the right X bounds in X units.
+    reserve     -- the indent size (the fraction of the curve's range)
+    '''
+    if time_bounds is None:
+        time_bounds = (None, None)
+    if time_bounds[0] is None:
+        time_bounds = (time[0], time_bounds[1])
+    if time_bounds[1] is None:
+        time_bounds = (time_bounds[0], time[-1])
+    start = pp.find_nearest_idx(time, time_bounds[0], side='right')
+    stop = pp.find_nearest_idx(time, time_bounds[1], side='left')
+    y_max = np.amax(y[start:stop])
+    y_min = np.amin(y[start:stop])
+    y_range = y_max - y_min
+    reserve *= y_range
+    if y_max == 0 and y_min == 0:
+        y_max = 1.4
+        y_min = -1.4
+    return y_min - reserve, y_max + reserve
+
+
+def plot_peaks_all(data, peak_data, curves_list,
+                   xlim=None, show=False, save_as=None,
+                   amp_unit=None, time_unit=None, title=None):
+    '''Plots subplots for all curves with index in curve_list.
+    Optional: plots peaks.
+    Subplots are located one under the other. 
+    
+    data -- the SignalsData instance
+    peak_data -- the list of list of peaks (SinglePeak instance) 
+                 of curves with index in curve_list
+                 peak_data[0] == list of peaks for data.curves[curves_list[0]]
+                 peak_data[1] == list of peaks for data.curves[curves_list[1]]
+                 etc.
+    curves_list -- the list of curve indexes in data to be plotted
+    xlim        -- the tuple/list with the left and 
+                   the right X bounds in X units.
+    show        -- (bool) show/hide the graph window
+    save_as     -- filename (full path) to save the plot as .png
+                   Does not save by default.
+    amp_unit    -- the unit of Y scale for all subplots.
+                   If not specified, the curve.unit parameter will be used
+    time_unit   -- the unit of time scale for all subplots.
+                   If not specified, the time_unit parameter of 
+                   the first curve in curves_list will be used
+    title       -- the main title of the figure.
+    '''
+    plt.close('all')
+    fig, axes = plt.subplots(len(curves_list), 1, sharex='all')
+    # # an old color scheme
+    # colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
+    #           '#8c564b', '#17becf', '#bcbd22', '#e377c2']
+    if title is not None:
+        fig.suptitle(title)
+
+    for wf in range(len(curves_list)):
+        # plot curve
+        axes[wf].plot(data.time(curves_list[wf]),
+                      data.value(curves_list[wf]),
+                      '-', color='#999999', linewidth=0.5)
+        # set bounds
+        if xlim is not None:
+            axes[wf].set_xlim(xlim)
+            axes[wf].set_ylim(calc_ylim(data.time(curves_list[wf]),
+                                        data.value(curves_list[wf]),
+                                        xlim, reserve=0.1))
+        # y label (units only)
+        if amp_unit is None:
+            amp_unit = data.curves[curves_list[wf]].unit
+        axes[wf].set_ylabel(amp_unit, size=10, rotation='horizontal')
+
+        # subplot title
+        amp_label = data.curves[curves_list[wf]].label
+        if data.curves[curves_list[wf]].unit:
+            amp_label += ", " + data.curves[curves_list[wf]].unit
+        axes[wf].text(0.99, 0.01, amp_label, verticalalignment='bottom',
+                      horizontalalignment='right',
+                      transform=axes[wf].transAxes, size=8)
+
+        # Time axis label
+        if wf == len(curves_list) - 1:
+            time_label = "Time"
+            if time_unit:
+                time_label += ", " + time_unit
+            else:
+                time_label += ", " + data.curves[curves_list[wf]].time_unit
+            axes[wf].set_xlabel(time_label, size=10)
+        axes[wf].tick_params(labelsize=8)
+
+        # plot peaks scatter
+        if peak_data is not None:
+            for pk in peak_data[wf]:
+                color_iter = iter(ColorRange())
+                color = next(color_iter)
+                if pk is not None:
+                    axes[wf].scatter([pk.time], [pk.val], s=20,
+                                     edgecolors=color, facecolors='none',
+                                     linewidths=1.5)
+                    axes[wf].scatter([pk.time], [pk.val], s=50,
+                                     edgecolors='none', facecolors=color,
+                                     linewidths=1.5, marker='x')
+    if save_as is not None:
+        # print("Saving plot " + save_as)
+        plt.savefig(save_as, dpi=400)
+        # print("Done!")
+    if show:
+        plt.show()
+
+    plt.close('all')
+
+
 def plot_multiple_curve(curve_list, peaks=None,
                         xlim=None, show=False, save_as=None,
                         amp_unit=None, time_unit=None, title=None):
@@ -1297,15 +1461,14 @@ def plot_multiple_curve(curve_list, peaks=None,
     curve_list  -- the list of SingleCurve instances
                    or SingleCurve instance
     peaks       -- the list or SinglePeak instances
-    labels      -- the list of labels for curves
-    units       -- the list of units for curves
+    title       -- the title for plot
+    amp_unit    -- the units for curves Y scale
     time_unit   -- the unit for time scale
     xlim        -- the tuple with the left and the right X bounds
     show        -- (bool) show/hide the graph window
     save_as     -- filename (full path) to save the plot as .png
                    Does not save by default.
     '''
-    from matplotlib import pyplot as plt
     plt.close('all')
     if xlim is not None:
         plt.xlim(xlim)
@@ -1654,13 +1817,22 @@ if __name__ == "__main__":
                              'This will override the automatic generation '
                              'of file names.'
                         )
-    parser.add_argument('-p', '--save-plots-to',
+    parser.add_argument('-p', '--plot',
+                        action='store',
+                        nargs='+',
+                        metavar='CURVE',
+                        dest='plot',
+                        help='specify the directory after the flag. Each '
+                             'curve from data will be plotted and saved '
+                             'as a single curve graph (preview).'
+                        )
+    parser.add_argument('--p-save', '--save-plots-to',
                         action='store',
                         dest='save_plots_to',
                         metavar='SAVE_PLOTS_TO',
                         help='specify the directory after the flag. Each '
                              'curve from data will be plotted and saved '
-                             'as a single curve graph (preview.'
+                             'as a single curve graph (preview).'
                         )
     parser.add_argument('-m', '--multiplot',
                         action='append',
@@ -1671,9 +1843,9 @@ if __name__ == "__main__":
                              '\'-m\' flags (with different lists of curves)'
                              ' as you want.'
                         )
-    parser.add_argument('--save-multiplot-as',
+    parser.add_argument('--mp-save', '--save-multiplot-as',
                         action='append',
-                        dest='save_mp_as',
+                        dest='mp_save',
                         metavar='SAVE_MULTIPLOT_AS',
                         nargs=1,
                         help='the postfix to the multiplot file names. '
@@ -1685,13 +1857,18 @@ if __name__ == "__main__":
                              'use as many \'-s\' flags as '
                              'you used \'-m\' flags.'
                         )
-    parser.add_argument('--hide', '--hide-multiplot',
+    parser.add_argument('--mp-hide', '--multiplot-hide',
                         action='store_true',
-                        dest='hide_mplt',
+                        dest='mp_hide',
                         help='if the flag is specified the multiplots '
                              'will be saved (if the \'-s\' flag was '
                              'specified as well) but not shown. This '
                              'option can reduce the runtime of the program.'
+                        )
+    parser.add_argument('--p-hide', '--plot-hide',
+                        action='store_true',
+                        dest='p_hide',
+                        help=''
                         )
 
     args = parser.parse_args()
@@ -1727,6 +1904,14 @@ if __name__ == "__main__":
     #         "Label value error! Only latin letters, " \
     #         "numbers and underscore are allowed."
 
+    # raw check plot and multiplot
+    if args.plot:
+        args.plot = global_check_plot(args.plot, '--plot',
+                                            allow_all=True)
+    if args.multiplot:
+        for idx, m_param in enumerate(args.multiplot):
+            args.multiplot[idx] = global_check_plot(m_param, '--multiplot')
+
     # raw check y_auto_zero parameters (types)
     if args.y_auto_zero:
         args.y_auto_zero = global_check_y_auto_zero_params(args.y_auto_zero)
@@ -1737,12 +1922,10 @@ if __name__ == "__main__":
             "The number of multipliers ({}) is not equal to the number of " \
             "delays ({}).".format(len(args.multiplier), len(args.delay))
 
-    number_start, number_end = numbering_parser(files[0] for files in grouped_files)
-    print("======================================================")
-    print([number_start, number_end])
-    print(os.path.basename(grouped_files[0][0])[number_start:number_end])
-    print("======================================================")
-    labels_dict = {'labels': args.labels, 'units': args.units, 'time': args.time_unit}
+    number_start, number_end = numbering_parser(files[0] for
+                                                files in grouped_files)
+    labels_dict = {'labels': args.labels, 'units': args.units,
+                   'time': args.time_unit}
 
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
@@ -1776,7 +1959,7 @@ if __name__ == "__main__":
         raw_front_point = None
         if args.offset_by_front:
             front_plot_name = os.path.basename(file_list[0])[number_start:number_end]
-            front_plot_name += ("_curve{:03d}_front_level{:.3f}.png"
+            front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
                                "".format(args.offset_by_front[0],
                                          args.offset_by_front[1]))
             front_plot_name = os.path.join(args.src_dir,
@@ -1803,26 +1986,43 @@ if __name__ == "__main__":
         #                                   args.offset_by_front[0])
         #     plot_multiple_curve(data.curves)
 
+        # plot_peaks_all(data, None, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], show=True)
+
         # plot preview
+        if args.plot:
+            # args.plot = check_plot(args.plot)
+            if args.plot[0] == -1:       # 'all'
+                args.plot = list(range(0, data.count))
+            else:
+                check_plot_param(args.plot, data.count, '--plot')
+            for idx in args.plot:
+                plot_multiple_curve(data.curves[idx], show=True)
+
+        # save plot
 
         # plot multi-plots
+        if args.multiplot:
+            for curve_list in args.multiplot:
+                check_plot_param(curve_list, data.count, '--multiplot')
+            for curve_list in args.multiplot:
+                plot_peaks_all(data, None, curve_list, show=True)
 
+        # save multiplot
+                
         # save data
 
         # DEBUG
-        from only_for_tests import plot_peaks_all
+        # from only_for_tests import plot_peaks_all
         # plot_peaks_all(data, None, [0, 4, 8, 11], show=True)
-
-        plot_multiple_curve(data.curves[12], show=True)
-        plot_multiple_curve(data.curves[0], show=True)
+        #
+        # plot_multiple_curve(data.curves[12], show=True)
+        # plot_multiple_curve(data.curves[0], show=True)
 
     # TODO: interactive offset_by_curve smooth process
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
     # TODO: user interactive input commands?
     # TODO: partial import (start, step, points)
-    # TODO: add legend to plots
-    # TODO: add labels to multi-plot
     # TODO: add labels to CSV files
     # TODO: add log file with multipliers and delays applied to data saved to CSV
 
