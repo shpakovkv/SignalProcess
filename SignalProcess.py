@@ -261,8 +261,10 @@ class SignalsData:
         
         return -- 2d ndarray 
         '''
-        return align_and_append_ndarray(*[self.curves[idx].data for
-                                          idx in sorted(self.curves.keys())])
+        list_of_2D_arr = [self.curves[idx].data for
+                          idx in sorted(self.idx_to_label.keys())]
+        print("len(lest of 2D arr) = {}".format(len(list_of_2D_arr)))
+        return align_and_append_ndarray(*list_of_2D_arr)
 
     def by_label(self, label):
         # returns SingleCurve by name
@@ -493,13 +495,17 @@ def load_from_file(filename, start=0, step=1, points=-1):
     points -- data points to read (-1 == all)
      '''
 
-    valid_delimiters = [',', ';', ' ', '\t']
+    valid_delimiters = [',', ';', ' ', ':', '\t']
 
     import csv
 
     if filename[-3:].upper() != 'WFM':
         with open(filename, "r") as datafile:
-            dialect = csv.Sniffer().sniff(datafile.read(2048))
+            try:
+                dialect = csv.Sniffer().sniff(datafile.read(2096))
+            except:
+                datafile.seek(0)
+                dialect = csv.Sniffer().sniff(datafile.readline())
             datafile.seek(0)
             if dialect.delimiter not in valid_delimiters:
                 dialect.delimiter = ','
@@ -806,6 +812,7 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
     # precision - a number of units after comma
 
     # check precision value
+    print("Save columns count = {}".format(data.shape[1]))
     if not isinstance(precision, int):
         raise ValueError("Precision must be integer")
     if precision > 18:
@@ -856,6 +863,7 @@ def align_and_append_ndarray(*args):
 
         aligned_arr = np.append(arr, nan_arr, axis=0)
         data = np.append(data, aligned_arr, axis=1)
+    print("aligned array shape = {}".format(data.shape))
     return data
 
 
@@ -2084,6 +2092,7 @@ if __name__ == "__main__":
                              "".format(pref=args.prefix, number=shot_name,
                                        postf=args.postfix))
                 file_path = os.path.join(args.save_to, file_name)
+            print("Curves count = {}".format(data.count))
             save_ndarray_csv(file_path, data.get_array())
             if verbose:
                 print("Saved as {}".format(file_path))
@@ -2093,6 +2102,8 @@ if __name__ == "__main__":
         #
         # plot_multiple_curve(data.curves[12], show=True)
         # plot_multiple_curve(data.curves[0], show=True)
+
+    # TODO: change data read (labels, curve_idx, idx_to_labels dict)
 
     # TODO: interactive offset_by_curve smooth process
     # TODO: process fake files (not recorded)
