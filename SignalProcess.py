@@ -8,6 +8,7 @@ import colorsys
 import numpy as np
 from scipy.signal import savgol_filter
 from matplotlib import pyplot as plt
+from matplotlib import axes
 
 import wfm_reader_lite as wfm
 import PeakProcess as pp
@@ -1398,7 +1399,7 @@ def plot_peaks_all(data, peak_data, curves_list,
         # plot curve
         axes[wf].plot(data.time(curves_list[wf]),
                       data.value(curves_list[wf]),
-                      '-', color='#999999', linewidth=0.5)
+                      '-', color='#9999aa', linewidth=0.5)
         # set bounds
         if xlim is not None:
             axes[wf].set_xlim(xlim)
@@ -1451,12 +1452,15 @@ def plot_peaks_all(data, peak_data, curves_list,
 
 
 def plot_multiple_curve(curve_list, peaks=None,
-                        xlim=None, show=False, save_as=None,
-                        amp_unit=None, time_unit=None, title=None):
+                        xlim=None, amp_unit=None,
+                        time_unit=None, title=None):
     '''Draws one or more curves on one graph.
     Additionally draws peaks on the underlying layer 
     of the same graph, if the peaks exists.
-    The color of the curves iterates though the list 'corols'.
+    The color of the curves iterates though the ColorRange iterator.
+    
+    NOTE: after the function execution you need to show() or save() pyplot
+          otherwise the figure will not be saved or shown
     
     curve_list  -- the list of SingleCurve instances
                    or SingleCurve instance
@@ -1465,9 +1469,6 @@ def plot_multiple_curve(curve_list, peaks=None,
     amp_unit    -- the units for curves Y scale
     time_unit   -- the unit for time scale
     xlim        -- the tuple with the left and the right X bounds
-    show        -- (bool) show/hide the graph window
-    save_as     -- filename (full path) to save the plot as .png
-                   Does not save by default.
     '''
     plt.close('all')
     if xlim is not None:
@@ -1483,6 +1484,8 @@ def plot_multiple_curve(curve_list, peaks=None,
         # print("||  COLOR == {} ===================".format(color))
         plt.plot(curve.time, curve.val, '-',
                  color=color, linewidth=1)
+        axes_obj = plt.gca()
+        axes_obj.tick_params(direction='in', top=True, right=True)
 
     time_label = "Time"
     amp_label = "Amplitude"
@@ -1521,19 +1524,19 @@ def plot_multiple_curve(curve_list, peaks=None,
         #           facecolors='none', linewidths=2)
         # plt.scatter(peak_x, peak_y, s=160, edgecolors='#62e200',
         #           facecolors='none', linewidths=1.5)
-    if save_as is not None:
-        if not os.path.isdir(os.path.dirname(save_as)):
-            os.mkdir(os.path.dirname(save_as))
-        # print("Saveing " + save_as)
-        plt.savefig(save_as, dpi=400)
-    if show:
-        plt.show()
-    plt.close('all')
+    # if save_as is not None:
+    #     if not os.path.isdir(os.path.dirname(save_as)):
+    #         os.mkdir(os.path.dirname(save_as))
+    #     # print("Saveing " + save_as)
+    #     plt.savefig(save_as, dpi=400)
+    # if show:
+    #     plt.show()
+    # plt.close('all')
 
 
 def update_delays_by_curve_front(data, offset_by_curve_params,
                                  multiplier, delay, smooth=True,
-                                 show_plot=False, save_as=None):
+                                 plot=False):
     '''This function finds the time point of the selected curve front on level
     'level', recalculates input delays of all time columns (odd 
     elements of the input delay list) to make that time point be zero.
@@ -1584,7 +1587,7 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
         smoothed_curve = data.curves[curve_idx]
     front_x, front_y = pp.find_curve_front(smoothed_curve,
                                            level, polarity)
-    if show_plot:
+    if plot:
         if front_x:
             front_point = [pp.SinglePeak(front_x, front_y, 0)]
         else:
@@ -1592,8 +1595,8 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
         plot_title = "Curve[{}]\nRaw data before applying multipliers and " \
                      "delays".format(data.curves[curve_idx].label)
         plot_multiple_curve([data.curves[curve_idx], smoothed_curve],
-                            front_point, show=True, amp_unit="a.u.",
-                            time_unit="a.u.", save_as=save_as, title=plot_title)
+                            front_point, amp_unit="a.u.",
+                            time_unit="a.u.", title=plot_title)
 
     new_delay = delay[:]
     if front_x:
@@ -1822,54 +1825,55 @@ if __name__ == "__main__":
                         nargs='+',
                         metavar='CURVE',
                         dest='plot',
-                        help='specify the directory after the flag. Each '
-                             'curve from data will be plotted and saved '
-                             'as a single curve graph (preview).'
+                        help='specify the indexes of curves to be plotted '
+                             '(or \'all\' to plot all the curves). Each '
+                             'curve from this list will be plotted separately.\n'
+                             'You can specify --p-save for saveing them '
+                             'as .png files.'
                         )
     parser.add_argument('--p-save', '--save-plots-to',
                         action='store',
-                        dest='save_plots_to',
-                        metavar='SAVE_PLOTS_TO',
+                        dest='plot_dir',
+                        metavar='PLOT_DIR',
                         help='specify the directory after the flag. Each '
-                             'curve from data will be plotted and saved '
-                             'as a single curve graph (preview).'
+                             'curve from the --plot list will be plotted '
+                             'and saved separately as .png file.'
                         )
     parser.add_argument('-m', '--multiplot',
                         action='append',
                         dest='multiplot',
                         nargs='+',
-                        help='specify the indexes of curves to be added to '
-                             'plot after \'-m\' flag. You may use as many '
+                        help='specify the indexes of curves to be plotted '
+                             'as subplots one under the other. You may use as many '
                              '\'-m\' flags (with different lists of curves)'
                              ' as you want.'
                         )
     parser.add_argument('--mp-save', '--save-multiplot-as',
-                        action='append',
-                        dest='mp_save',
-                        metavar='SAVE_MULTIPLOT_AS',
+                        action='store',
+                        dest='multiplot_dir',
+                        metavar='MULTIPLOT_DIR',
                         nargs=1,
-                        help='the postfix to the multiplot file names. '
-                             'The prefix will be equal to the output data '
-                             'file.\n'
-                             'If this flag is omitted the multiplots '
-                             'will not be saved.\n'
-                             'NOTE: if you use \'-s\' flags, then you must '
-                             'use as many \'-s\' flags as '
-                             'you used \'-m\' flags.'
+                        help='specify the directory after the flag. The '
+                             'subplots will be saved as .png file for all '
+                             'the --multiplot lists.'
                         )
     parser.add_argument('--mp-hide', '--multiplot-hide',
                         action='store_true',
                         dest='mp_hide',
                         help='if the flag is specified the multiplots '
-                             'will be saved (if the \'-s\' flag was '
+                             'will be saved (if the \'--mp-save\' flag was '
                              'specified as well) but not shown. This '
                              'option can reduce the runtime of the program.'
                         )
     parser.add_argument('--p-hide', '--plot-hide',
                         action='store_true',
                         dest='p_hide',
-                        help=''
+                        help='if the flag is specified the plots '
+                             'will be saved (if the \'--p-save\' flag was '
+                             'specified as well) but not shown. This '
+                             'option can reduce the runtime of the program.'
                         )
+
 
     args = parser.parse_args()
     verbose = not args.silent
@@ -1929,6 +1933,7 @@ if __name__ == "__main__":
 
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
+        shot_name = os.path.basename(file_list[0])[number_start:number_end]
         data = read_signals(file_list, start=0, step=1, points=-1,
                             labels=args.labels, units=args.units,
                             time_unit=args.time_unit)
@@ -1958,7 +1963,7 @@ if __name__ == "__main__":
         # updates delay values with accordance to voltage front
         raw_front_point = None
         if args.offset_by_front:
-            front_plot_name = os.path.basename(file_list[0])[number_start:number_end]
+            front_plot_name = shot_name
             front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
                                "".format(args.offset_by_front[0],
                                          args.offset_by_front[1]))
@@ -1972,8 +1977,12 @@ if __name__ == "__main__":
                                              args.multiplier,
                                              args.delay,
                                              smooth=True,
-                                             show_plot=True,
-                                             save_as=front_plot_name)
+                                             plot=True)
+            if not os.path.isdir(os.path.dirname(front_plot_name)):
+                os.mkdir(os.path.dirname(front_plot_name))
+            plt.savefig(front_plot_name, dpi=400)
+            plt.show()
+            plt.close('all')
 
 
         # multiplier and delay
@@ -1988,7 +1997,7 @@ if __name__ == "__main__":
 
         # plot_peaks_all(data, None, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], show=True)
 
-        # plot preview
+        # plot preview and save
         if args.plot:
             # args.plot = check_plot(args.plot)
             if args.plot[0] == -1:       # 'all'
@@ -1996,7 +2005,19 @@ if __name__ == "__main__":
             else:
                 check_plot_param(args.plot, data.count, '--plot')
             for idx in args.plot:
-                plot_multiple_curve(data.curves[idx], show=True)
+                plot_multiple_curve(data.curves[idx])
+
+                if args.plot_dir:
+                    if not os.path.isdir(os.path.dirname(args.plot_dir)):
+                        os.mkdir(os.path.dirname(args.plot_dir))
+                    plot_name = ("{shot}_curves_{idx}_{label}.plot.png"
+                                 "".format(shot=shot_name, idx=idx,
+                                           label=data.curves[idx].label))
+                    plot_path = os.path.join(args.plot_dir, plot_name)
+                    plt.savefig(plot_path, dpi=400)
+                if not args.p_hide:
+                    plt.show()
+                plt.close('all')
 
         # save plot
 
@@ -2008,7 +2029,8 @@ if __name__ == "__main__":
                 plot_peaks_all(data, None, curve_list, show=True)
 
         # save multiplot
-                
+        # multiplot file name constructor
+
         # save data
 
         # DEBUG
