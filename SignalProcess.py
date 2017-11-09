@@ -150,10 +150,11 @@ class SignalsData:
         # EMPTY INSTANCE
         # number of curves:
         self.count = 0
-        # dict of curves data (SingleCurve instances):
+        # dict with indexes as keys and SingleCurve instances as values:
         self.curves = {}
         # dict with curve labels as keys and curve indexes as values:
         self.label_to_idx = dict()
+        # dict with curve indexes as keys and curve labels as values:
         self.idx_to_label = dict()
 
         # FILL WITH VALUES
@@ -260,8 +261,8 @@ class SignalsData:
         
         return -- 2d ndarray 
         '''
-        return align_and_append_ndarray(*[curve.data for
-                                          curve in self.curves])
+        return align_and_append_ndarray(*[self.curves[idx].data for
+                                          idx in sorted(self.curves.keys())])
 
     def by_label(self, label):
         # returns SingleCurve by name
@@ -850,7 +851,8 @@ def align_and_append_ndarray(*args):
         miss_rows = max_rows - arr.shape[0]
         nan_arr = np.empty(shape=(miss_rows, arr.shape[1]),
                            dtype=float, order='F')
-        nan_arr = nan_arr * np.nan
+        nan_arr[:] = np.nan
+        # nan_arr[:] = np.NAN
 
         aligned_arr = np.append(arr, nan_arr, axis=0)
         data = np.append(data, aligned_arr, axis=1)
@@ -1619,13 +1621,14 @@ def check_param_path(path, param_name):
     param_name  -- the key on which the path was entered.
                    Needed for correct error message.
     '''
-    try:
-        path = os.path.abspath(path)
-        if not os.path.isdir(path):
-            os.makedirs(path)
-    except:
-        raise ValueError("Unsupported path ({path}) was entered via key "
-                         "{param}.".format(path=path, param=param_name))
+    if path is not None:
+        try:
+            path = os.path.abspath(path)
+            if not os.path.isdir(path):
+                os.makedirs(path)
+        except:
+            raise ValueError("Unsupported path ({path}) was entered via key "
+                             "{param}.".format(path=path, param=param_name))
     return path
 
 
@@ -1794,7 +1797,7 @@ if __name__ == "__main__":
     # output settings --------------------------------------------------------
     parser.add_argument('-s', '--save',
                         action='store_true',
-                        dest='save_data',
+                        dest='save',
                         help='saves data files.\n'
                              'NOTE: If in the input data one '
                              'shot corresponds to one file and output '
@@ -1811,6 +1814,7 @@ if __name__ == "__main__":
                         action='store',
                         metavar='FILE_PREFIX',
                         dest='prefix',
+                        default='',
                         help='specify the prefix after the flag. This prefix '
                              'will be added to the output file names during '
                              'the automatic generation of file names. '
@@ -1820,6 +1824,7 @@ if __name__ == "__main__":
                         action='store',
                         metavar='FILE_POSTFIX',
                         dest='postfix',
+                        default='',
                         help='specify the postfix after the flag. This '
                              'postfix will be added to the output file '
                              'names during the automatic generation '
@@ -1905,7 +1910,8 @@ if __name__ == "__main__":
             args.src_dir = os.path.dirname(grouped_files[0][0])
     else:
         grouped_files = get_grouped_file_list(args.src_dir, args.ext_list,
-                                           args.group_size, args.sorted_by_ch)
+                                              args.group_size,
+                                              args.sorted_by_ch)
 
     # Now we have the list of files, grouped by shots:
     # grouped_files == [
@@ -1926,6 +1932,15 @@ if __name__ == "__main__":
 
     args.plot_dir = check_param_path(args.plot_dir, '--p_save')
     args.multiplot_dir = check_param_path(args.multiplot_dir, '--mp-save')
+    args.save_to = check_param_path(args.save_to, '--save-to')
+    if args.save_to is None:
+        args.save_to = os.path.dirname(grouped_files[0][0])
+
+    # checks if postfix and prefix can be used in filename
+    if args.prefix:
+        args.prefix = re.sub(r'[^-.\w]', '_', args.prefix)
+    if args.postfix:
+        args.postfix = re.sub(r'[^-.\w]', '_', args.postfix)
 
     # raw check plot and multiplot
     if args.plot:
@@ -1966,42 +1981,44 @@ if __name__ == "__main__":
                             args.labels, args.units)
 
         # check y_zero_offset parameters (if idx is out of range)
-        check_y_auto_zero_params(data, args.y_auto_zero)
+        if args.y_auto_zero:
+            check_y_auto_zero_params(data, args.y_auto_zero)
 
-        # updates delays with accordance to Y zero offset
-        args.delay = apdate_delays_by_y_auto_zero(data, args.y_auto_zero,
-                                                  args.multiplier, args.delay,
-                                                  verbose=True)
+            # updates delays with accordance to Y zero offset
+            args.delay = apdate_delays_by_y_auto_zero(data, args.y_auto_zero,
+                                                      args.multiplier,
+                                                      args.delay,
+                                                      verbose=True)
 
         # check offset_by_voltage parameters (if idx is out of range)
-        assert args.offset_by_front[0] < data.count, \
-            "Index ({}) is out of range in --y-offset-by-curve-level " \
-            "parameters.\nCurves count = {}" \
-            "".format(args.offset_by_front[0], data.count)
-
-        # updates delay values with accordance to voltage front
-        raw_front_point = None
         if args.offset_by_front:
-            front_plot_name = shot_name
-            front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
-                               "".format(args.offset_by_front[0],
-                                         args.offset_by_front[1]))
-            front_plot_name = os.path.join(args.src_dir,
-                                           'FrontBeforeTimeOffset',
-                                           front_plot_name)
-            print("FRONT PLOT NAME = {}".format(front_plot_name))
-            args.delay, raw_front_point = \
-                update_delays_by_curve_front(data,
-                                             args.offset_by_front,
-                                             args.multiplier,
-                                             args.delay,
-                                             smooth=True,
-                                             plot=True)
-            if not os.path.isdir(os.path.dirname(front_plot_name)):
-                os.makedirs(os.path.dirname(front_plot_name))
-            plt.savefig(front_plot_name, dpi=400)
-            plt.show()
-            plt.close('all')
+            assert args.offset_by_front[0] < data.count, \
+                "Index ({}) is out of range in --y-offset-by-curve-level " \
+                "parameters.\nCurves count = {}" \
+                "".format(args.offset_by_front[0], data.count)
+
+            # updates delay values with accordance to voltage front
+            raw_front_point = None
+            if args.offset_by_front:
+                front_plot_name = shot_name
+                front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
+                                   "".format(args.offset_by_front[0],
+                                             args.offset_by_front[1]))
+                front_plot_name = os.path.join(args.src_dir,
+                                               'FrontBeforeTimeOffset',
+                                               front_plot_name)
+                args.delay, raw_front_point = \
+                    update_delays_by_curve_front(data,
+                                                 args.offset_by_front,
+                                                 args.multiplier,
+                                                 args.delay,
+                                                 smooth=True,
+                                                 plot=True)
+                if not os.path.isdir(os.path.dirname(front_plot_name)):
+                    os.makedirs(os.path.dirname(front_plot_name))
+                plt.savefig(front_plot_name, dpi=400)
+                plt.show()
+                plt.close('all')
 
 
         # multiplier and delay
@@ -2032,14 +2049,14 @@ if __name__ == "__main__":
                                            label=data.curves[idx].label))
                     plot_path = os.path.join(args.plot_dir, plot_name)
                     plt.savefig(plot_path, dpi=400)
-                    print("saved as {}".format(plot_path))
+                    if verbose:
+                        print("Plot is saved as {}".format(plot_path))
                 if not args.p_hide:
                     plt.show()
                 plt.close('all')
 
-        # save plot
 
-        # plot multi-plots
+        # plot and save multi-plots
         if args.multiplot:
             for curve_list in args.multiplot:
                 check_plot_param(curve_list, data.count, '--multiplot')
@@ -2052,16 +2069,24 @@ if __name__ == "__main__":
                                            idx_list=idx_list))
                     mplot_path = os.path.join(args.multiplot_dir, mplot_name)
                     plt.savefig(mplot_path, dpi=400)
-                    print("saved as {}".format(mplot_path))
+                    if verbose:
+                        print("Multiplot is saved {}".format(mplot_path))
                 if not args.mp_hide:
                     plt.show()
                 plt.close('all')
 
-        # save multiplot
-        # multiplot file name constructor
-
         # save data
-
+        if args.save:
+            if len(file_list) == 1 and not args.save_to:
+                file_path = file_list[0]
+            else:
+                file_name = ("{pref}{number}{postf}.csv"
+                             "".format(pref=args.prefix, number=shot_name,
+                                       postf=args.postfix))
+                file_path = os.path.join(args.save_to, file_name)
+            save_ndarray_csv(file_path, data.get_array())
+            if verbose:
+                print("Saved as {}".format(file_path))
         # DEBUG
         # from only_for_tests import plot_multiplot
         # plot_multiplot(data, None, [0, 4, 8, 11], show=True)
@@ -2077,6 +2102,6 @@ if __name__ == "__main__":
     # TODO: add labels to CSV files
     # TODO: add log file with multipliers and delays applied to data saved to CSV
 
-    print(args.y_auto_zero)
+    # print(args.y_auto_zero)
     print()
     print(args)
