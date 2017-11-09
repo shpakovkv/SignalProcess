@@ -1361,9 +1361,9 @@ def calc_ylim(time, y, time_bounds=None, reserve=0.1):
     return y_min - reserve, y_max + reserve
 
 
-def plot_peaks_all(data, peak_data, curves_list,
-                   xlim=None, show=False, save_as=None,
-                   amp_unit=None, time_unit=None, title=None):
+def plot_multiplot(data, peak_data, curves_list,
+                   xlim=None, amp_unit=None,
+                   time_unit=None, title=None):
     '''Plots subplots for all curves with index in curve_list.
     Optional: plots peaks.
     Subplots are located one under the other. 
@@ -1400,6 +1400,8 @@ def plot_peaks_all(data, peak_data, curves_list,
         axes[wf].plot(data.time(curves_list[wf]),
                       data.value(curves_list[wf]),
                       '-', color='#9999aa', linewidth=0.5)
+        axes[wf].tick_params(direction='in', top=True, right=True)
+
         # set bounds
         if xlim is not None:
             axes[wf].set_xlim(xlim)
@@ -1441,14 +1443,7 @@ def plot_peaks_all(data, peak_data, curves_list,
                     axes[wf].scatter([pk.time], [pk.val], s=50,
                                      edgecolors='none', facecolors=color,
                                      linewidths=1.5, marker='x')
-    if save_as is not None:
-        # print("Saving plot " + save_as)
-        plt.savefig(save_as, dpi=400)
-        # print("Done!")
-    if show:
-        plt.show()
-
-    plt.close('all')
+    fig.subplots_adjust(hspace=0)
 
 
 def plot_multiple_curve(curve_list, peaks=None,
@@ -1526,7 +1521,7 @@ def plot_multiple_curve(curve_list, peaks=None,
         #           facecolors='none', linewidths=1.5)
     # if save_as is not None:
     #     if not os.path.isdir(os.path.dirname(save_as)):
-    #         os.mkdir(os.path.dirname(save_as))
+    #         os.makedirs(os.path.dirname(save_as))
     #     # print("Saveing " + save_as)
     #     plt.savefig(save_as, dpi=400)
     # if show:
@@ -1610,6 +1605,28 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
         for idx in range(0, len(delay), 2):
             new_delay[idx] += time_offset
     return new_delay, pp.SinglePeak(front_x, front_y, 0)
+
+
+def check_param_path(path, param_name):
+    '''Path checker. 
+    Verifies the syntactic correctness of the entered path.
+    Does not check the existence of the path.
+    Returns abs version of the path. 
+    Recursive creates all directories from the path 
+    if they are not exists. 
+    
+    path        -- the path to check
+    param_name  -- the key on which the path was entered.
+                   Needed for correct error message.
+    '''
+    try:
+        path = os.path.abspath(path)
+        if not os.path.isdir(path):
+            os.makedirs(path)
+    except:
+        raise ValueError("Unsupported path ({path}) was entered via key "
+                         "{param}.".format(path=path, param=param_name))
+    return path
 
 
 def global_check_labels(labels):
@@ -1852,7 +1869,6 @@ if __name__ == "__main__":
                         action='store',
                         dest='multiplot_dir',
                         metavar='MULTIPLOT_DIR',
-                        nargs=1,
                         help='specify the directory after the flag. The '
                              'subplots will be saved as .png file for all '
                              'the --multiplot lists.'
@@ -1907,6 +1923,9 @@ if __name__ == "__main__":
     #     assert global_check_labels(args.labels), \
     #         "Label value error! Only latin letters, " \
     #         "numbers and underscore are allowed."
+
+    args.plot_dir = check_param_path(args.plot_dir, '--p_save')
+    args.multiplot_dir = check_param_path(args.multiplot_dir, '--mp-save')
 
     # raw check plot and multiplot
     if args.plot:
@@ -1979,7 +1998,7 @@ if __name__ == "__main__":
                                              smooth=True,
                                              plot=True)
             if not os.path.isdir(os.path.dirname(front_plot_name)):
-                os.mkdir(os.path.dirname(front_plot_name))
+                os.makedirs(os.path.dirname(front_plot_name))
             plt.savefig(front_plot_name, dpi=400)
             plt.show()
             plt.close('all')
@@ -1995,7 +2014,7 @@ if __name__ == "__main__":
         #                                   args.offset_by_front[0])
         #     plot_multiple_curve(data.curves)
 
-        # plot_peaks_all(data, None, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], show=True)
+        # plot_multiplot(data, None, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], show=True)
 
         # plot preview and save
         if args.plot:
@@ -2007,14 +2026,13 @@ if __name__ == "__main__":
             for idx in args.plot:
                 plot_multiple_curve(data.curves[idx])
 
-                if args.plot_dir:
-                    if not os.path.isdir(os.path.dirname(args.plot_dir)):
-                        os.mkdir(os.path.dirname(args.plot_dir))
-                    plot_name = ("{shot}_curves_{idx}_{label}.plot.png"
+                if args.plot_dir is not None:
+                    plot_name = ("{shot}_curve_{idx}_{label}.plot.png"
                                  "".format(shot=shot_name, idx=idx,
                                            label=data.curves[idx].label))
                     plot_path = os.path.join(args.plot_dir, plot_name)
                     plt.savefig(plot_path, dpi=400)
+                    print("saved as {}".format(plot_path))
                 if not args.p_hide:
                     plt.show()
                 plt.close('all')
@@ -2026,7 +2044,18 @@ if __name__ == "__main__":
             for curve_list in args.multiplot:
                 check_plot_param(curve_list, data.count, '--multiplot')
             for curve_list in args.multiplot:
-                plot_peaks_all(data, None, curve_list, show=True)
+                plot_multiplot(data, None, curve_list)
+                if args.multiplot_dir is not None:
+                    idx_list = "_".join(str(i) for i in sorted(curve_list))
+                    mplot_name = ("{shot}_curves_{idx_list}.multiplot.png"
+                                 "".format(shot=shot_name,
+                                           idx_list=idx_list))
+                    mplot_path = os.path.join(args.multiplot_dir, mplot_name)
+                    plt.savefig(mplot_path, dpi=400)
+                    print("saved as {}".format(mplot_path))
+                if not args.mp_hide:
+                    plt.show()
+                plt.close('all')
 
         # save multiplot
         # multiplot file name constructor
@@ -2034,8 +2063,8 @@ if __name__ == "__main__":
         # save data
 
         # DEBUG
-        # from only_for_tests import plot_peaks_all
-        # plot_peaks_all(data, None, [0, 4, 8, 11], show=True)
+        # from only_for_tests import plot_multiplot
+        # plot_multiplot(data, None, [0, 4, 8, 11], show=True)
         #
         # plot_multiple_curve(data.curves[12], show=True)
         # plot_multiple_curve(data.curves[0], show=True)
