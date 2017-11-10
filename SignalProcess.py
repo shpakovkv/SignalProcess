@@ -162,6 +162,22 @@ class SignalsData:
             self.append(input_data, labels, units, time_units)
 
     def append(self, input_data, labels=None, units=None, time_unit=None):
+        '''Separates the input ndarray data into SingleCurves
+        and adds it to the self.curves dict.
+
+        input_data -- ndarray with curves data. if the array has
+                      an even number of columns, then the first
+                      two curves will form the first curve,
+                      the next two columns will result in the second
+                      curve, etc.
+                      If the array has an odd number of columns,
+                      then the first column will be considered as
+                      an X-column for all the curves added. And the
+                      rest of the columns will be treated as Y-columns.
+        labels     -- the list of labels for the added curves
+        units      -- the list of labels for the added curves
+        time_unit  -- the unit of the time scale
+        '''
         # appends one or more new SingleCurves to the self.curves list
         # and updates the corresponding self parameters
         data = np.array(input_data, dtype=float, order='F')
@@ -289,10 +305,13 @@ class SignalsData:
 
     def value(self, curve):
         return self.curves[curve].get_y()
+
     def label(self, curve):
         return self.curves[curve].label
+
     def unit(self, curve):
         return self.curves[curve].unit
+
     def time_unit(self, curve):
         return self.curves[curve].time_unit
 
@@ -357,6 +376,21 @@ def add_zeros_to_filename(full_path, count):
     return os.path.join(folder_path, name)
 
 
+def check_labels_string(s, count):
+    '''Checks if header line (from csv file) contains
+    contains the required number of labels/units/etc.
+
+    Returns the list of labels or None.
+
+    s -- the header line (string) to check
+    count -- the requered number of labels/units/etc.
+    '''
+    labels = [word.strip() for word in s.split(",")]
+    if len(labels) == count:
+        return labels
+    return None
+
+
 def read_signals(file_list, start=0, step=1, points=-1,
                  labels=None, units=None, time_unit=None):
     '''
@@ -388,19 +422,25 @@ def read_signals(file_list, start=0, step=1, points=-1,
     for filename in file_list:
         if verbose:
             print("Loading \"{}\"".format(filename))
-        new_data = load_from_file(filename, start, step, points)
+        new_data, new_header = load_from_file(filename, start, step, points)
         if new_data.shape[1] % 2 != 0:
             # multiple_X_columns = False
             add_count = new_data.shape[1] - 1
         else:
             # multiple_X_columns = True
             add_count = new_data.shape[1] // 2
-        current_labels = None
-        current_units = None
         if labels:
+            # user input
             current_labels = labels[current_count: current_count + add_count]
+        else:
+            # from file
+            current_labels = check_labels_string(new_header[0], add_count)
         if units:
+            # user input
             current_units = units[current_count: current_count + add_count]
+        else:
+            # from file
+            current_units = check_labels_string(new_header[1], add_count)
 
         data.append(new_data, current_labels, current_units, time_unit)
 
@@ -516,6 +556,7 @@ def load_from_file(filename, start=0, step=1, points=-1):
                 print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
                       end="")
             text_data = datafile.readlines()
+            header = text_data[0:2]
             if dialect.delimiter == ";":
                 text_data = origin_to_csv(text_data)
                 dialect.delimiter = ','
@@ -533,13 +574,14 @@ def load_from_file(filename, start=0, step=1, points=-1):
         data = wfm.read_wfm_group([filename], start_index=start,
                                   number_of_points=points,
                                   read_step=step)
+        header = None
     if verbose:
         if data.shape[1] % 2 ==0:
             curves_count = data.shape[1] // 2
         else:
             curves_count = data.shape[1] - 1
         print("Curves count = {}".format(curves_count))
-    return data
+    return data, header
 
 
 def compare_2_files(first_file_name, second_file_name, lines=30):
@@ -831,9 +873,63 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
 
     with open(filename, 'w') as fid:
         lines = []
+        # add headers
+        labels = ",".join([data.curves[idx].label for
+                           idx in data.idx_to_label.keys()])
+        units = ",".join([data.curves[idx].unit for
+                           idx in data.idx_to_label.keys()])
+        lines.append(labels)
+        lines.append(units)
+        # add data
         for row in range(data.shape[0]):
             s = delimiter.join([value_format % data[row, col] for
                                 col in range(data.shape[1])]) + "\n"
+            s = re.sub(r'nan', '', s)
+            lines.append(s)
+        fid.writelines(lines)
+
+
+def save_signals_csv(filename, signals, delimiter=",", precision=18):
+    '''
+
+    :param filename:
+    :param signals:
+    :param delimiter:
+    :param precision:
+    :return:
+    '''
+    # check precision value
+    table = signals.get_array()
+    print("Save columns count = {}".format(table.shape[1]))
+    if not isinstance(precision, int):
+        raise ValueError("Precision must be integer")
+    if precision > 18:
+        precision = 18
+    value_format = '%0.' + str(precision) + 'e'
+
+    # check filename value
+    if len(filename) < 4 or filename[-4:].upper() != ".CSV":
+        filename += ".csv"
+    folder_path = os.path.dirname(filename)
+    if folder_path and not os.path.isdir(folder_path):
+        os.makedirs(folder_path)
+    with open(filename, 'w') as fid:
+        lines = []
+        # add headers
+        labels = [signals.curves[idx].label for
+                  idx in signals.idx_to_label.keys()]
+        labels = [re.sub(r'[^-.\w_]', '_', label) for label in labels]
+        labels = delimiter.join(labels) + "\n"
+        units = [signals.curves[idx].unit for
+                 idx in signals.idx_to_label.keys()]
+        units = [re.sub(r'[^-.\w_]', '_', unit) for unit in units]
+        units = delimiter.join(units) + "\n"
+        lines.append(labels)
+        lines.append(units)
+        # add data
+        for row in range(table.shape[0]):
+            s = delimiter.join([value_format % table[row, col] for
+                                col in range(table.shape[1])]) + "\n"
             s = re.sub(r'nan', '', s)
             lines.append(s)
         fid.writelines(lines)
@@ -2096,7 +2192,7 @@ if __name__ == "__main__":
                                        postf=args.postfix))
                 file_path = os.path.join(args.save_to, file_name)
             print("Curves count = {}".format(data.count))
-            save_ndarray_csv(file_path, data.get_array())
+            save_signals_csv(file_path, data)
             if verbose:
                 print("Saved as {}".format(file_path))
         # DEBUG
@@ -2106,14 +2202,11 @@ if __name__ == "__main__":
         # plot_multiple_curve(data.curves[12], show=True)
         # plot_multiple_curve(data.curves[0], show=True)
 
-    # TODO: change data read (labels, curve_idx, idx_to_labels dict)
-
     # TODO: interactive offset_by_curve smooth process
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
     # TODO: user interactive input commands?
     # TODO: partial import (start, step, points)
-    # TODO: add labels to CSV files
     # TODO: add log file with multipliers and delays applied to data saved to CSV
 
     # print(args.y_auto_zero)
