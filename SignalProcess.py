@@ -173,13 +173,16 @@ class SignalsData:
             multiple_X_columns = True
             add_count = data.shape[1] // 2
 
-        for curve_idx in range(0, add_count):
+        for old_idx in range(0, add_count):
+            # old_idx -- the curve index inside the adding ndarray
+            # new_idx -- the curve index inside the output SignalsData
+            new_idx = self.count
             if labels:
-                current_label = labels[curve_idx]
+                current_label = labels[old_idx]
             else:
-                current_label = "Curve[{}]".format(curve_idx)
+                current_label = "Curve[{}]".format(old_idx)
             if units:
-                current_unit = units[curve_idx]
+                current_unit = units[old_idx]
             else:
                 current_unit = "a.u."
             if time_unit:
@@ -189,20 +192,20 @@ class SignalsData:
 
             if multiple_X_columns:
                 self.curves[self.count] = \
-                    SingleCurve(data[:, curve_idx * 2],
-                                data[:, curve_idx * 2 + 1],
+                    SingleCurve(data[:, old_idx * 2],
+                                data[:, old_idx * 2 + 1],
                                 current_label, current_unit,
                                 current_time_unit)
             else:
                 self.curves[self.count] = \
-                    SingleCurve(data[:, 0], data[:, curve_idx + 1],
+                    SingleCurve(data[:, 0], data[:, old_idx + 1],
                                 current_label, current_unit,
                                 current_time_unit)
             self.curves[current_label] = self.curves[self.count]
             self.count += 1
 
-            self.label_to_idx[current_label] = curve_idx
-            self.idx_to_label[curve_idx] = current_label
+            self.label_to_idx[current_label] = new_idx
+            self.idx_to_label[new_idx] = current_label
 
 
     def check_input(self, data, new_labels=None, new_units=None):
