@@ -4,6 +4,7 @@ from __future__ import print_function, with_statement
 import re
 import os
 import colorsys
+import sys
 
 import numpy as np
 from scipy.signal import savgol_filter
@@ -841,6 +842,10 @@ def smooth_voltage(y_data, window=101, poly_order=3):
     """
 
     # calc time_step and converts to nanoseconds
+    assert isinstance(window, int), \
+        "The length of the filter window must be positive integer >= 5."
+    assert isinstance(poly_order, int), \
+        "The polynomial order of the filter must be positive integer."
     if len(y_data) < window:
         window = len(y_data) - 1
     if window % 2 == 0:
@@ -851,7 +856,7 @@ def smooth_voltage(y_data, window=101, poly_order=3):
         window = 5
 
     if len(y_data) >= 5:
-        # print("WINDOW LEN = {}  |  POLY ORDER = {}".format(window, poly_order))
+        print("WINDOW LEN = {}  |  POLY ORDER = {}".format(window, poly_order))
         y_smoothed = savgol_filter(y_data, window, poly_order)
         return y_smoothed
 
@@ -1078,14 +1083,23 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
     return grouped_files
 
 
-def global_check_front_params(params):
+def global_check_front_params(params, window=101, polyorder=3, plot=True):
     """ Parses user input of offset_by_curve_level parameter.
-    Returns (idx, level), where:
+    Returns (idx, level, window, order), where:
         idx -- [int] the index of the curve, inputted by user
         level -- [float] the curve front level (amplitude),
                  which will be found and set as time zero
+        window -- The length of the smooth filter window 
+                  (i.e. the number of coefficients)
+        order -- The order of the polynomial used to fit the samples
+                 (for smooth filter)
 
-    params -- user input (list of two strings)
+    params      -- user input (list of 2, 3 or 4 strings)
+    window      -- the default value of filter window (if not 
+                   specified by user)
+    polyorder   -- the default value of polynomial order of the 
+                   smooth filter (if not specified by user)
+    
     """
     try:
         idx = int(params[0])
@@ -1104,27 +1118,42 @@ def global_check_front_params(params):
                          "--offset_by_curve_level parameters\n"
                          "Only float values are allowed."
                          "".format(params[0]))
-    try:
-        window = int(params[2])
-        if window < 5:
-            raise ValueError
-    except ValueError:
-        raise ValueError("Unsupported value for filter window "
-                         "length ({}) at "
-                         "--offset_by_curve_level parameters\n"
-                         "Only integer values >=5 are allowed."
-                         "".format(params[0]))
-    try:
-        poly_order = int(params[3])
-        if poly_order < 1:
-            raise ValueError
-    except ValueError:
-        raise ValueError("Unsupported value for filter polynomial "
-                         "order ({}) at "
-                         "--offset_by_curve_level parameters\n"
-                         "Only integer values >=1 are allowed."
-                         "".format(params[0]))
-    return idx, level, window, poly_order
+
+    if len(params) > 2:
+        try:
+            window = int(params[2])
+            if window < 5:
+                raise ValueError
+        except ValueError:
+            raise ValueError("Unsupported value for filter window "
+                             "length ({}) at "
+                             "--offset_by_curve_level parameters\n"
+                             "Only integer values >=5 are allowed."
+                             "".format(params[0]))
+    if len(params) == 4:
+        try:
+            polyorder = int(params[3])
+            if polyorder < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError("Unsupported value for filter polynomial "
+                             "order ({}) at "
+                             "--offset_by_curve_level parameters\n"
+                             "Only integer values >=1 are allowed."
+                             "".format(params[0]))
+    if len(params) == 5:
+        try:
+            plot = int(params[4])
+            if plot not in {0, 1}:
+                raise ValueError
+            plot = bool(plot)
+        except ValueError:
+            raise ValueError("Unsupported value for plot_graph "
+                             "({}) at "
+                             "--offset_by_curve_level parameters\n"
+                             "Only 0 and 1 are allowed."
+                             "".format(params[0]))
+    return idx, level, window, polyorder, plot
 
 
 def check_file_list(dir, grouped_files):
@@ -1643,9 +1672,9 @@ def plot_multiple_curve(curve_list, peaks=None,
         # plt.close('all')
 
 
-def update_delays_by_curve_front(data, offset_by_curve_params,
-                                 multiplier, delay, smooth=True,
-                                 plot=False):
+def offset_by_front(data, offset_by_curve_params,
+                    multiplier, delay, smooth=True,
+                    plot=False, interactive=False):
     """This function finds the time point of the selected curve front on level
     'level', recalculates input delays of all time columns (odd
     elements of the input delay list) to make that time point be zero.
@@ -1690,28 +1719,47 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
 
     level_raw = ((level + delay[curve_idx * 2 + 1]) /
                  multiplier[curve_idx * 2 + 1])
-    # smooth curve to improve accuracy of front search
     if smooth:
         print("Smoothing is turned ON.")
-        smoothed_y = smooth_voltage(data.curves[curve_idx].get_y(),
-                                    window, poly_order)
-        smoothed_curve = SingleCurve(data.curves[curve_idx].get_x(),
-                                     smoothed_y)
     else:
         print("Smoothing is turned OFF.")
-        smoothed_curve = data.curves[curve_idx]
-    front_x, front_y = pp.find_curve_front(smoothed_curve,
-                                           level_raw, polarity)
-    if plot:
-        if front_x:
-            front_point = [pp.SinglePeak(front_x, front_y, 0)]
+
+    if smooth and interactive:
+        print("INTERACTIVE")
+    # smooth curve to improve accuracy of front search
+    data_x = data.curves[curve_idx].get_x()
+    data_y = data.curves[curve_idx].get_y()
+    front_x, front_y = None, None
+    for _ in range(1):
+        if smooth:
+            smoothed_y = smooth_voltage(data_y, window, poly_order)
+            smoothed_curve = SingleCurve(data_x, smoothed_y)
         else:
-            front_point = None
-        plot_title = "Curve[{}]\nRaw data before applying multipliers and " \
-                     "delays".format(data.curves[curve_idx].label)
-        plot_multiple_curve([data.curves[curve_idx], smoothed_curve],
-                            front_point, amp_unit="a.u.",
-                            time_unit="a.u.", title=plot_title)
+            smoothed_curve = data.curves[curve_idx]
+        front_x, front_y = pp.find_curve_front(smoothed_curve,
+                                               level_raw, polarity)
+        if plot:
+            plt.close("all")
+            if front_x:
+                front_point = [pp.SinglePeak(front_x, front_y, 0)]
+            else:
+                front_point = None
+            plot_title = "Curve[{}]\nRaw data before applying multipliers and " \
+                         "delays".format(data.curves[curve_idx].label)
+            plot_multiple_curve([data.curves[curve_idx], smoothed_curve],
+                                front_point, amp_unit="a.u.",
+                                time_unit="a.u.", title=plot_title)
+        # print("Filter window = {}, polyorder = {}".format(window, poly_order))
+        # plt.show()
+        # print(">>>", end="")
+        # input_val = sys.stdin.readline()
+        # input_val = input_val.strip()
+        # input_val = input_val.split()
+        # window = int(input_val[0])
+        # poly_order = int(input_val[1])
+        # print("New window and order = {}    {}".format(window, poly_order))
+        # print(input_val)
+        # window, poly_order = map(int, input('>>>').split())
 
     new_delay = delay[:]
     if front_x:
@@ -1905,10 +1953,10 @@ if __name__ == "__main__":
                              'a multiplier and then the delay '
                              'is subtracted from them.'
                         )
-    parser.add_argument('--offset-by-curve_level',
+    parser.add_argument('--offset-by-curve-level',
                         action='store',
-                        metavar=('IDX', 'LEVEL', 'WIN', 'ORDER'),
-                        nargs=4,
+                        metavar='VAL',
+                        nargs='+',
                         dest='offset_by_front',
                         default=None,
                         help=''
@@ -2057,7 +2105,13 @@ if __name__ == "__main__":
     #                  ]
 
     # raw check offset_by_voltage parameters (types)
+    it_offset = False  # interactive offset process
     if args.offset_by_front:
+        assert 2 >= len(args.offset_by_front) >= 5, \
+            ("error: argument {arg_name}: expected 2 or 3 or 4 arguments."
+             "".format(arg_name="--offset-by-curve_level"))
+        if len(args.offset_by_front) < 4:
+            it_offset = True
         args.offset_by_front = global_check_front_params(args.offset_by_front)
 
     # raw check labels
@@ -2145,12 +2199,10 @@ if __name__ == "__main__":
                                                'FrontBeforeTimeOffset',
                                                front_plot_name)
                 args.delay, raw_front_point = \
-                    update_delays_by_curve_front(data,
-                                                 args.offset_by_front,
-                                                 args.multiplier,
-                                                 args.delay,
-                                                 smooth=True,
-                                                 plot=True)
+                    offset_by_front(data, args.offset_by_front,
+                                    args.multiplier, args.delay,
+                                    smooth=True, plot=True,
+                                    interactive=it_offset)
                 if not os.path.isdir(os.path.dirname(front_plot_name)):
                     os.makedirs(os.path.dirname(front_plot_name))
                 plt.savefig(front_plot_name, dpi=400)
@@ -2228,7 +2280,6 @@ if __name__ == "__main__":
                 # plot_multiple_curve(data.curves[0], show=True)
 
     # TODO: interactive offset_by_curve smooth process
-    # TODO: correct save if one file in (wfm), use prefix and postfix
     # TODO: user interactive input commands?
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
