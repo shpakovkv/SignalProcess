@@ -427,16 +427,19 @@ def read_signals(file_list, start=0, step=1, points=-1,
         else:
             # multiple_X_columns = True
             add_count = new_data.shape[1] // 2
+
+        current_labels = None
+        current_units = None
         if labels:
             # user input
             current_labels = labels[current_count: current_count + add_count]
-        else:
+        elif new_header:
             # from file
             current_labels = check_labels_string(new_header[0], add_count)
         if units:
             # user input
             current_units = units[current_count: current_count + add_count]
-        else:
+        elif new_header:
             # from file
             current_units = check_labels_string(new_header[1], add_count)
 
@@ -988,6 +991,9 @@ def numbering_parser(group):
         names.append(os.path.basename(raw))
     assert all(len(name) for name in names), \
         "Error! All file names must have the same length"
+    if len(group) == 1:
+        return 0, len(names[0])
+
     numbers = []
     # for idx in range(2):
     #     numbers.append(parse_filename(names[idx]))
@@ -1733,7 +1739,7 @@ def check_param_path(path, param_name):
     param_name  -- the key on which the path was entered.
                    Needed for correct error message.
     """
-    if path is not None:
+    if path:
         try:
             path = os.path.abspath(path)
             if not os.path.isdir(path):
@@ -1755,6 +1761,24 @@ def global_check_labels(labels):
         if re.search(r'[\W]', label):
             return False
     return True
+
+
+def trim_ext(filename, ext_list):
+    """Return the filename without extension, 
+    if the extension is in the ext_list.
+    
+    filename -- the file name 
+    ext_list -- the list of the extensions to check
+    """
+    filename = os.path.basename(filename)
+    if isinstance(ext_list, str):
+        ext_list = [ext_list]
+    if not ext_list:
+        ext_list = [".CSV", ".WFM", ".DAT", ".TXT"]
+    for ext in ext_list:
+        if filename.upper().endswith(ext.upper()):
+            return filename[0: - len(ext)]
+    return filename
 
 
 # ============================================================================
@@ -2045,7 +2069,7 @@ if __name__ == "__main__":
     args.plot_dir = check_param_path(args.plot_dir, '--p_save')
     args.multiplot_dir = check_param_path(args.multiplot_dir, '--mp-save')
     args.save_to = check_param_path(args.save_to, '--save-to')
-    if args.save_to == '':
+    if not args.save_to:
         args.save_to = os.path.dirname(grouped_files[0][0])
 
     # checks if postfix and prefix can be used in filename
@@ -2072,14 +2096,15 @@ if __name__ == "__main__":
             "The number of multipliers ({}) is not equal to the number of " \
             "delays ({}).".format(len(args.multiplier), len(args.delay))
 
-    number_start, number_end = numbering_parser(files[0] for
-                                                files in grouped_files)
+    number_start, number_end = numbering_parser([files[0] for
+                                                files in grouped_files])
     labels_dict = {'labels': args.labels, 'units': args.units,
                    'time': args.time_unit}
 
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
         shot_name = os.path.basename(file_list[0])[number_start:number_end]
+        shot_name = trim_ext(shot_name, args.ext_list)
         data = read_signals(file_list, start=0, step=1, points=-1,
                             labels=args.labels, units=args.units,
                             time_unit=args.time_unit)
@@ -2187,14 +2212,10 @@ if __name__ == "__main__":
 
         # save data
         if args.save:
-            if len(file_list) == 1 and not args.save_to:
-                file_path = file_list[0]
-                # PREFIX POSTFIX
-            else:
-                file_name = ("{pref}{number}{postf}.csv"
-                             "".format(pref=args.prefix, number=shot_name,
-                                       postf=args.postfix))
-                file_path = os.path.join(args.save_to, file_name)
+            file_name = ("{pref}{number}{postf}.csv"
+                         "".format(pref=args.prefix, number=shot_name,
+                                   postf=args.postfix))
+            file_path = os.path.join(args.save_to, file_name)
             print("Curves count = {}".format(data.count))
             save_signals_csv(file_path, data)
             if verbose:
