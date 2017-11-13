@@ -3,27 +3,26 @@ from __future__ import print_function, with_statement
 
 import re
 import os
-
 import colorsys
+
 import numpy as np
 from scipy.signal import savgol_filter
 from matplotlib import pyplot as plt
-from matplotlib import axes
 
 import wfm_reader_lite as wfm
 import PeakProcess as pp
 
-
 verbose = True
 
 
-class ColorRange():
-    '''Color code iterator. Generates contrast colors.
+class ColorRange:
+    """Color code iterator. Generates contrast colors.
     Returns the hexadecimal RGB color code (for example '#ffaa00')
-    '''
+    """
+
     def __init__(self, start_hue=0, hue_step=140, min_hue_diff=20,
-                  saturation=(90, 90, 60),
-                  luminosity=(55, 30, 50)):
+                 saturation=(90, 90, 60),
+                 luminosity=(55, 30, 50)):
         self.start = start_hue
         self.step = hue_step
         self.window = min_hue_diff
@@ -31,9 +30,11 @@ class ColorRange():
         self.s_list = saturation
         self.l_list = luminosity
 
-    def too_close(self, val_list, val, window=10):
+    def too_close(self, val_list, val, window=None):
+        if window is None:
+            window = self.window
         for item in val_list:
-            if val < item + window and val > item - window:
+            if item - window < val < item + window:
                 return True
         return False
 
@@ -51,13 +52,12 @@ class ColorRange():
         return count
 
     def hsl_to_rgb_code(self, hue, saturation, luminosity):
-        hue = hue / 360.0
+        hue = float(hue) / 360.0
         saturation = saturation / 100.0
         luminosity = luminosity / 100.0
         # print([hue, saturation, luminosity])
         rgb_float = colorsys.hls_to_rgb(hue, luminosity, saturation)
         # print(rgb_float)
-        rgb = [val * 255 for val in rgb_float]
         rgb_int = [int(round(val * 255)) for val in rgb_float]
         # print("{:.2f}, {:.2f}, {:.2f}".format(*rgb), end=" == ")
         rgb_code = "#{:02x}{:02x}{:02x}".format(*rgb_int)
@@ -69,13 +69,13 @@ class ColorRange():
             for sat, lum in zip(self.s_list, self.l_list):
                 last = self.start + offset
                 offset += 10
-                yield self.hsl_to_rgb_code(*[0, sat, lum])
+                yield self.hsl_to_rgb_code(0, sat, lum)
                 for i in range(0, self.calc_count()):
                     new_hue = last + self.step
                     if new_hue > 360:
                         new_hue -= 360
                     last = new_hue
-                    yield self.hsl_to_rgb_code(*[new_hue, sat, lum])
+                    yield self.hsl_to_rgb_code(new_hue, sat, lum)
 
 
 class SingleCurve:
@@ -162,7 +162,7 @@ class SignalsData:
             self.append(input_data, labels, units, time_units)
 
     def append(self, input_data, labels=None, units=None, time_unit=None):
-        '''Separates the input ndarray data into SingleCurves
+        """Separates the input ndarray data into SingleCurves
         and adds it to the self.curves dict.
 
         input_data -- ndarray with curves data. if the array has
@@ -177,17 +177,17 @@ class SignalsData:
         labels     -- the list of labels for the added curves
         units      -- the list of labels for the added curves
         time_unit  -- the unit of the time scale
-        '''
+        """
         # appends one or more new SingleCurves to the self.curves list
         # and updates the corresponding self parameters
-        data = np.array(input_data, dtype=float, order='F')
-        self.check_input(data)
-        if data.shape[1] % 2 != 0:
-            multiple_X_columns = False
-            add_count = data.shape[1] - 1
+        new_data = np.array(input_data, dtype=float, order='F')
+        self.check_input(new_data)
+        if new_data.shape[1] % 2 != 0:
+            multiple_x_columns = False
+            add_count = new_data.shape[1] - 1
         else:
-            multiple_X_columns = True
-            add_count = data.shape[1] // 2
+            multiple_x_columns = True
+            add_count = new_data.shape[1] // 2
 
         for old_idx in range(0, add_count):
             # old_idx -- the curve index inside the adding ndarray
@@ -206,15 +206,15 @@ class SignalsData:
             else:
                 current_time_unit = "a.u."
 
-            if multiple_X_columns:
+            if multiple_x_columns:
                 self.curves[self.count] = \
-                    SingleCurve(data[:, old_idx * 2],
-                                data[:, old_idx * 2 + 1],
+                    SingleCurve(new_data[:, old_idx * 2],
+                                new_data[:, old_idx * 2 + 1],
                                 current_label, current_unit,
                                 current_time_unit)
             else:
                 self.curves[self.count] = \
-                    SingleCurve(data[:, 0], data[:, old_idx + 1],
+                    SingleCurve(new_data[:, 0], new_data[:, old_idx + 1],
                                 current_label, current_unit,
                                 current_time_unit)
             self.curves[current_label] = self.curves[self.count]
@@ -223,31 +223,30 @@ class SignalsData:
             self.label_to_idx[current_label] = new_idx
             self.idx_to_label[new_idx] = current_label
 
+    def check_input(self, data_ndarray, new_labels=None, new_units=None):
+        """
+        Checks the correctness of input data_ndarray.
+        Raises exception if data_ndarray check fails.
 
-    def check_input(self, data, new_labels=None, new_units=None):
-        '''
-        Checks the correctness of input data.
-        Raises exception if data check fails.
-        
-        data        -- ndarray with data to add to a SignlsData instance
-        new_labels  -- the list of labels for the new curves
-        new_units   -- the list of units for the new curves
-        '''
+        data_ndarray  -- ndarray with data to add to a SignlsData instance
+        new_labels    -- the list of labels for the new curves
+        new_units     -- the list of units for the new curves
+        """
         # CHECK INPUT DATA
-        if np.ndim(data) != 2:
+        if np.ndim(data_ndarray) != 2:
             raise ValueError("Input array must have 2 dimensions.")
-        if data.shape[1] % 2 != 0:
+        if data_ndarray.shape[1] % 2 != 0:
             if verbose:
                 print("The input array has an odd number of columns! "
                       "The first column is considered as X column, "
                       "and the rest as Y columns.")
 
-        if data.shape[1] % 2 != 0:
+        if data_ndarray.shape[1] % 2 != 0:
             # multiple_X_columns = False
-            curves_count = data.shape[1] - 1
+            curves_count = data_ndarray.shape[1] - 1
         else:
             # multiple_X_columns = True
-            curves_count = data.shape[1] // 2
+            curves_count = data_ndarray.shape[1] // 2
         if new_labels:
             if not isinstance(new_labels, list):
                 raise TypeError("The variable 'labels' must be "
@@ -274,16 +273,16 @@ class SignalsData:
                                  "".format(curves_count, len(new_labels)))
 
     def get_array(self):
-        '''Returns all curves data as united 2D array
-        short curve arrays are supplemented with 
+        """Returns all curves data as united 2D array
+        short curve arrays are supplemented with
         required amount of rows (filled with 'nan')
-        
-        return -- 2d ndarray 
-        '''
-        list_of_2D_arr = [self.curves[idx].data for
+
+        return -- 2d ndarray
+        """
+        list_of_2d_arr = [self.curves[idx].data for
                           idx in sorted(self.idx_to_label.keys())]
-        print("len(lest of 2D arr) = {}".format(len(list_of_2D_arr)))
-        return align_and_append_ndarray(*list_of_2D_arr)
+        print("len(lest of 2D arr) = {}".format(len(list_of_2d_arr)))
+        return align_and_append_ndarray(*list_of_2d_arr)
 
     def by_label(self, label):
         # returns SingleCurve by name
@@ -317,42 +316,42 @@ class SignalsData:
 
 
 def get_subdir_list(path):
-    '''Returns list of subdirectories for the given directory.
-    
-    path -- path to the target directory 
-    '''
+    """Returns list of subdirectories for the given directory.
+
+    path -- path to the target directory
+    """
     return [os.path.join(path, x) for x in os.listdir(path)
             if os.path.isdir(os.path.join(path, x))]
 
 
 def get_file_list_by_ext(path, ext_list, sort=True):
-    '''Returns a list of files (with the specified extensions) 
+    """Returns a list of files (with the specified extensions)
     contained in the folder (path).
     Each element of the returned list is a full path to the file
-    
+
     path -- target directory.
     ext -- the list of file extensions or one extension (str).
     sort -- by default, the list of results is sorted
             in lexicographical order.
-    '''
+    """
     if isinstance(ext_list, str):
         ext_list = [ext_list]
-    file_list = [os.path.join(path, x) for x in os.listdir(path)
-                 if os.path.isfile(os.path.join(path, x)) and
-                 any(x.upper().endswith(ext.upper()) for
-                 ext in ext_list)]
+    target_files = [os.path.join(path, x) for x in os.listdir(path)
+                    if os.path.isfile(os.path.join(path, x)) and
+                    any(x.upper().endswith(ext.upper()) for
+                    ext in ext_list)]
     if sort:
-        file_list.sort()
-    return file_list
+        target_files.sort()
+    return target_files
 
 
 def add_zeros_to_filename(full_path, count):
-    '''Adds zeros to number in filename.
+    """Adds zeros to number in filename.
     Example: f("shot22.csv", 4) => "shot0022.csv"
-    
+
     full_path -- filename or full path to file
     count -- number of digits
-    '''
+    """
     name = os.path.basename(full_path)
     folder_path = os.path.dirname(full_path)
 
@@ -377,14 +376,14 @@ def add_zeros_to_filename(full_path, count):
 
 
 def check_labels_string(s, count):
-    '''Checks if header line (from csv file) contains
+    """Checks if header line (from csv file) contains
     contains the required number of labels/units/etc.
 
     Returns the list of labels or None.
 
     s -- the header line (string) to check
     count -- the requered number of labels/units/etc.
-    '''
+    """
     labels = [word.strip() for word in s.split(",")]
     if len(labels) == count:
         return labels
@@ -393,22 +392,21 @@ def check_labels_string(s, count):
 
 def read_signals(file_list, start=0, step=1, points=-1,
                  labels=None, units=None, time_unit=None):
-    '''
-    Function returns one SignalsData object filled with
+    """Function returns one SignalsData object filled with
     data from files in file_list.
     Do not forget to sort the list of files
     for the correct order of curves.
-    
+
     Can handle different type of files.
     Supported formats: CSV, WFM
-    For more information about the supported formats, 
+    For more information about the supported formats,
     see the help of the function load_from_file().
 
     file_list -- list of full paths or 1 path (str)
     start -- start read data points from this index
     step -- read data points with this step
     points -- data points to read (-1 == all)
-    '''
+    """
 
     # check inputs
     if isinstance(file_list, str):
@@ -451,15 +449,15 @@ def read_signals(file_list, start=0, step=1, points=-1,
 
 
 def origin_to_csv(readed_lines):
-    '''
+    """
     Replaces ',' with '.' and then ';' with ',' in the
     given list of lines of a .csv file.
 
-    Use it for OriginPro ascii export format with ';' as delimiter 
+    Use it for OriginPro ascii export format with ';' as delimiter
     and ',' as decimal separator.
 
     read_lines -- array of a .csv file lines (array of string)
-    '''
+    """
     import re
     converted = [re.sub(r',', '.', line) for line in readed_lines]
     converted = [re.sub(r';', ',', line) for line in converted]
@@ -469,15 +467,15 @@ def origin_to_csv(readed_lines):
 
 
 def valid_cols(read_lines, skip_header, delimiter=','):
-    '''
+    """
     Returns the list of valid (non empty) columns
     for the given list of lines of a .csv file.
 
     read_lines -- array of a .csv file lines (array of string)
     skip_header -- the number of header lines
     delimiter -- .csv data delimiter
-    :return: 
-    '''
+    :return:
+    """
     cols = read_lines[skip_header].strip().split(delimiter)
     valid_col_list = []
     for idx, val in enumerate(cols):
@@ -492,8 +490,8 @@ def valid_cols(read_lines, skip_header, delimiter=','):
 
 
 def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
-    '''
-    Returns the number of header lines 
+    """
+    Returns the number of header lines
     for the given list of lines of a .csv file.
 
     read_lines -- array of a .csv file lines (array of string)
@@ -501,7 +499,7 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
     except_list -- the list of special strings, that can not be converted
                    to numeric with the float() function, but the csv reader
                    may considered it as a valid value.
-    '''
+    """
     cols_count = len(read_lines[-1].strip().split(delimiter))
     headers = 0
     idx = 0
@@ -509,7 +507,7 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
 
     # column number difference
     while (len(read_lines[-1].strip().split(delimiter)) !=
-               cols_count and idx < lines and idx < lines):
+           cols_count and idx < lines):
         idx += 1
         headers += 1
 
@@ -529,24 +527,25 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
 
 
 def load_from_file(filename, start=0, step=1, points=-1):
-    '''
+    """
     Return ndarray instance filled with data from csv or wfm file.
-    
+
     filename -- file name (full/relative path)
     start -- start read data points from this index
     step -- read data points with this step
     points -- data points to read (-1 == all)
-     '''
+     """
 
     valid_delimiters = [',', ';', ' ', ':', '\t']
 
     import csv
+    from csv import Error as CSV_Error
 
     if filename[-3:].upper() != 'WFM':
         with open(filename, "r") as datafile:
             try:
                 dialect = csv.Sniffer().sniff(datafile.read(2096))
-            except:
+            except CSV_Error:
                 datafile.seek(0)
                 dialect = csv.Sniffer().sniff(datafile.readline())
             datafile.seek(0)
@@ -576,7 +575,7 @@ def load_from_file(filename, start=0, step=1, points=-1):
                                   read_step=step)
         header = None
     if verbose:
-        if data.shape[1] % 2 ==0:
+        if data.shape[1] % 2 == 0:
             curves_count = data.shape[1] // 2
         else:
             curves_count = data.shape[1] - 1
@@ -619,12 +618,12 @@ def add_to_log(s, print_to_console=True):
     return s
 
 
-def get_max_min_from_file_cols(file_list,       # list of fullpaths of target files
-                               col_list,        # list of zero-based indexes of column to be processed
-                               col_corr=list(),     # list of correction multiplayer for each col in the col_list
-                               delimiter=',',   # file column separator
-                               skip_header=0,   # number of headerlines in files
-                               verbose_mode=True):   # print log to console
+def get_max_min_from_file_cols(file_list,  # list of fullpaths of target files
+                               col_list,  # list of zero-based indexes of column to be processed
+                               col_corr=list(),  # list of correction multiplayer for each col in the col_list
+                               delimiter=',',  # file column separator
+                               skip_header=0,  # number of headerlines in files
+                               verbose_mode=True):  # print log to console
     # For each specified column, finds the maximum and minimum values for all files in the list
     # returns the file processing log
     log = ""
@@ -665,14 +664,20 @@ def get_max_min_from_file_cols(file_list,       # list of fullpaths of target fi
     return log
 
 
-def get_max_min_from_dir(dir_path,        # target folder
-                         col_list,        # list of zero-based indexes of column to be processed
-                         col_corr=list(),     # list of correction multiplayer for each col in the col_list
-                         ext='.CSV',      # target files extension
-                         delimiter=',',   # file column separator
-                         skip_header=0,   # number of headerlines in files
-                         log_file_name='log.txt',   # log file name
-                         verbose_mode=True):        # print log to console
+def get_max_min_from_dir(dir_path, col_list, col_corr=list(), ext='.CSV',
+                         delimiter=',', skip_header=0,
+                         log_file_name='log.txt', verbose_mode=True):
+    """
+
+    dir_path      -- # target folder
+    col_list      -- # list of zero-based indexes of column to be processed
+    col_corr      -- # list of correction multiplayer for each col in the col_list
+    ext           -- # target files extension
+    delimiter     -- # file column separator
+    skip_header   -- # number of headerlines in files
+    log_file_name -- # log file name
+    verbose_mode  -- # print log to console
+    """
     file_list = get_file_list_by_ext(dir_path, ext, sort=True)
 
     log = get_max_min_from_file_cols(file_list, col_list,
@@ -692,15 +697,15 @@ def get_max_min_from_dir(dir_path,        # target folder
 
 
 def multiplier_and_delay(data, multiplier, delay):
-    '''Returns the modified data.
-    Each column of the data is first multiplied by 
+    """Returns the modified data.
+    Each column of the data is first multiplied by
     the corresponding multiplier value and
     then the corresponding delay value is subtracted from it.
-    
+
     data -- an instance of the SignalsData class OR 2D numpy.ndarray
     multiplier -- the list of multipliers for each columns in the input data.
     delay -- the list of delays (subtrahend) for each columns in the input data.
-    '''
+    """
     if multiplier is None and delay is None:
         return data
 
@@ -729,7 +734,7 @@ def multiplier_and_delay(data, multiplier, delay):
         # check_coeffs_number(data.count * 2, ["multiplier", "delay"],
         #                     multiplier, delay)
         for curve_idx in range(data.count):
-            col_idx = curve_idx * 2             # index of time-column of current curve
+            col_idx = curve_idx * 2  # index of time-column of current curve
             data.curves[curve_idx].data = multiplier_and_delay(data.curves[curve_idx].data,
                                                                multiplier[col_idx:col_idx + 2],
                                                                delay[col_idx:col_idx + 2])
@@ -739,18 +744,18 @@ def multiplier_and_delay(data, multiplier, delay):
 
 
 def multiplier_and_delay_peak(peaks, multiplier, delay, curve_idx):
-    '''Returns the modified peaks data.
-    Each time and amplitude of each peak is first multiplied by 
+    """Returns the modified peaks data.
+    Each time and amplitude of each peak is first multiplied by
     the corresponding multiplier value and
     then the corresponding delay value is subtracted from it.
-    
+
     peaks       -- the list of the SinglePeak instance
-    multiplier  -- the list of multipliers for each columns 
+    multiplier  -- the list of multipliers for each columns
                    in the SignalsData.
-    delay       -- the list of delays (subtrahend) 
+    delay       -- the list of delays (subtrahend)
                    for each columns in the SignalsData.
     curve_idx   -- the index of the curve to which the peaks belong
-    '''
+    """
     for peak in peaks:
         if not isinstance(peak, pp.SinglePeak):
             raise ValueError("'peaks' must be a list of "
@@ -777,17 +782,17 @@ def multiplier_and_delay_peak(peaks, multiplier, delay, curve_idx):
     return corr_peaks
 
 
-def OLD_smooth_voltage(x, y, x_multiplier=1):
-    '''This function returns smoothed copy of 'y'.
+def old_smooth_voltage(x, y, x_multiplier=1):
+    """This function returns smoothed copy of 'y'.
     Optimized for voltage pulse of ERG installation.
-    
+
     x -- 1D numpy.ndarray of time points (in seconds by default)
     y -- 1D numpy.ndarray value points
-    x_multiplier -- multiplier applied to time data 
+    x_multiplier -- multiplier applied to time data
         (default 1 for x in seconds)
-    
+
     return -- smoothed curve (1D numpy.ndarray)
-    '''
+    """
     # 3 is optimal polyorder value for speed and accuracy
     poly_order = 3
 
@@ -816,21 +821,21 @@ def OLD_smooth_voltage(x, y, x_multiplier=1):
 
 
 def smooth_voltage(y_data, window=101, poly_order=3):
-    '''This function returns smoothed copy of 'y_data'.
+    """This function returns smoothed copy of 'y_data'.
 
     y_data      -- 1D numpy.ndarray value points
-    window      -- The length of the filter window 
-                   (i.e. the number of coefficients). 
-                   window_length must be a positive 
+    window      -- The length of the filter window
+                   (i.e. the number of coefficients).
+                   window_length must be a positive
                    odd integer >= 5.
-    poly_order  -- The order of the polynomial used to fit 
-                   the samples. polyorder must be less 
+    poly_order  -- The order of the polynomial used to fit
+                   the samples. polyorder must be less
                    than window_length.
-    The values below are optimal for 1 ns resolution of 
+    The values below are optimal for 1 ns resolution of
     voltage waveform of ERG installation:
-    poly_order = 3 
+    poly_order = 3
     window = 101
-    '''
+    """
 
     # calc time_step and converts to nanoseconds
     if len(y_data) < window:
@@ -877,7 +882,7 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
         labels = ",".join([data.curves[idx].label for
                            idx in data.idx_to_label.keys()])
         units = ",".join([data.curves[idx].unit for
-                           idx in data.idx_to_label.keys()])
+                          idx in data.idx_to_label.keys()])
         lines.append(labels)
         lines.append(units)
         # add data
@@ -890,14 +895,14 @@ def save_ndarray_csv(filename, data, delimiter=",", precision=18):
 
 
 def save_signals_csv(filename, signals, delimiter=",", precision=18):
-    '''
+    """
 
     :param filename:
     :param signals:
     :param delimiter:
     :param precision:
     :return:
-    '''
+    """
     # check precision value
     table = signals.get_array()
     print("Save columns count = {}".format(table.shape[1]))
@@ -936,12 +941,12 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
 
 
 def align_and_append_ndarray(*args):
-    '''Returns 2D numpy.ndarray containing all input 2D numpy.ndarrays.
-    If input arrays have different number of rows, 
+    """Returns 2D numpy.ndarray containing all input 2D numpy.ndarrays.
+    If input arrays have different number of rows,
     fills missing values with 'nan'.
-    
+
     args -- 2d ndarrays
-    '''
+    """
     # CHECK TYPE & LENGTH
     for arr in args:
         if not isinstance(arr, np.ndarray):
@@ -967,22 +972,22 @@ def align_and_append_ndarray(*args):
 
 
 def numbering_parser(group):
-    '''
+    """
     Finds serial number (substring) in the file name string.
 
-    group -- list of files (each file must corresponds 
+    group -- list of files (each file must corresponds
              to different shot)
 
-    return -- (start, end), where: 
+    return -- (start, end), where:
         start -- index of the first digit of the serial number
                  in a file name
         end -- index of the last digit of the serial number
-    '''
+    """
     names = []
     for raw in group:
         names.append(os.path.basename(raw))
     assert all(len(name) for name in names), \
-        ("Error! All file names must have the same length")
+        "Error! All file names must have the same length"
     numbers = []
     # for idx in range(2):
     #     numbers.append(parse_filename(names[idx]))
@@ -992,7 +997,7 @@ def numbering_parser(group):
     # numbers[filename_idx][number_idx]{}
     num_count = len(numbers[0])
     if len(numbers) == 1:
-        return (numbers[0][0]['start'], numbers[0][0]['end'])
+        return numbers[0][0]['start'], numbers[0][0]['end']
 
     for match_idx in range(num_count):
         unique = True
@@ -1000,9 +1005,8 @@ def numbering_parser(group):
             for name_idx in range(len(names)):
                 start = numbers[num][match_idx]['start']
                 end = numbers[num][match_idx]['end']
-                if (num != name_idx and
-                            numbers[num][match_idx]['num'] ==
-                            names[name_idx][start:end]):
+                if num != name_idx and (numbers[num][match_idx]['num'] ==
+                                        names[name_idx][start:end]):
                     unique = False
                     break
             if not unique:
@@ -1010,11 +1014,11 @@ def numbering_parser(group):
         if unique:
             return (numbers[0][match_idx]['start'],
                     numbers[0][match_idx]['end'])
-    return (0, len(names[0]))
+    return 0, len(names[0])
 
 
 def parse_filename(name):
-    '''
+    """
     Finds substrings with numbers in the input string.
 
     name -- string with numbers.
@@ -1024,7 +1028,7 @@ def parse_filename(name):
         'start' -- index of the first digit of the found number in the string
         'end'   -- index of the last digit of the found number in the string
         'num'   -- string representation of the number
-    '''
+    """
     import re
     matches = re.finditer(r'\d+', name)
     match_list = []
@@ -1037,10 +1041,10 @@ def parse_filename(name):
 
 
 def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
-    '''Return the list of files grouped by shots.
-    
+    """Return the list of files grouped by shots.
+
     dir             -- the directory containing the target files
-    group_size      -- the size of the groups (number of 
+    group_size      -- the size of the groups (number of
                        files for each shot)
     sorted_by_ch    -- this options tells the program that the files
                        are sorted by the oscilloscope/channel
@@ -1048,9 +1052,9 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
                        By default, the program considers that the
                        files are sorted by the shot number (firstly)
                        and by the oscilloscope/channel (secondly).
-    '''
+    """
     assert dir, ("Specify the directory (-d) containing the "
-                          "data files. See help for more details.")
+                 "data files. See help for more details.")
     file_list = get_file_list_by_ext(dir, ext_list, sort=True)
     assert len(file_list) % group_size == 0, \
         ("The number of .csv files ({}) in the specified folder "
@@ -1061,7 +1065,7 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
         shots_count = len(file_list) // group_size
         for shot in range(shots_count):
             grouped_files.append([file_list[idx] for idx in
-                               range(shot, len(file_list), shots_count)])
+                                  range(shot, len(file_list), shots_count)])
     else:
         for idx in range(0, len(file_list), group_size):
             grouped_files.append(file_list[idx: idx + group_size])
@@ -1069,14 +1073,14 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
 
 
 def global_check_front_params(params):
-    '''Parses user input of offset_by_curve_level parameter.
+    """ Parses user input of offset_by_curve_level parameter.
     Returns (idx, level), where:
         idx -- [int] the index of the curve, inputted by user
         level -- [float] the curve front level (amplitude),
                  which will be found and set as time zero
 
     params -- user input (list of two strings)
-    '''
+    """
     try:
         idx = int(params[0])
         if idx < 0:
@@ -1118,14 +1122,14 @@ def global_check_front_params(params):
 
 
 def check_file_list(dir, grouped_files):
-    '''Checks the list of file names, inputted by user.
+    """Checks the list of file names, inputted by user.
     The file names must be grouped by shots.
     Raises an exception if any test fails.
-    
-    Returns the list of full paths, grouped by shots. 
-    
-    grouped_files -- the list of the files, grouped by shots 
-    '''
+
+    Returns the list of full paths, grouped by shots.
+
+    grouped_files -- the list of the files, grouped by shots
+    """
     group_size = len(grouped_files[0])
     for shot_idx, shot_files in enumerate(grouped_files):
         assert len(shot_files) == group_size, \
@@ -1141,19 +1145,20 @@ def check_file_list(dir, grouped_files):
                 "Can not find file \"{}\"".format(full_path)
     return grouped_files
 
+
 def global_check_y_auto_zero_params(y_auto_zero_params):
-    '''The function checks y zero offset parameters inputted by user,
+    """The function checks y zero offset parameters inputted by user,
     converts string values to numeric and returns it.
-    
+
     The structure of input/output parameters list:
         [
             [curve_idx, bg_start, bg_stop]
             [curve_idx, bg_start, bg_stop]
             ...etc.
         ]
-    
+
     y_auto_zero_params -- the list of --y-offset parameters inputted by user:
-    '''
+    """
     # 'CURVE_IDX', 'BG_START', 'BG_STOP'
     output = []
     for params in y_auto_zero_params:
@@ -1179,13 +1184,13 @@ def global_check_y_auto_zero_params(y_auto_zero_params):
 
 
 def check_y_auto_zero_params(data, y_auto_zero_params):
-    '''Checks if the curve indexes of y auto zero parameters list
-     is out of range. Raises an exception if true. 
+    """Checks if the curve indexes of y auto zero parameters list
+     is out of range. Raises an exception if true.
 
     data                -- SignalsData instance
     y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
                            argument's hep for more detail)
-    '''
+    """
     for params in y_auto_zero_params:
         assert params[0] < data.count, ("Index ({}) is out of range in "
                                         "--y-auto-zero parameters."
@@ -1193,14 +1198,14 @@ def check_y_auto_zero_params(data, y_auto_zero_params):
 
 
 def check_coeffs_number(need_count, coeff_names, *coeffs):
-    '''Checks the needed and the actual number of the coefficients.
+    """Checks the needed and the actual number of the coefficients.
     Raises an exception if they are not equal.
-    
+
     need_count  -- the number of needed coefficients
     coeff_names -- the list of the coefficient names
-    coeffs      -- the list of coefficients to check 
+    coeffs      -- the list of coefficients to check
                    (multiplier, delay, etc.)
-    '''
+    """
     for idx, coeff_list in enumerate(coeffs):
         if coeff_list is not None:
             coeffs_count = len(coeff_list)
@@ -1215,60 +1220,53 @@ def check_coeffs_number(need_count, coeff_names, *coeffs):
                                  "".format(coeff_names[idx],
                                            need_count, coeffs_count))
 
+
 def y_zero_offset(curve, start_x, stop_x):
-    '''
+    """
     Returns the Y zero level offset value.
     Use it for zero level correction before PeakProcess.
 
     curve               -- SingleCurve instance
-    start_x and stop_x  -- define the limits of the 
+    start_x and stop_x  -- define the limits of the
                            X interval where Y is filled with noise only.
-    '''
+    """
     if start_x < curve.time[0]:
         start_x = curve.time[0]
     if stop_x > curve.time[-1]:
         stop_x = curve.time[-1]
     assert stop_x > start_x, \
         ("Error! start_x value ({}) must be lower than stop_x({}) value."
-        "".format(start_x, stop_x))
+         "".format(start_x, stop_x))
     if start_x > curve.time[-1] or stop_x < curve.time[0]:
         return 0
     start_idx = pp.find_nearest_idx(curve.time, start_x, side='right')
     stop_idx = pp.find_nearest_idx(curve.time, stop_x, side='left')
     amp_sum = 0.0
-    DEBUG_VAL = {}
     for val in curve.val[start_idx:stop_idx + 1]:
         amp_sum += val
-        DEBUG_VAL[int(val * 100)] = (DEBUG_VAL.setdefault(int(val * 100), 0) +
-                                     1)
-    # DEBUG
-    # print("\n".join("{}: {} : {}".format(float(key) / 100, count, count * float(key) / 100) for
-    #                  key, count in DEBUG_VAL.items()))
-    # print("AMP_SUM = {}  |  stop_idx={}  |  start_idx={}  | result = {}"
-    #       "".format(amp_sum, stop_idx, start_idx, amp_sum / (stop_idx - start_idx + 1)))
     return amp_sum / (stop_idx - start_idx + 1)
 
 
 def y_zero_offset_all(signals_data, curves_list, start_stop_tuples):
-    '''Return delays list for all columns in SignalsData stored 
-    in filename_or_list. 
-    Delays for Y-columns will be filled with 
+    """Return delays list for all columns in SignalsData stored
+    in filename_or_list.
+    Delays for Y-columns will be filled with
     the Y zero level offset values for only specified curves.
     For all other Y columns and for all X columns delay will be 0.
 
     Use it for zero level correction before PeakProcess.
 
-    filename_or_list    -- file with data or list of files, 
+    filename_or_list    -- file with data or list of files,
                            if the data stored in several files
-    curves_list         -- zero-based indices of curves for which 
+    curves_list         -- zero-based indices of curves for which
                            you want to find the zero level offset
-    start_stop_tuples   -- list of (start_x, stop_x) tuples for each 
+    start_stop_tuples   -- list of (start_x, stop_x) tuples for each
                            curves in curves list.
                            You can specify one tuple or list and
                            it will be applied to all the curves.
     file_type           -- file type (Default = 'CSV')
     delimiter           -- delimiter for csv files
-    '''
+    """
 
     assert len(curves_list) == len(start_stop_tuples), \
         "Error! The number of (start_x, stop_x) tuples ({}) " \
@@ -1288,16 +1286,16 @@ def y_zero_offset_all(signals_data, curves_list, start_stop_tuples):
 
 def pretty_print_nums(nums, prefix=None, postfix=None,
                       s=u'{pref}{val:.2f}{postf}', show=True):
-    '''Prints template 's' filled with values from 'nums',
+    """Prints template 's' filled with values from 'nums',
     'prefix' and 'postfix' arrays for all numbers in 'nums'.
 
     nums    -- array of float or int
     prefix  -- array of prefixes for all values in 'nums'
-               or single prefix string for all elements. 
+               or single prefix string for all elements.
     postfix -- array of postfixes for all values in 'nums'
-               or single postfix string for all elements. 
+               or single postfix string for all elements.
     s       -- template string.
-    '''
+    """
     if not prefix:
         prefix = ("" for _ in nums)
     elif isinstance(prefix, str):
@@ -1315,13 +1313,14 @@ def pretty_print_nums(nums, prefix=None, postfix=None,
         print(message)
     return message
 
+
 def check_labels(labels):
-    '''Checks if all the labels contains only 
+    """Checks if all the labels contains only
     Latin letters, numbers and underscore.
     Raises an exception if the test fails.
-    
+
     labels -- the list of labels
-    '''
+    """
     import re
     for label in labels:
         if re.search(r'[^\w]+', label):
@@ -1330,14 +1329,14 @@ def check_labels(labels):
 
 
 def global_check_plot(args, name, allow_all=False):
-    '''Checks the values of a parameter,
+    """Checks the values of a parameter,
     converts it to integers and returns it.
     Returns [-1] if only 'all' is entered (if allow_all==True)
-    
+
     args -- the list of str parameters to be converted to integers
     name -- the name of the parameter (needed for error message)
     allow_all -- turns on/off support of the value 'all'
-    '''
+    """
     error_text = ("Unsupported curve index ({val}) at {name} parameter."
                   "\nOnly positive integer values ")
     if allow_all:
@@ -1357,13 +1356,13 @@ def global_check_plot(args, name, allow_all=False):
 
 
 def check_plot_param(args, curves_count, param_name):
-    '''Checks if any index from args list is greater than the curves count.
-    
+    """Checks if any index from args list is greater than the curves count.
+
     args            -- the list of curve indexes
     curves_count    -- the count of curves
-    param_name      -- the name of the parameter through which 
+    param_name      -- the name of the parameter through which
                        the value was entered
-    '''
+    """
     error_text = ("The curve index ({idx}) from ({name}) parameters "
                   "is greater than the number of curves ({count}).")
     for idx in args:
@@ -1372,17 +1371,17 @@ def check_plot_param(args, curves_count, param_name):
 
 
 def raw_y_auto_zero(params, multiplier, delay):
-    '''Returns raw values for y_auto_zero parameters.
+    """Returns raw values for y_auto_zero parameters.
     'Raw values' are values before applying the multiplier.
-    
+
     params      -- y auto zero parameters (see --y-auto-zero
                    argument's hep for more detail)
     multiplier  -- the list of multipliers for all the curves
-                   in the SignalsData  
+                   in the SignalsData
     delay       -- the list of delays for all the curves
-                   in the SignalsData 
-    '''
-    raw_params=[]
+                   in the SignalsData
+    """
+    raw_params = []
     for item_idx, item in enumerate(params):
         curve_idx = item[0]
         start_x = (item[1] + delay[curve_idx * 2]) / multiplier[curve_idx * 2]
@@ -1393,16 +1392,16 @@ def raw_y_auto_zero(params, multiplier, delay):
 
 def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
                                  multiplier, delay, verbose=True):
-    '''The function analyzes the mean amplitude in 
-    the selected X range of the selected curves. 
-    The Y zero offset values obtained are added to 
+    """The function analyzes the mean amplitude in
+    the selected X range of the selected curves.
+    The Y zero offset values obtained are added to
     the corresponding items of the original list of delays.
     The new list of delays is returned.
-    
-    NOTE: adjusting the delay values before applying 
-    the multipliers and the delays to the input data, 
+
+    NOTE: adjusting the delay values before applying
+    the multipliers and the delays to the input data,
     decreases the execution time of the code.
-    
+
     data                -- SignalsData instance
     y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
                            argument's hep for more detail)
@@ -1411,7 +1410,7 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
     delay               -- the list of delays for all the curves
                            in the SignalsData
     verbose             -- show/hide information during function execution
-    '''
+    """
     new_delay = delay[:]
     curves_list = [item[0] for item in y_auto_zero_params]
     start_stop_tuples = [(item[1], item[2]) for item in
@@ -1440,18 +1439,18 @@ def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
 
 
 def calc_ylim(time, y, time_bounds=None, reserve=0.1):
-    '''Returns (min_y, max_y) tuple with y axis bounds.
-    The axis boundaries are calculated in such a way 
-    as to show all points of the curve with a indent 
-    (default = 10% of the span of the curve) from 
+    """Returns (min_y, max_y) tuple with y axis bounds.
+    The axis boundaries are calculated in such a way
+    as to show all points of the curve with a indent
+    (default = 10% of the span of the curve) from
     top and bottom.
-    
+
     time        -- the array of time points
     y           -- the array of amplitude points
-    time_bounds -- the tuple/list with the left and 
+    time_bounds -- the tuple/list with the left and
                    the right X bounds in X units.
     reserve     -- the indent size (the fraction of the curve's range)
-    '''
+    """
     if time_bounds is None:
         time_bounds = (None, None)
     if time_bounds[0] is None:
@@ -1473,18 +1472,18 @@ def calc_ylim(time, y, time_bounds=None, reserve=0.1):
 def plot_multiplot(data, peak_data, curves_list,
                    xlim=None, amp_unit=None,
                    time_unit=None, title=None):
-    '''Plots subplots for all curves with index in curve_list.
+    """Plots subplots for all curves with index in curve_list.
     Optional: plots peaks.
-    Subplots are located one under the other. 
-    
+    Subplots are located one under the other.
+
     data -- the SignalsData instance
-    peak_data -- the list of list of peaks (SinglePeak instance) 
+    peak_data -- the list of list of peaks (SinglePeak instance)
                  of curves with index in curve_list
                  peak_data[0] == list of peaks for data.curves[curves_list[0]]
                  peak_data[1] == list of peaks for data.curves[curves_list[1]]
                  etc.
     curves_list -- the list of curve indexes in data to be plotted
-    xlim        -- the tuple/list with the left and 
+    xlim        -- the tuple/list with the left and
                    the right X bounds in X units.
     show        -- (bool) show/hide the graph window
     save_as     -- filename (full path) to save the plot as .png
@@ -1492,10 +1491,10 @@ def plot_multiplot(data, peak_data, curves_list,
     amp_unit    -- the unit of Y scale for all subplots.
                    If not specified, the curve.unit parameter will be used
     time_unit   -- the unit of time scale for all subplots.
-                   If not specified, the time_unit parameter of 
+                   If not specified, the time_unit parameter of
                    the first curve in curves_list will be used
     title       -- the main title of the figure.
-    '''
+    """
     plt.close('all')
     fig, axes = plt.subplots(len(curves_list), 1, sharex='all')
     # # an old color scheme
@@ -1558,14 +1557,14 @@ def plot_multiplot(data, peak_data, curves_list,
 def plot_multiple_curve(curve_list, peaks=None,
                         xlim=None, amp_unit=None,
                         time_unit=None, title=None):
-    '''Draws one or more curves on one graph.
-    Additionally draws peaks on the underlying layer 
+    """Draws one or more curves on one graph.
+    Additionally draws peaks on the underlying layer
     of the same graph, if the peaks exists.
     The color of the curves iterates though the ColorRange iterator.
-    
+
     NOTE: after the function execution you need to show() or save() pyplot
           otherwise the figure will not be saved or shown
-    
+
     curve_list  -- the list of SingleCurve instances
                    or SingleCurve instance
     peaks       -- the list or SinglePeak instances
@@ -1573,7 +1572,7 @@ def plot_multiple_curve(curve_list, peaks=None,
     amp_unit    -- the units for curves Y scale
     time_unit   -- the unit for time scale
     xlim        -- the tuple with the left and the right X bounds
-    '''
+    """
     plt.close('all')
     if xlim is not None:
         plt.xlim(xlim)
@@ -1628,39 +1627,45 @@ def plot_multiple_curve(curve_list, peaks=None,
         #           facecolors='none', linewidths=2)
         # plt.scatter(peak_x, peak_y, s=160, edgecolors='#62e200',
         #           facecolors='none', linewidths=1.5)
-    # if save_as is not None:
-    #     if not os.path.isdir(os.path.dirname(save_as)):
-    #         os.makedirs(os.path.dirname(save_as))
-    #     # print("Saveing " + save_as)
-    #     plt.savefig(save_as, dpi=400)
-    # if show:
-    #     plt.show()
-    # plt.close('all')
+        # if save_as is not None:
+        #     if not os.path.isdir(os.path.dirname(save_as)):
+        #         os.makedirs(os.path.dirname(save_as))
+        #     # print("Saveing " + save_as)
+        #     plt.savefig(save_as, dpi=400)
+        # if show:
+        #     plt.show()
+        # plt.close('all')
 
 
 def update_delays_by_curve_front(data, offset_by_curve_params,
                                  multiplier, delay, smooth=True,
                                  plot=False):
-    '''This function finds the time point of the selected curve front on level
-    'level', recalculates input delays of all time columns (odd 
+    """This function finds the time point of the selected curve front on level
+    'level', recalculates input delays of all time columns (odd
     elements of the input delay list) to make that time point be zero.
 
-    NOTE: the curve is not multiplied yet, so the 'level' 
+    NOTE: the curve is not multiplied yet, so the 'level'
     value must be in raw data units
 
     data                    -- an instance of SingleCurve
-    offset_by_curve_params  -- level of voltage front
+    offset_by_curve_params  -- the list of parameters ['IDX', 'LEVEL', 'WIN', 'ORDER']
+                               where IDX -- the index of the curve to find front
+                               LEVEL -- the level of the front to search for
+                               WIN   -- The length of the filter window (i.e. the number
+                                        of coefficients) for the smooth filter
+                               ORDER -- order of the polynomial used to fit the samples
+                                        in the smooth filter
     multiplier              -- the list of multipliers for all the curves
                                in the SignalsData
     delay                   -- the list of delays for all the curves
                                in the SignalsData
     smooth                  -- smooth curve before front detection
-                               NOTE: the smooth process is optimized for 
-                               Voltage pulse of ERG installation 
+                               NOTE: the smooth process is optimized for
+                               Voltage pulse of ERG installation
                                (~500 ns width)
 
     return -- list of recalculated delays (floats)
-    '''
+    """
 
     curve_idx = offset_by_curve_params[0]
     level = offset_by_curve_params[1]
@@ -1690,7 +1695,7 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
         print("Smoothing is turned OFF.")
         smoothed_curve = data.curves[curve_idx]
     front_x, front_y = pp.find_curve_front(smoothed_curve,
-                                           level, polarity)
+                                           level_raw, polarity)
     if plot:
         if front_x:
             front_point = [pp.SinglePeak(front_x, front_y, 0)]
@@ -1717,17 +1722,17 @@ def update_delays_by_curve_front(data, offset_by_curve_params,
 
 
 def check_param_path(path, param_name):
-    '''Path checker. 
+    """Path checker.
     Verifies the syntactic correctness of the entered path.
     Does not check the existence of the path.
-    Returns abs version of the path. 
-    Recursive creates all directories from the path 
-    if they are not exists. 
-    
+    Returns abs version of the path.
+    Recursive creates all directories from the path
+    if they are not exists.
+
     path        -- the path to check
     param_name  -- the key on which the path was entered.
                    Needed for correct error message.
-    '''
+    """
     if path is not None:
         try:
             path = os.path.abspath(path)
@@ -1740,12 +1745,12 @@ def check_param_path(path, param_name):
 
 
 def global_check_labels(labels):
-    '''Checks if any label contains non alphanumeric character.
+    """Checks if any label contains non alphanumeric character.
      Underscore are allowed.
      Returns true if all the labels passed the test.
-    
+
     labels -- the list of labels for graph process
-    '''
+    """
     for label in labels:
         if re.search(r'[\W]', label):
             return False
@@ -1773,25 +1778,25 @@ if __name__ == "__main__":
                         )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-f', '--input-files',
-                        action='append',
-                        nargs='+',
-                        metavar='INPUT_FILES',
-                        dest='files',
-                        help='specify one or more (space separated) input '
-                             'file names after the flag. '
-                             'It is assumed that the files belong '
-                             'to the same shot. '
-                             'In order to process multiple shots enter '
-                             'multiple \'-i\' parameters. '
-                        )
+                       action='append',
+                       nargs='+',
+                       metavar='INPUT_FILES',
+                       dest='files',
+                       help='specify one or more (space separated) input '
+                            'file names after the flag. '
+                            'It is assumed that the files belong '
+                            'to the same shot. '
+                            'In order to process multiple shots enter '
+                            'multiple \'-i\' parameters. '
+                       )
     group.add_argument('-e', '--ext', '--extension',
-                        action='store',
-                        nargs='+',
-                        metavar='EXT',
-                        dest='ext_list',
-                        help='specify one or more (space separated) '
-                             'extensions of the files with data.'
-                        )
+                       action='store',
+                       nargs='+',
+                       metavar='EXT',
+                       dest='ext_list',
+                       help='specify one or more (space separated) '
+                            'extensions of the files with data.'
+                       )
     parser.add_argument('--labels',
                         action='store',
                         metavar='LABEL',
@@ -1830,7 +1835,7 @@ if __name__ == "__main__":
                              'is specified, then all the files in the '
                              'specified directory will be processed.'
                         )
-    parser.add_argument('-c', '--ch',  '--sorted-by-channel',
+    parser.add_argument('-c', '--ch', '--sorted-by-channel',
                         action='store_true',
                         dest='sorted_by_ch',
                         help='this options tells the program that the files '
@@ -1915,6 +1920,7 @@ if __name__ == "__main__":
                         action='store',
                         metavar='SAVE_TO',
                         dest='save_to',
+                        default='',
                         help='specify the output directory after the flag.'
                         )
     parser.add_argument('--prefix',
@@ -2002,7 +2008,6 @@ if __name__ == "__main__":
                              'option can reduce the runtime of the program.'
                         )
 
-
     args = parser.parse_args()
     verbose = not args.silent
 
@@ -2040,7 +2045,7 @@ if __name__ == "__main__":
     args.plot_dir = check_param_path(args.plot_dir, '--p_save')
     args.multiplot_dir = check_param_path(args.multiplot_dir, '--mp-save')
     args.save_to = check_param_path(args.save_to, '--save-to')
-    if args.save_to is None:
+    if args.save_to == '':
         args.save_to = os.path.dirname(grouped_files[0][0])
 
     # checks if postfix and prefix can be used in filename
@@ -2052,7 +2057,7 @@ if __name__ == "__main__":
     # raw check plot and multiplot
     if args.plot:
         args.plot = global_check_plot(args.plot, '--plot',
-                                            allow_all=True)
+                                      allow_all=True)
     if args.multiplot:
         for idx, m_param in enumerate(args.multiplot):
             args.multiplot[idx] = global_check_plot(m_param, '--multiplot')
@@ -2109,8 +2114,8 @@ if __name__ == "__main__":
             if args.offset_by_front:
                 front_plot_name = shot_name
                 front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
-                                   "".format(args.offset_by_front[0],
-                                             args.offset_by_front[1]))
+                                    "".format(args.offset_by_front[0],
+                                              args.offset_by_front[1]))
                 front_plot_name = os.path.join(args.src_dir,
                                                'FrontBeforeTimeOffset',
                                                front_plot_name)
@@ -2127,7 +2132,6 @@ if __name__ == "__main__":
                 plt.show()
                 plt.close('all')
 
-
         # multiplier and delay
         data = multiplier_and_delay(data, args.multiplier, args.delay)
         # if raw_front_point:
@@ -2143,17 +2147,17 @@ if __name__ == "__main__":
         # plot preview and save
         if args.plot:
             # args.plot = check_plot(args.plot)
-            if args.plot[0] == -1:       # 'all'
+            if args.plot[0] == -1:  # 'all'
                 args.plot = list(range(0, data.count))
             else:
                 check_plot_param(args.plot, data.count, '--plot')
-            for idx in args.plot:
-                plot_multiple_curve(data.curves[idx])
+            for curve_idx in args.plot:
+                plot_multiple_curve(data.curves[curve_idx])
 
                 if args.plot_dir is not None:
                     plot_name = ("{shot}_curve_{idx}_{label}.plot.png"
-                                 "".format(shot=shot_name, idx=idx,
-                                           label=data.curves[idx].label))
+                                 "".format(shot=shot_name, idx=curve_idx,
+                                           label=data.curves[curve_idx].label))
                     plot_path = os.path.join(args.plot_dir, plot_name)
                     plt.savefig(plot_path, dpi=400)
                     if verbose:
@@ -2161,7 +2165,6 @@ if __name__ == "__main__":
                 if not args.p_hide:
                     plt.show()
                 plt.close('all')
-
 
         # plot and save multi-plots
         if args.multiplot:
@@ -2172,8 +2175,8 @@ if __name__ == "__main__":
                 if args.multiplot_dir is not None:
                     idx_list = "_".join(str(i) for i in sorted(curve_list))
                     mplot_name = ("{shot}_curves_{idx_list}.multiplot.png"
-                                 "".format(shot=shot_name,
-                                           idx_list=idx_list))
+                                  "".format(shot=shot_name,
+                                            idx_list=idx_list))
                     mplot_path = os.path.join(args.multiplot_dir, mplot_name)
                     plt.savefig(mplot_path, dpi=400)
                     if verbose:
@@ -2186,6 +2189,7 @@ if __name__ == "__main__":
         if args.save:
             if len(file_list) == 1 and not args.save_to:
                 file_path = file_list[0]
+                # PREFIX POSTFIX
             else:
                 file_name = ("{pref}{number}{postf}.csv"
                              "".format(pref=args.prefix, number=shot_name,
@@ -2195,17 +2199,18 @@ if __name__ == "__main__":
             save_signals_csv(file_path, data)
             if verbose:
                 print("Saved as {}".format(file_path))
-        # DEBUG
-        # from only_for_tests import plot_multiplot
-        # plot_multiplot(data, None, [0, 4, 8, 11], show=True)
-        #
-        # plot_multiple_curve(data.curves[12], show=True)
-        # plot_multiple_curve(data.curves[0], show=True)
+                # DEBUG
+                # from only_for_tests import plot_multiplot
+                # plot_multiplot(data, None, [0, 4, 8, 11], show=True)
+                #
+                # plot_multiple_curve(data.curves[12], show=True)
+                # plot_multiple_curve(data.curves[0], show=True)
 
     # TODO: interactive offset_by_curve smooth process
+    # TODO: correct save if one file in (wfm), use prefix and postfix
+    # TODO: user interactive input commands?
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
-    # TODO: user interactive input commands?
     # TODO: partial import (start, step, points)
     # TODO: add log file with multipliers and delays applied to data saved to CSV
 
