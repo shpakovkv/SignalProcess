@@ -856,7 +856,7 @@ def smooth_voltage(y_data, window=101, poly_order=3):
         window = 5
 
     if len(y_data) >= 5:
-        print("WINDOW LEN = {}  |  POLY ORDER = {}".format(window, poly_order))
+        # print("WINDOW LEN = {}  |  POLY ORDER = {}".format(window, poly_order))
         y_smoothed = savgol_filter(y_data, window, poly_order)
         return y_smoothed
 
@@ -1083,7 +1083,7 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
     return grouped_files
 
 
-def global_check_front_params(params, window=101, polyorder=3, plot=True):
+def global_check_front_params(params, window=101, polyorder=3):
     """ Parses user input of offset_by_curve_level parameter.
     Returns (idx, level, window, order), where:
         idx -- [int] the index of the curve, inputted by user
@@ -1141,19 +1141,7 @@ def global_check_front_params(params, window=101, polyorder=3, plot=True):
                              "--offset_by_curve_level parameters\n"
                              "Only integer values >=1 are allowed."
                              "".format(params[0]))
-    if len(params) == 5:
-        try:
-            plot = int(params[4])
-            if plot not in {0, 1}:
-                raise ValueError
-            plot = bool(plot)
-        except ValueError:
-            raise ValueError("Unsupported value for plot_graph "
-                             "({}) at "
-                             "--offset_by_curve_level parameters\n"
-                             "Only 0 and 1 are allowed."
-                             "".format(params[0]))
-    return idx, level, window, polyorder, plot
+    return idx, level, window, polyorder
 
 
 def check_file_list(dir, grouped_files):
@@ -1425,7 +1413,7 @@ def raw_y_auto_zero(params, multiplier, delay):
     return raw_params
 
 
-def apdate_delays_by_y_auto_zero(data, y_auto_zero_params,
+def update_by_y_auto_zero(data, y_auto_zero_params,
                                  multiplier, delay, verbose=True):
     """The function analyzes the mean amplitude in
     the selected X range of the selected curves.
@@ -1672,107 +1660,161 @@ def plot_multiple_curve(curve_list, peaks=None,
         # plt.close('all')
 
 
-def offset_by_front(data, offset_by_curve_params,
-                    multiplier, delay, smooth=True,
-                    plot=False, interactive=False):
-    """This function finds the time point of the selected curve front on level
-    'level', recalculates input delays of all time columns (odd
-    elements of the input delay list) to make that time point be zero.
-
-    NOTE: the curve is not multiplied yet, so the 'level'
-    value must be in raw data units
-
-    data                    -- an instance of SingleCurve
-    offset_by_curve_params  -- the list of parameters ['IDX', 'LEVEL', 'WIN', 'ORDER']
-                               where IDX -- the index of the curve to find front
-                               LEVEL -- the level of the front to search for
-                               WIN   -- The length of the filter window (i.e. the number
-                                        of coefficients) for the smooth filter
-                               ORDER -- order of the polynomial used to fit the samples
-                                        in the smooth filter
-    multiplier              -- the list of multipliers for all the curves
-                               in the SignalsData
-    delay                   -- the list of delays for all the curves
-                               in the SignalsData
-    smooth                  -- smooth curve before front detection
-                               NOTE: the smooth process is optimized for
-                               Voltage pulse of ERG installation
-                               (~500 ns width)
-
-    return -- list of recalculated delays (floats)
+def update_by_front(signals_data, args, multiplier, delay,
+                    front_plot_name, interactive=False):
     """
+    
+    :param signals_data: 
+    :param args: 
+    :param multiplier: 
+    :param delay: 
+    :param front_plot_name: 
+    :param interactive: 
+    :return: 
+    """
+    cancel = False
 
-    curve_idx = offset_by_curve_params[0]
-    level = offset_by_curve_params[1]
-    window = offset_by_curve_params[2]
-    poly_order = offset_by_curve_params[3]
+    if not os.path.isdir(os.path.dirname(front_plot_name)):
+        os.makedirs(os.path.dirname(front_plot_name))
 
-    polarity = pp.check_polarity(data.curves[curve_idx])
+    curve_idx = args[0]
+    level = args[1]
+    window = args[2]
+    poly_order = args[3]
 
+    polarity = pp.check_polarity(signals_data.curves[curve_idx])
     if pp.is_pos(polarity):
         level = abs(level)
     else:
         level = -abs(level)
 
+    x_mult = multiplier[curve_idx * 2]
+    y_mult = multiplier[curve_idx * 2 + 1]
+    x_del = delay[curve_idx * 2]
+    y_del = delay[curve_idx * 2 + 1]
+
+    # make local copy of target curve
+    curve = SingleCurve(signals_data.time(curve_idx),
+                        signals_data.value(curve_idx),
+                        signals_data.label(curve_idx),
+                        signals_data.unit(curve_idx),
+                        signals_data.time_unit(curve_idx))
+    # apply multiplier and delay to local copy
+    curve.data = multiplier_and_delay(curve.data,
+                                      [x_mult, y_mult],
+                                      [x_del, y_del])
+    # get x and y columns
+    data_x = curve.get_x()
+    data_y = curve.get_y()
+
     print("Time offset by curve front process.")
-    print("Searching curve[{}] front at level = {}".format(curve_idx, level))
+    print("Searching curve[{idx}] \"{label}\" front at level = {level}"
+          "".format(idx=curve_idx, label=curve.label, level=level))
 
-    level_raw = ((level + delay[curve_idx * 2 + 1]) /
-                 multiplier[curve_idx * 2 + 1])
-    if smooth:
-        print("Smoothing is turned ON.")
-    else:
-        print("Smoothing is turned OFF.")
-
-    if smooth and interactive:
-        print("INTERACTIVE")
-    # smooth curve to improve accuracy of front search
-    data_x = data.curves[curve_idx].get_x()
-    data_y = data.curves[curve_idx].get_y()
-    front_x, front_y = None, None
-    for _ in range(1):
-        if smooth:
-            smoothed_y = smooth_voltage(data_y, window, poly_order)
-            smoothed_curve = SingleCurve(data_x, smoothed_y)
-        else:
-            smoothed_curve = data.curves[curve_idx]
+    plot_title = None
+    smoothed_curve = None
+    front_point = None
+    if interactive:
+        print("\n----------- Interactive offset_by_curve_front process "
+              "--------------\n"
+              "Enter two space separated positive integer value\n"
+              "for WINDOW and POLYORDER parameters.\n"
+              "\n"
+              "WINDOW must be an odd value greater or equal to 5,\n"
+              "POLYORDER must be >= 0, <= 5 and less than WINDOW.\n"
+              "\n"
+              "The larger the WINDOW value, the greater the smooth effect.\n"
+              "\n"
+              "The larger the POLYORDER value, the more accurate the result\n"
+              "of smoothing.\n"
+              "\n"
+              "Close graph window to continue.")
+    # interactive cycle
+    while not cancel:
+        # smooth curve
+        data_y_smooth = smooth_voltage(data_y, window, poly_order)
+        smoothed_curve = SingleCurve(data_x, data_y_smooth,
+                                     curve.label, curve.unit,
+                                     curve.time_unit)
+        # find front
         front_x, front_y = pp.find_curve_front(smoothed_curve,
-                                               level_raw, polarity)
-        if plot:
-            plt.close("all")
-            if front_x:
-                front_point = [pp.SinglePeak(front_x, front_y, 0)]
-            else:
-                front_point = None
-            plot_title = "Curve[{}]\nRaw data before applying multipliers and " \
-                         "delays".format(data.curves[curve_idx].label)
-            plot_multiple_curve([data.curves[curve_idx], smoothed_curve],
-                                front_point, amp_unit="a.u.",
-                                time_unit="a.u.", title=plot_title)
-        # print("Filter window = {}, polyorder = {}".format(window, poly_order))
-        # plt.show()
-        # print(">>>", end="")
-        # input_val = sys.stdin.readline()
-        # input_val = input_val.strip()
-        # input_val = input_val.split()
-        # window = int(input_val[0])
-        # poly_order = int(input_val[1])
-        # print("New window and order = {}    {}".format(window, poly_order))
-        # print(input_val)
-        # window, poly_order = map(int, input('>>>').split())
+                                               level, polarity)
+        plot_title = ("Curve[{idx}] \"{label}\"\n"
+                     "".format(idx=curve_idx, label=curve.label))
+        if front_x:
+            front_point = pp.SinglePeak(front_x, front_y, 0)
+            plot_title += "Found front at [{},  {}]".format(front_x, front_y)
+        else:
+            plot_title += "No front found."
+            front_point = None
 
+        # get input
+        if interactive:
+            # plot
+            plot_multiple_curve([curve, smoothed_curve],
+                                [front_point], title=plot_title)
+
+            print("\nPrevious values:  {win}  {ord}\n"
+                  "".format(win=window, ord=poly_order))
+            plt.show()
+            print("Press enter without entering values to save the last values and quit.")
+            while True:
+                try:
+                    print("Enter WINDOW POLYORDER >>>", end="")
+                    user_input = sys.stdin.readline().strip()
+                    if user_input == "":
+                        # breaks both cycles
+                        cancel = True
+                        break
+                    user_input = user_input.split()
+                    assert len(user_input) == 2, ""
+                    new_win = int(user_input[0])
+                    assert new_win > 4, ""
+                    new_ord = int(user_input[1])
+                    assert new_win > new_ord, ""
+                    assert 0 <= new_ord <= 5, ""
+                except (ValueError, AssertionError):
+                    print("Wrong values!")
+                else:
+                    window = new_win
+                    poly_order = new_ord
+                    break
+        else:
+            break
+
+    # update delays
     new_delay = delay[:]
-    if front_x:
-        # add_to_log("Raw_voltage_front_level = " + str(level_raw))
-
-        # apply multiplier and compensate voltage delay
-        time_offset = (front_x * multiplier[curve_idx * 2] -
-                       delay[curve_idx * 2])
-        print("Time offset by curve front = " + str(time_offset))
-        print()
+    if front_point is not None:
         for idx in range(0, len(delay), 2):
-            new_delay[idx] += time_offset
-    return new_delay, pp.SinglePeak(front_x, front_y, 0)
+            new_delay[idx] += front_point.time
+    # save final version of the plot
+    plot_multiple_curve([curve, smoothed_curve],
+                        [front_point], title=plot_title)
+    plt.savefig(front_plot_name, dpi=400)
+    # show plot to avoid tkinter warning "can't invoke "event" command..."
+    plt.show(block=False)
+    plt.close('all')
+
+    return new_delay
+
+
+def get_front_plot_name(args, save_to, shot_name):
+    """Generates plot name for offset_by_curve_front
+    function's plot.
+    Returns full path for the plot.
+    
+    args        -- offset_by_curve_front args 
+    save_to     -- the directory to save data files
+    shot_name   -- the name of current shot (number of shot)
+    """
+    front_plot_name = str(shot_name)
+    front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
+                        "".format(args[0],
+                                  args[1]))
+    front_plot_name = os.path.join(save_to,
+                                   'Offset_By_Front',
+                                   front_plot_name)
+    return front_plot_name
 
 
 def check_param_path(path, param_name):
@@ -1827,6 +1869,18 @@ def trim_ext(filename, ext_list):
         if filename.upper().endswith(ext.upper()):
             return filename[0: - len(ext)]
     return filename
+
+
+def check_offset_by_front(args):
+    """Checks if the curve index is greater than 
+    curves count.
+    
+    args -- offser_by_curve_front args
+    """
+    assert args[0] < data.count, \
+        "Index ({}) is out of range in --y-offset-by-curve-level " \
+        "parameters.\nCurves count = {}" \
+        "".format(args[0], data.count)
 
 
 # ============================================================================
@@ -1953,7 +2007,7 @@ if __name__ == "__main__":
                              'a multiplier and then the delay '
                              'is subtracted from them.'
                         )
-    parser.add_argument('--offset-by-curve-level',
+    parser.add_argument('--offset-by-curve-front',
                         action='store',
                         metavar='VAL',
                         nargs='+',
@@ -2107,8 +2161,9 @@ if __name__ == "__main__":
     # raw check offset_by_voltage parameters (types)
     it_offset = False  # interactive offset process
     if args.offset_by_front:
-        assert 2 >= len(args.offset_by_front) >= 5, \
-            ("error: argument {arg_name}: expected 2 or 3 or 4 arguments."
+        assert len(args.offset_by_front) in [2, 4], \
+            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
+             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
              "".format(arg_name="--offset-by-curve_level"))
         if len(args.offset_by_front) < 4:
             it_offset = True
@@ -2157,8 +2212,10 @@ if __name__ == "__main__":
 
     # MAIN LOOP
     for shot_idx, file_list in enumerate(grouped_files):
+        # get current shot name (number)
         shot_name = os.path.basename(file_list[0])[number_start:number_end]
         shot_name = trim_ext(shot_name, args.ext_list)
+        # get SignalsData
         data = read_signals(file_list, start=0, step=1, points=-1,
                             labels=args.labels, units=args.units,
                             time_unit=args.time_unit)
@@ -2176,39 +2233,22 @@ if __name__ == "__main__":
             check_y_auto_zero_params(data, args.y_auto_zero)
 
             # updates delays with accordance to Y zero offset
-            args.delay = apdate_delays_by_y_auto_zero(data, args.y_auto_zero,
-                                                      args.multiplier,
-                                                      args.delay,
-                                                      verbose=True)
+            args.delay = update_by_y_auto_zero(data, args.y_auto_zero,
+                                               args.multiplier,
+                                               args.delay,
+                                               verbose=True)
 
         # check offset_by_voltage parameters (if idx is out of range)
         if args.offset_by_front:
-            assert args.offset_by_front[0] < data.count, \
-                "Index ({}) is out of range in --y-offset-by-curve-level " \
-                "parameters.\nCurves count = {}" \
-                "".format(args.offset_by_front[0], data.count)
+            check_offset_by_front(args.offset_by_front)
 
             # updates delay values with accordance to voltage front
-            raw_front_point = None
-            if args.offset_by_front:
-                front_plot_name = shot_name
-                front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
-                                    "".format(args.offset_by_front[0],
-                                              args.offset_by_front[1]))
-                front_plot_name = os.path.join(args.src_dir,
-                                               'FrontBeforeTimeOffset',
-                                               front_plot_name)
-                args.delay, raw_front_point = \
-                    offset_by_front(data, args.offset_by_front,
-                                    args.multiplier, args.delay,
-                                    smooth=True, plot=True,
-                                    interactive=it_offset)
-                if not os.path.isdir(os.path.dirname(front_plot_name)):
-                    os.makedirs(os.path.dirname(front_plot_name))
-                plt.savefig(front_plot_name, dpi=400)
-                plt.show()
-                plt.close('all')
-
+            front_plot_name = get_front_plot_name(args.offset_by_front,
+                                                  args.save_to, shot_name)
+            args.delay = update_by_front(data, args.offset_by_front,
+                                         args.multiplier, args.delay,
+                                         front_plot_name,
+                                         interactive=it_offset)
         # multiplier and delay
         data = multiplier_and_delay(data, args.multiplier, args.delay)
         # if raw_front_point:
@@ -2230,7 +2270,6 @@ if __name__ == "__main__":
                 check_plot_param(args.plot, data.count, '--plot')
             for curve_idx in args.plot:
                 plot_multiple_curve(data.curves[curve_idx])
-
                 if args.plot_dir is not None:
                     plot_name = ("{shot}_curve_{idx}_{label}.plot.png"
                                  "".format(shot=shot_name, idx=curve_idx,
@@ -2241,6 +2280,8 @@ if __name__ == "__main__":
                         print("Plot is saved as {}".format(plot_path))
                 if not args.p_hide:
                     plt.show()
+                else:
+                    plt.show(block=False)
                 plt.close('all')
 
         # plot and save multi-plots
@@ -2260,6 +2301,8 @@ if __name__ == "__main__":
                         print("Multiplot is saved {}".format(mplot_path))
                 if not args.mp_hide:
                     plt.show()
+                else:
+                    plt.show(block=False)
                 plt.close('all')
 
         # save data
