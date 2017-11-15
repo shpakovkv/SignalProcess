@@ -1861,13 +1861,18 @@ def trim_ext(filename, ext_list):
     ext_list -- the list of the extensions to check
     """
     filename = os.path.basename(filename)
+    filename.strip()
     if isinstance(ext_list, str):
         ext_list = [ext_list]
     if not ext_list:
-        ext_list = [".CSV", ".WFM", ".DAT", ".TXT"]
+        ext_list = ['.CSV', '.WFM', '.DAT', '.TXT']
+        # have bug: len(ext_list[idx]) == 3
     for ext in ext_list:
         if filename.upper().endswith(ext.upper()):
-            return filename[0: - len(ext)]
+            ext_len = len(ext)
+            if not ext.startswith("."):
+                ext_len += 1
+            return filename[0: - ext_len]
     return filename
 
 
@@ -2370,6 +2375,8 @@ if __name__ == "__main__":
 
         # save data
         if args.save:
+            print("pref = [{}],  number = [{}], postf = [{}]"
+                  "".format(args.prefix, shot_name, args.postfix))
             file_name = ("{pref}{number}{postf}.csv"
                          "".format(pref=args.prefix, number=shot_name,
                                    postf=args.postfix))
