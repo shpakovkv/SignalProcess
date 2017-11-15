@@ -1871,17 +1871,60 @@ def trim_ext(filename, ext_list):
     return filename
 
 
-def check_offset_by_front(args):
-    """Checks if the curve index is greater than 
-    curves count.
-    
-    args -- offser_by_curve_front args
-    """
-    assert args[0] < data.count, \
-        "Index ({}) is out of range in --y-offset-by-curve-level " \
-        "parameters.\nCurves count = {}" \
-        "".format(args[0], data.count)
+def check_idx_list(idx_list, max_idx, arg_name):
+    """Checks if the curve index in idx_list is greater
+    than max_idx. Raises an error if true.
 
+    max_idx  -- the limit
+    idx_list -- the list of indexes to check
+    arg_name -- the name of the argument through which
+                indexes were entered by the user.
+                Needed for correct error message.
+    """
+    if isinstance(idx_list, (int, bool)):
+        idx_list = [idx_list]
+    for idx in idx_list:
+        assert idx < max_idx, \
+            "Index ({idx}) is out of range in {name} " \
+            "parameters.\nMaximum index = {max}" \
+            "".format(idx=idx, name=arg_name, max=max_idx)
+
+
+def zero_one_curve(curve, max_rows=30):
+    """Reesets the y values to 0, leaves first 'max_rows' rows
+    and deletes the others.
+
+    Returns reset curve.
+
+    curve    -- the SingleCurve instance
+    max_rows -- the number of rows to leave
+    """
+    curve.data = curve.data[0:max_rows + 1, :]
+    for row in range(max_rows + 1):
+        curve.data[row, 1] = 0
+    return curve
+
+
+def zero_curves(signals, curve_indexes, max_rows=30):
+    """Reesets the y values to 0, leaves first 'max_rows' rows
+    and deletes the others for all curves with index in
+    curve_indexes.
+
+    Returns modified SingnalsData
+
+    data          -- the SignalsData instance
+    curve_indexes -- the list of curves indexes to reset
+    max_rows      -- the number of rows to leaved
+    """
+    for idx in curve_indexes:
+        signals.curves[idx] = zero_one_curve(signals.curves[idx], max_rows)
+    return data
+
+
+def check_zero_list(signals, idx_list):
+    for curve_idx in idx_list:
+        assert signals.count < curve_idx, \
+            ""
 
 # ============================================================================
 # --------------   MAIN    ----------------------------------------
@@ -2031,7 +2074,16 @@ if __name__ == "__main__":
                              'You can specify as many --y-auto-zero '
                              'parameters as you want.'
                         )
-
+    parser.add_argument('--set-to-zero',
+                        action='store',
+                        type=int,
+                        metavar='CURVE_IDX',
+                        nargs='+',
+                        dest='zero',
+                        default=None,
+                        help='Specify the indexes of the fake curves, '
+                             'whose values you want to set to zero.'
+                        )
     # output settings --------------------------------------------------------
     parser.add_argument('-s', '--save',
                         action='store_true',
@@ -2240,7 +2292,9 @@ if __name__ == "__main__":
 
         # check offset_by_voltage parameters (if idx is out of range)
         if args.offset_by_front:
-            check_offset_by_front(args.offset_by_front)
+            # check_offset_by_front(data, args.offset_by_front)
+            check_idx_list(args.offset_by_front[0], data.count - 1,
+                           "--offset-by-curve-front")
 
             # updates delay values with accordance to voltage front
             front_plot_name = get_front_plot_name(args.offset_by_front,
@@ -2249,6 +2303,15 @@ if __name__ == "__main__":
                                          args.multiplier, args.delay,
                                          front_plot_name,
                                          interactive=it_offset)
+
+        # reset to zero
+        if args.zero:
+            check_idx_list(args.zero, data.count - 1, "--set-to-zero")
+            if verbose:
+                print("Resetting to zero the values of the curves "
+                      "with index in {}".format(args.zero))
+            data = zero_curves(data, args.zero)
+
         # multiplier and delay
         data = multiplier_and_delay(data, args.multiplier, args.delay)
         # if raw_front_point:
@@ -2322,8 +2385,6 @@ if __name__ == "__main__":
                 # plot_multiple_curve(data.curves[12], show=True)
                 # plot_multiple_curve(data.curves[0], show=True)
 
-    # TODO: interactive offset_by_curve smooth process
-    # TODO: user interactive input commands?
     # TODO: process fake files (not recorded)
     # TODO: file duplicates check
     # TODO: partial import (start, step, points)
