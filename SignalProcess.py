@@ -421,7 +421,7 @@ def read_signals(file_list, start=0, step=1, points=-1,
     for filename in file_list:
         if verbose:
             print("Loading \"{}\"".format(filename))
-        new_data, new_header = load_from_file(filename, start, step, points)
+        new_data, new_header = load_from_file(filename, start, step, points, h_lines=3)
         if new_data.shape[1] % 2 != 0:
             # multiple_X_columns = False
             add_count = new_data.shape[1] - 1
@@ -431,12 +431,15 @@ def read_signals(file_list, start=0, step=1, points=-1,
 
         current_labels = None
         current_units = None
+        current_time_unit = None
+
         if labels:
             # user input
             current_labels = labels[current_count: current_count + add_count]
         elif new_header:
             # from file
             current_labels = check_labels_string(new_header[0], add_count)
+
         if units:
             # user input
             current_units = units[current_count: current_count + add_count]
@@ -444,7 +447,12 @@ def read_signals(file_list, start=0, step=1, points=-1,
             # from file
             current_units = check_labels_string(new_header[1], add_count)
 
-        data.append(new_data, current_labels, current_units, time_unit)
+        if time_unit:
+            current_time_unit = time_unit
+        elif new_header:
+            current_time_unit = check_labels_string(new_header[2], 1)[0]
+
+        data.append(new_data, current_labels, current_units, current_time_unit)
 
         if verbose:
             print()
@@ -530,7 +538,7 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
     return headers
 
 
-def load_from_file(filename, start=0, step=1, points=-1):
+def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
     """
     Return ndarray instance filled with data from csv or wfm file.
 
@@ -559,7 +567,7 @@ def load_from_file(filename, start=0, step=1, points=-1):
                 print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
                       end="")
             text_data = datafile.readlines()
-            header = text_data[0:2]
+            header = text_data[0:h_lines]
             if dialect.delimiter == ";":
                 text_data = origin_to_csv(text_data)
                 dialect.delimiter = ','
@@ -937,8 +945,10 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
                  idx in signals.idx_to_label.keys()]
         units = [re.sub(r'[^-.\w_]', '_', unit) for unit in units]
         units = delimiter.join(units) + "\n"
+        time_unit = "{}\n".format(signals.curves[0].time_unit)
         lines.append(labels)
         lines.append(units)
+        lines.append(time_unit)
         # add data
         for row in range(table.shape[0]):
             s = delimiter.join([value_format % table[row, col] for
@@ -2389,7 +2399,7 @@ if __name__ == "__main__":
             file_path = os.path.join(args.save_to, file_name)
             save_signals_csv(file_path, data)
             if verbose:
-                max_rows = max(curve.data.shape[0] for curve in data.curves)
+                max_rows = max(curve.data.shape[0] for curve in data.curves.values())
                 print("Curves count = {}\n"
                       "Rows count = {} ".format(data.count, max_rows))
                 print("Saved as {}".format(file_path))
