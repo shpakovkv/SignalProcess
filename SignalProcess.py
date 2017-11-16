@@ -1351,7 +1351,7 @@ def check_labels(labels):
                              " are allowed only.".format(label))
 
 
-def global_check_plot(args, name, allow_all=False):
+def global_check_idx_list(args, name, allow_all=False):
     """Checks the values of a parameter,
     converts it to integers and returns it.
     Returns [-1] if only 'all' is entered (if allow_all==True)
@@ -1363,7 +1363,7 @@ def global_check_plot(args, name, allow_all=False):
     error_text = ("Unsupported curve index ({val}) at {name} parameter."
                   "\nOnly positive integer values ")
     if allow_all:
-        error_text += "and string 'all' "
+        error_text += "and string 'all' (without the qoutes) "
     error_text += "are allowed."
 
     if len(args) == 1 and args[0].upper() == 'ALL' and allow_all:
@@ -1921,6 +1921,8 @@ def zero_curves(signals, curve_indexes, max_rows=30):
     curve_indexes -- the list of curves indexes to reset
     max_rows      -- the number of rows to leaved
     """
+    if curve_indexes == -1:
+        curve_indexes = list(range(0, signals.count))
     for idx in curve_indexes:
         signals.curves[idx] = zero_one_curve(signals.curves[idx], max_rows)
     return data
@@ -2081,13 +2083,14 @@ if __name__ == "__main__":
                         )
     parser.add_argument('--set-to-zero',
                         action='store',
-                        type=int,
                         metavar='CURVE_IDX',
                         nargs='+',
                         dest='zero',
                         default=None,
                         help='Specify the indexes of the fake curves, '
-                             'whose values you want to set to zero.'
+                             'whose values you want to set to zero.\n'
+                             'Enter \'all\' (without the quotes) to set '
+                             'all curve values to zero.'
                         )
     # output settings --------------------------------------------------------
     parser.add_argument('-s', '--save',
@@ -2244,17 +2247,22 @@ if __name__ == "__main__":
     if args.postfix:
         args.postfix = re.sub(r'[^-.\w]', '_', args.postfix)
 
-    # raw check plot and multiplot
+    # check and convert plot and multiplot args
     if args.plot:
-        args.plot = global_check_plot(args.plot, '--plot',
+        args.plot = global_check_idx_list(args.plot, '--plot',
                                       allow_all=True)
     if args.multiplot:
         for idx, m_param in enumerate(args.multiplot):
-            args.multiplot[idx] = global_check_plot(m_param, '--multiplot')
+            args.multiplot[idx] = global_check_idx_list(m_param, '--multiplot')
 
     # raw check y_auto_zero parameters (types)
     if args.y_auto_zero:
         args.y_auto_zero = global_check_y_auto_zero_params(args.y_auto_zero)
+
+    # check and convert set-to-zero args
+    if args.zero:
+        args.zero = global_check_idx_list(args.zero, '--set-to-zero',
+                                          allow_all=True)
 
     # raw check multiplier and delay
     if args.multiplier is not None and args.delay is not None:
@@ -2375,15 +2383,15 @@ if __name__ == "__main__":
 
         # save data
         if args.save:
-            print("pref = [{}],  number = [{}], postf = [{}]"
-                  "".format(args.prefix, shot_name, args.postfix))
             file_name = ("{pref}{number}{postf}.csv"
                          "".format(pref=args.prefix, number=shot_name,
                                    postf=args.postfix))
             file_path = os.path.join(args.save_to, file_name)
-            print("Curves count = {}".format(data.count))
             save_signals_csv(file_path, data)
             if verbose:
+                max_rows = max(curve.data.shape[0] for curve in data.curves)
+                print("Curves count = {}\n"
+                      "Rows count = {} ".format(data.count, max_rows))
                 print("Saved as {}".format(file_path))
                 # DEBUG
                 # from only_for_tests import plot_multiplot
@@ -2392,7 +2400,6 @@ if __name__ == "__main__":
                 # plot_multiple_curve(data.curves[12], show=True)
                 # plot_multiple_curve(data.curves[0], show=True)
 
-    # TODO: process fake files (not recorded)
     # TODO: file duplicates check
     # TODO: partial import (start, step, points)
     # TODO: add log file with multipliers and delays applied to data saved to CSV
