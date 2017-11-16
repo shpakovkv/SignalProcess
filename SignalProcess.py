@@ -5,6 +5,7 @@ import re
 import os
 import colorsys
 import sys
+import math
 
 import numpy as np
 from scipy.signal import savgol_filter
@@ -538,6 +539,22 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
     return headers
 
 
+def read_lines(file_obj, start=0, step=1, points=-1, skip_header=0):
+    # all
+    if points == 0:
+        points = -1
+    count = 0
+    data = []
+    for idx, line in enumerate(file_obj):
+        if idx >= skip_header and idx >= start and count == 0:
+            data.append(line)
+        count += 1
+        if count == step:
+            count = 0
+        if len(data) == points:
+            break
+    return data
+
 def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
     """
     Return ndarray instance filled with data from csv or wfm file.
@@ -566,19 +583,35 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
             if verbose:
                 print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
                       end="")
+            # read
             text_data = datafile.readlines()
-            header = text_data[0:h_lines]
+            header = text_data[0: h_lines]
             if dialect.delimiter == ";":
                 text_data = origin_to_csv(text_data)
                 dialect.delimiter = ','
             skip_header = get_csv_headers(text_data)
             usecols = valid_cols(text_data, skip_header,
                                  delimiter=dialect.delimiter)
+
+            # remove excess
+            last_row = len(text_data) - 1
+            if points > 0:
+                available = int(math.ceil((len(text_data) - skip_header -
+                                           start) / float(step)))
+                if points < available:
+                    last_row = points * step + skip_header + start - 1
+            text_data = text_data[h_lines + start : last_row + 1 : step]
+            if len(text_data) < 2:
+                sys.exit("\nError! Not enough data lines in the file.")
+
             if verbose:
-                print("Valid columns = {}   |   ".format(usecols), end="")
+                print("Valid columns = {}".format(usecols))
+            # data = np.genfromtxt(text_data,
+            #                      delimiter=dialect.delimiter,
+            #                      skip_header=skip_header,
+            #                      usecols=usecols)
             data = np.genfromtxt(text_data,
                                  delimiter=dialect.delimiter,
-                                 skip_header=skip_header,
                                  usecols=usecols)
 
     else:
@@ -592,6 +625,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
         else:
             curves_count = data.shape[1] - 1
         print("Curves count = {}".format(curves_count))
+        print("Points count = {}".format(data.shape[0]))
     return data, header
 
 
@@ -1943,6 +1977,20 @@ def check_zero_list(signals, idx_list):
         assert signals.count < curve_idx, \
             ""
 
+
+def check_partial_args(args):
+    if args is not None:
+        start, step, count = args
+        assert start >= 0, "The start point must be non-negative integer."
+        assert step > 0, "The step of the import must be natural number."
+        assert count > 0 or count == -1, \
+            "The count of the data points to import " \
+            "must be natural number or -1."
+        return args
+    return 0, 1, -1
+
+
+
 # ============================================================================
 # --------------   MAIN    ----------------------------------------
 # ======================================================
@@ -2033,6 +2081,18 @@ if __name__ == "__main__":
                              'ATTENTION: files from all oscilloscopes must '
                              'be in the same folder and be sorted '
                              'in one style.'
+                        )
+    parser.add_argument('--partial-import',
+                        action='store',
+                        type=int,
+                        metavar=('START', 'STEP', 'COUNT'),
+                        nargs=3,
+                        dest='partial',
+                        help='Specify the index of the data point (lines '
+                             'in the file) with which you need to start '
+                             'the import, the reading step, and the number '
+                             'of points that you want to import (to read '
+                             'to the end of the file, specify -1).'
                         )
 
     # process parameters and options -----------------------------------------
@@ -2228,6 +2288,9 @@ if __name__ == "__main__":
     #                    ...etc.
     #                  ]
 
+    # check partial import args
+    args.partial = check_partial_args(args.partial)
+
     # raw check offset_by_voltage parameters (types)
     it_offset = False  # interactive offset process
     if args.offset_by_front:
@@ -2291,7 +2354,8 @@ if __name__ == "__main__":
         shot_name = os.path.basename(file_list[0])[number_start:number_end]
         shot_name = trim_ext(shot_name, args.ext_list)
         # get SignalsData
-        data = read_signals(file_list, start=0, step=1, points=-1,
+        data = read_signals(file_list, start=args.partial[0],
+                            step=args.partial[1], points=args.partial[2],
                             labels=args.labels, units=args.units,
                             time_unit=args.time_unit)
         if verbose:
