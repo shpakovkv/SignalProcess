@@ -2475,8 +2475,9 @@ if __name__ == "__main__":
                 # plot_multiple_curve(data.curves[0], show=True)
 
     # TODO: file duplicates check
-    # TODO: partial import (start, step, points)
     # TODO: add log file with multipliers and delays applied to data saved to CSV
+    # TODO: comments
+    # TODO: description
 
     # print(args.y_auto_zero)
     print()

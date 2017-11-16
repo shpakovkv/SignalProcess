@@ -582,3 +582,12 @@ def group_peaks(data, window):
 
 if __name__ == '__main__':
     print('Done!!!')
+
+    # TODO: reformat lines PEP8
+    # TODO: English comments
+    # TODO: command line args from SP
+    # TODO: cl args original
+    # TODO: cl read/save/plot (copy from SP)
+    # TODO: cl peak finder
+    # TODO: cl peak reader
+    # TODO: cl replot peak multiplots
