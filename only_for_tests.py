@@ -77,6 +77,182 @@ def read_signals(file_list, file_type='csv', delimiter=","):
         raise TypeError("Unknown type of file \"{}\"".format(type))
 
 
+def get_max_min_from_file_cols(file_list,  # list of fullpaths of target files
+                               col_list,  # list of zero-based indexes of column to be processed
+                               col_corr=list(),  # list of correction multiplayer for each col in the col_list
+                               delimiter=',',  # file column separator
+                               skip_header=0,  # number of headerlines in files
+                               verbose_mode=True):  # print log to console
+    # For each specified column, finds the maximum and minimum values for all files in the list
+    # returns the file processing log
+    log = ""
+    min_data = {}
+    max_data = {}
+    for item in col_list:
+        min_data[item] = 0
+        max_data[item] = 0
+    if not col_corr:
+        for _ in col_list:
+            col_corr.append(1)
+    for file_i in range(len(file_list)):
+        log += add_to_log("FILE \"" + file_list[file_i] + "\"\n", verbose_mode)
+        data = np.genfromtxt(file_list[file_i], delimiter=delimiter, skip_header=skip_header, usecols=col_list)
+        for col_i in range(len(col_list)):
+            col = col_list[col_i]
+
+            current_max = max(data[:, col_i])
+            if max_data[col] < current_max:
+                max_data[col] = current_max
+
+            current_min = min(data[:, col_i])
+            if min_data[col] > current_min:
+                min_data[col] = current_min
+            log += add_to_log("Col [" + str(col) + "] \t MAX = " + str(current_max)
+                              + "\t MAX_corr = " + str(current_max * col_corr[col_i])
+                              + "\t MIN = " + str(current_min)
+                              + "\t MIN_corr = " + str(current_min * col_corr[col_i]) + "\n", verbose_mode)
+        log += add_to_log("\n", verbose_mode)
+    log += add_to_log("OVERALL STATS (from " + str(len(file_list)) + " files)\n", verbose_mode)
+    for col_i in range(len(col_list)):
+        col = col_list[col_i]
+        log += add_to_log("Column [" + str(col) + "] (x" + str(col_corr[col_i]) + ")\t MAX = " + str(max_data[col])
+                          + "\t MAX_corr = " + str(max_data[col] * col_corr[col_i])
+                          + "\t MIN = " + str(min_data[col])
+                          + "\t MIN_corr = " + str(min_data[col] * col_corr[col_i]) + "\n", verbose_mode)
+    log += add_to_log("\n", verbose_mode)
+    return log
+
+
+def read_lines(file_obj, start=0, step=1, points=-1, skip_header=0):
+    # all
+    if points == 0:
+        points = -1
+    count = 0
+    data = []
+    for idx, line in enumerate(file_obj):
+        if idx >= skip_header and idx >= start and count == 0:
+            data.append(line)
+        count += 1
+        if count == step:
+            count = 0
+        if len(data) == points:
+            break
+    return data
+
+
+def old_smooth_voltage(x, y, x_multiplier=1):
+    """This function returns smoothed copy of 'y'.
+    Optimized for voltage pulse of ERG installation.
+
+    x -- 1D numpy.ndarray of time points (in seconds by default)
+    y -- 1D numpy.ndarray value points
+    x_multiplier -- multiplier applied to time data
+        (default 1 for x in seconds)
+
+    return -- smoothed curve (1D numpy.ndarray)
+    """
+    from scipy.signal import savgol_filter
+    # 3 is optimal polyorder value for speed and accuracy
+    poly_order = 3
+
+    # value 101 is optimal for 1 ns (1e9 multiplier) resolution
+    # of voltage waveform for 25 kV charging voltage of ERG installation
+    window_len = 101
+
+    # calc time_step and converts to nanoseconds
+    time_step = (x[1] - x[0]) * 1e9 / x_multiplier
+    window_len = int(window_len / time_step)
+    if len(y) < window_len:
+        window_len = len(y) - 1
+    if window_len % 2 == 0:
+        # window must be even number
+        window_len += 1
+    if window_len < 5:
+        # lowest possible value
+        window_len = 5
+
+    if len(y) >= 5:
+        # print("WINDOW LEN = {}  |  POLY ORDER = {}"
+        #       "".format(window_len, poly_order))
+        y_smoothed = savgol_filter(y, window_len, poly_order)
+        return y_smoothed
+    # too short array to be processed
+    return y
+
+
+def save_ndarray_csv(filename, data, delimiter=",", precision=18):
+    # Saves 2-dimensional numpy.ndarray as .csv file
+    # Replaces 'nan' values with ''
+    # precision - a number of units after comma
+
+    # check precision value
+    import re
+    print("Save columns count = {}".format(data.shape[1]))
+    if not isinstance(precision, int):
+        raise ValueError("Precision must be integer")
+    if precision > 18:
+        precision = 18
+    value_format = '%0.' + str(precision) + 'e'
+
+    # check filename value
+    if len(filename) < 4 or filename[-4:].upper() != ".CSV":
+        filename += ".csv"
+    folder_path = os.path.dirname(filename)
+    if folder_path and not os.path.isdir(folder_path):
+        os.makedirs(folder_path)
+
+    with open(filename, 'w') as fid:
+        lines = []
+        # add headers
+        labels = ",".join([data.curves[idx].label for
+                           idx in data.idx_to_label.keys()])
+        units = ",".join([data.curves[idx].unit for
+                          idx in data.idx_to_label.keys()])
+        lines.append(labels)
+        lines.append(units)
+        # add data
+        for row in range(data.shape[0]):
+            s = delimiter.join([value_format % data[row, col] for
+                                col in range(data.shape[1])]) + "\n"
+            s = re.sub(r'nan', '', s)
+            lines.append(s)
+        fid.writelines(lines)
+
+
+def get_max_min_from_dir(dir_path, col_list, col_corr=list(), ext='.CSV',
+                         delimiter=',', skip_header=0,
+                         log_file_name='log.txt', verbose_mode=True):
+    """
+
+    dir_path      -- target folder
+    col_list      -- list of zero-based indexes of
+                     column to be processed
+    col_corr      -- list of correction multiplayer for each
+                     column in the col_list
+    ext           -- target files extension
+    delimiter     -- file column separator
+    skip_header   -- number of headerlines in files
+    log_file_name -- log file name
+    verbose_mode  -- print log to console
+    """
+    file_list = sp.get_file_list_by_ext(dir_path, ext, sort=True)
+
+    log = get_max_min_from_file_cols(file_list, col_list,
+                                     col_corr=col_corr,
+                                     delimiter=delimiter,
+                                     skip_header=skip_header,
+                                     verbose_mode=verbose_mode)
+    dir_name = os.path.split(dir_path)[1]
+    if dir_name == '':
+        dir_path = os.path.split(dir_path)[0]
+        dir_name = os.path.split(dir_path)[1]
+
+    log_file_path = os.path.join(dir_path, dir_name + ' ' + log_file_name)
+    with open(log_file_path, "w") as fid:
+        fid.write(log)
+    return log
+
+
 def zero_single_curve(curve, lenght=30):
     curve.data = curve.data[0:lenght + 1, :]
     for row in range(lenght):
