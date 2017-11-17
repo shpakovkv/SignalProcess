@@ -1174,6 +1174,19 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
 
 def save_m_log(src, save_as, labels, multiplier=None, delays=None,
                offset_by_front=None, y_auto_offset=None):
+    """Saves log file describing the changes made to the data.
+
+    If the log file exists and any new changes were made to the data and
+    saved at the same data file, appends new lines to the log file.
+
+    src             -- the list of source files the data was read from
+    save_as         -- the full path to the file the data was saved to
+    labels          -- the list of curves labels
+    multiplier      -- the list of multipliers that were applied to the data
+    delays          -- the list of delays that were applied to the data
+    offset_by_front -- the --offset-by-curve-front args
+    y_auto_offset   -- the list of --y-auto-zero args (list of lists)
+    """
     now = datetime.datetime.now().strftime("%Y.%m.%d %H:%M:%S")
     lines = list()
     lines.append("Modified on {}\n".format(now))
@@ -1189,12 +1202,16 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
         for pair in zip(multiplier[0:-1:2], multiplier[1:-1:2]):
             lines.append("{: <15.5e} {:.5e}\n".format(*pair))
         lines.append("\n")
+    else:
+        lines.append("No multipliers were applied.\n")
     if delays:
         lines.append("Applied delays:\n")
         lines.append("Time            Amplitude\n")
         for pair in zip(delays[0:-1:2], delays[1:-1:2]):
             lines.append("{: <15.5e} {:.5e}\n".format(*pair))
         lines.append("\n")
+    else:
+        lines.append("No delays were applied.\n")
     if offset_by_front:
         lines.append("Delays was modified by --offset-by-curve-front "
                      "option with values:\n")
@@ -1214,16 +1231,15 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
             lines.append("Background start time = {}\n".format(args[1]))
             lines.append("Background stop time  = {}\n".format(args[2]))
             lines.append("\n")
-    if len(lines) > 3:
-        lines.append("----------------------------------------------------\n")
-        if src == save_as and os.path.isfile(save_as + ".log"):
-            mode = "a"
-        else:
-            mode = "w"
+    lines.append("----------------------------------------------------\n")
+    if src == save_as and os.path.isfile(save_as + ".log"):
+        mode = "a"
+    else:
+        mode = "w"
+    # save log file if changes were made or data was saved as a new file
+    if len(lines) > 6 or src != save_as:
         with open(save_as + ".log", mode) as f:
             f.writelines(lines)
-    # TODO: add from file
-    # TODO: check if file is resaveing
 
 
 # ========================================
@@ -2420,7 +2436,6 @@ if __name__ == "__main__":
         print()
         sys.exit(e)
     # =========================================================================
-    # TODO: add log file with multipliers/delays applied to data saved to CSV
     # TODO: comments
     # TODO: description
 
