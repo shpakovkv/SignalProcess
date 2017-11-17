@@ -1608,46 +1608,37 @@ def update_by_front(signals_data, args, multiplier, delay,
     return new_delay
 
 
-def get_front_plot_name(args, save_to, shot_name):
-    """Generates plot name for offset_by_curve_front
-    function's plot.
-    Returns full path for the plot.
+def zero_one_curve(curve, max_rows=30):
+    """Reesets the y values to 0, leaves first 'max_rows' rows
+    and deletes the others.
 
-    args        -- offset_by_curve_front args
-    save_to     -- the directory to save data files
-    shot_name   -- the name of current shot (number of shot)
+    Returns reset curve.
+
+    curve    -- the SingleCurve instance
+    max_rows -- the number of rows to leave
     """
-    front_plot_name = str(shot_name)
-    front_plot_name += ("_curve{:03d}_front_level_{:.3f}.png"
-                        "".format(args[0],
-                                  args[1]))
-    front_plot_name = os.path.join(save_to,
-                                   'Offset_By_Front',
-                                   front_plot_name)
-    return front_plot_name
+    curve.data = curve.data[0:max_rows + 1, :]
+    for row in range(max_rows + 1):
+        curve.data[row, 1] = 0
+    return curve
 
 
-def trim_ext(filename, ext_list):
-    """Return the filename without extension,
-    if the extension is in the ext_list.
+def zero_curves(signals, curve_indexes, max_rows=30):
+    """Reesets the y values to 0, leaves first 'max_rows' rows
+    and deletes the others for all curves with index in
+    curve_indexes.
 
-    filename -- the file name
-    ext_list -- the list of the extensions to check
+    Returns modified SingnalsData
+
+    data          -- the SignalsData instance
+    curve_indexes -- the list of curves indexes to reset
+    max_rows      -- the number of rows to leaved
     """
-    filename = os.path.basename(filename)
-    filename.strip()
-    if isinstance(ext_list, str):
-        ext_list = [ext_list]
-    if not ext_list:
-        ext_list = ['.CSV', '.WFM', '.DAT', '.TXT']
-        # have bug: len(ext_list[idx]) == 3
-    for ext in ext_list:
-        if filename.upper().endswith(ext.upper()):
-            ext_len = len(ext)
-            if not ext.startswith("."):
-                ext_len += 1
-            return filename[0: - ext_len]
-    return filename
+    if curve_indexes == -1:
+        curve_indexes = list(range(0, signals.count))
+    for idx in curve_indexes:
+        signals.curves[idx] = zero_one_curve(signals.curves[idx], max_rows)
+    return data
 
 
 # ========================================
