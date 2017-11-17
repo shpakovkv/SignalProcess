@@ -572,6 +572,24 @@ def make_final():
     print("Done!")
 
 
+def compare_files_in_folder(path, ext=".CSV"):
+    file_list = sp.get_file_list_by_ext(path, ext, sort=True)
+    print("Current PATH = " + path)
+    for idx in range(len(file_list) - 1):
+        if sp.compare_2_files(file_list[idx], file_list[idx + 1]):
+            print(os.path.basename(file_list[idx]) + " == " + os.path.basename(file_list[idx + 1]))
+    print()
+
+
+def compare_files_in_subfolders(path, ext=".CSV"):
+    if os.path.isdir(path):
+        path = os.path.abspath(path)
+        for subpath in sp.get_subdir_list(path):
+            compare_files_in_folder(subpath, ext=ext)
+    else:
+        print("Path " + path + "\n does not exist!")
+
+
 def plot_single_curve(curve, peaks=None, xlim=None,
                       save=False, show=False, save_as=""):
     plt.close('all')

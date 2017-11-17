@@ -626,6 +626,71 @@ def check_idx_list(idx_list, max_idx, arg_name):
             "".format(idx=idx, name=arg_name, max=max_idx)
 
 
+def compare_2_files(first_file_name, second_file_name, lines=30):
+    """Compares a number of first lines of two files
+    return True if lines matches exactly.
+
+    first_file_name  --  the full path to the first file
+    second_file_name --  the full path to the second file
+    lines            --  the number of lines to compare
+    """
+    with open(first_file_name, 'r') as file:
+        with open(second_file_name, 'r') as file2:
+            for idx in range(lines):
+                if file.readline() != file2.readline():
+                    return False
+            return True
+
+
+def compare_grouped_files(group_list, lines=30):
+    """Compares files with corresponding indexes
+    in neighboring groups if the number of files in
+    these groups is the same.
+
+    Returns a list of pairs of matching files.
+    The files in each pair are sorted by
+    modification time in ascending order.
+
+    group_list -- the list of groups of files
+    lines      -- the number of files lines to compare
+    """
+    match_list = []
+    for group_1, group_2 in zip(group_list[0:-2], group_list[1:]):
+        if len(group_1) == len(group_2):
+            for file_1, file_2 in zip(group_1, group_2):
+                if compare_2_files(file_1, file_2, lines=lines):
+                    if os.path.getmtime(file_1) > os.path.getmtime(file_2):
+                        match_list.append([file_2, file_1])
+                    else:
+                        match_list.append([file_1, file_2])
+    return match_list
+
+
+def print_duplicates(group_list, lines=30):
+    """Compares files with corresponding indexes
+    in neighboring groups if the number of files in
+    these groups is the same.
+
+    Prints the information about file duplicates.
+
+    group_list -- the list of groups of files
+    lines      -- the number of files lines to compare
+    """
+    duplicates = compare_grouped_files(group_list, lines=lines)
+    if duplicates:
+        print()
+        print("Warning! Files duplicates are detected.")
+        for pair in duplicates:
+            if os.path.getmtime(pair[0]) != os.path.getmtime(pair[1]):
+                print("File '{}' is a copy of '{}'"
+                      "".format(os.path.basename(pair[1]),
+                                os.path.basename(pair[0])))
+            else:
+                print("Files '{}' and '{}' is the same."
+                      "".format(os.path.basename(pair[0]),
+                                os.path.basename(pair[1])))
+
+
 # ========================================
 # -----    FILES HANDLING     ------------
 # ========================================
@@ -644,7 +709,7 @@ def get_file_list_by_ext(path, ext_list, sort=True):
     Each element of the returned list is a full path to the file
 
     path -- target directory.
-    ext -- the list of file extensions or one extension (str).
+    ext  -- the list of file extensions or one extension (str).
     sort -- by default, the list of results is sorted
             in lexicographical order.
     """
@@ -687,35 +752,6 @@ def add_zeros_to_filename(full_path, count):
     name = prefix + num + postfix
 
     return os.path.join(folder_path, name)
-
-
-def compare_2_files(first_file_name, second_file_name, lines=30):
-    # compare a number of first lines of two files
-    # return True if lines matches exactly
-    with open(first_file_name, 'r') as file:
-        with open(second_file_name, 'r') as file2:
-            for idx in range(lines):
-                if file.readline() != file2.readline():
-                    return False
-            return True
-
-
-def compare_files_in_folder(path, ext=".CSV"):
-    file_list = get_file_list_by_ext(path, ext, sort=True)
-    print("Current PATH = " + path)
-    for idx in range(len(file_list) - 1):
-        if compare_2_files(file_list[idx], file_list[idx + 1]):
-            print(os.path.basename(file_list[idx]) + " == " + os.path.basename(file_list[idx + 1]))
-    print()
-
-
-def compare_files_in_subfolders(path, ext=".CSV"):
-    if os.path.isdir(path):
-        path = os.path.abspath(path)
-        for subpath in get_subdir_list(path):
-            compare_files_in_folder(subpath, ext=ext)
-    else:
-        print("Path " + path + "\n does not exist!")
 
 
 def numbering_parser(group):
@@ -2204,122 +2240,126 @@ if __name__ == "__main__":
                        'time': args.time_unit}
 
         # MAIN LOOP
-        for shot_idx, file_list in enumerate(grouped_files):
-            # get current shot name (number)
-            shot_name = os.path.basename(file_list[0])[number_start:number_end]
-            shot_name = trim_ext(shot_name, args.ext_list)
-            # get SignalsData
-            data = read_signals(file_list, start=args.partial[0],
-                                step=args.partial[1], points=args.partial[2],
-                                labels=args.labels, units=args.units,
-                                time_unit=args.time_unit)
-            if verbose:
-                print("The number of curves = {}".format(data.count))
+        if (args.save or
+                args.plot or
+                args.multiplot or
+                args.offset_by_front):
 
-            # checks multipliers, delays and labels numbers
-            check_coeffs_number(data.count * 2, ["multiplier", "delay"],
-                                args.multiplier, args.delay)
-            check_coeffs_number(data.count, ["label", "unit"],
-                                args.labels, args.units)
-
-            # check y_zero_offset parameters (if idx is out of range)
-            if args.y_auto_zero:
-                check_y_auto_zero_params(data, args.y_auto_zero)
-
-                # updates delays with accordance to Y zero offset
-                args.delay = update_by_y_auto_zero(data, args.y_auto_zero,
-                                                   args.multiplier,
-                                                   args.delay,
-                                                   verbose=True)
-
-            # check offset_by_voltage parameters (if idx is out of range)
-            if args.offset_by_front:
-                # check_offset_by_front(data, args.offset_by_front)
-                check_idx_list(args.offset_by_front[0], data.count - 1,
-                               "--offset-by-curve-front")
-
-                # updates delay values with accordance to voltage front
-                front_plot_name = get_front_plot_name(args.offset_by_front,
-                                                      args.save_to, shot_name)
-                args.delay = update_by_front(data, args.offset_by_front,
-                                             args.multiplier, args.delay,
-                                             front_plot_name,
-                                             interactive=it_offset)
-
-            # reset to zero
-            if args.zero:
-                check_idx_list(args.zero, data.count - 1, "--set-to-zero")
+            for shot_idx, file_list in enumerate(grouped_files):
+                # get current shot name (number)
+                shot_name = os.path.basename(file_list[0])[number_start:number_end]
+                shot_name = trim_ext(shot_name, args.ext_list)
+                # get SignalsData
+                data = read_signals(file_list, start=args.partial[0],
+                                    step=args.partial[1], points=args.partial[2],
+                                    labels=args.labels, units=args.units,
+                                    time_unit=args.time_unit)
                 if verbose:
-                    print("Resetting to zero the values of the curves "
-                          "with index in {}".format(args.zero))
-                data = zero_curves(data, args.zero)
+                    print("The number of curves = {}".format(data.count))
 
-            # multiplier and delay
-            data = multiplier_and_delay(data, args.multiplier, args.delay)
+                # checks multipliers, delays and labels numbers
+                check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+                                    args.multiplier, args.delay)
+                check_coeffs_number(data.count, ["label", "unit"],
+                                    args.labels, args.units)
 
-            # plot preview and save
-            if args.plot:
-                # args.plot = check_plot(args.plot)
-                if args.plot[0] == -1:  # 'all'
-                    args.plot = list(range(0, data.count))
-                else:
-                    check_plot_param(args.plot, data.count, '--plot')
-                for curve_idx in args.plot:
-                    plot_multiple_curve(data.curves[curve_idx])
-                    if args.plot_dir is not None:
-                        plot_name = ("{shot}_curve_{idx}_{label}.plot.png"
-                                     "".format(shot=shot_name, idx=curve_idx,
-                                               label=data.curves[curve_idx].label))
-                        plot_path = os.path.join(args.plot_dir, plot_name)
-                        plt.savefig(plot_path, dpi=400)
-                        if verbose:
-                            print("Plot is saved as {}".format(plot_path))
-                    if not args.p_hide:
-                        plt.show()
+                # check y_zero_offset parameters (if idx is out of range)
+                if args.y_auto_zero:
+                    check_y_auto_zero_params(data, args.y_auto_zero)
+
+                    # updates delays with accordance to Y zero offset
+                    args.delay = update_by_y_auto_zero(data, args.y_auto_zero,
+                                                       args.multiplier,
+                                                       args.delay,
+                                                       verbose=True)
+
+                # check offset_by_voltage parameters (if idx is out of range)
+                if args.offset_by_front:
+                    # check_offset_by_front(data, args.offset_by_front)
+                    check_idx_list(args.offset_by_front[0], data.count - 1,
+                                   "--offset-by-curve-front")
+
+                    # updates delay values with accordance to voltage front
+                    front_plot_name = get_front_plot_name(args.offset_by_front,
+                                                          args.save_to, shot_name)
+                    args.delay = update_by_front(data, args.offset_by_front,
+                                                 args.multiplier, args.delay,
+                                                 front_plot_name,
+                                                 interactive=it_offset)
+
+                # reset to zero
+                if args.zero:
+                    check_idx_list(args.zero, data.count - 1, "--set-to-zero")
+                    if verbose:
+                        print("Resetting to zero the values of the curves "
+                              "with index in {}".format(args.zero))
+                    data = zero_curves(data, args.zero)
+
+                # multiplier and delay
+                data = multiplier_and_delay(data, args.multiplier, args.delay)
+
+                # plot preview and save
+                if args.plot:
+                    # args.plot = check_plot(args.plot)
+                    if args.plot[0] == -1:  # 'all'
+                        args.plot = list(range(0, data.count))
                     else:
-                        plt.show(block=False)
-                    plt.close('all')
+                        check_plot_param(args.plot, data.count, '--plot')
+                    for curve_idx in args.plot:
+                        plot_multiple_curve(data.curves[curve_idx])
+                        if args.plot_dir is not None:
+                            plot_name = ("{shot}_curve_{idx}_{label}.plot.png"
+                                         "".format(shot=shot_name, idx=curve_idx,
+                                                   label=data.curves[curve_idx].label))
+                            plot_path = os.path.join(args.plot_dir, plot_name)
+                            plt.savefig(plot_path, dpi=400)
+                            if verbose:
+                                print("Plot is saved as {}".format(plot_path))
+                        if not args.p_hide:
+                            plt.show()
+                        else:
+                            plt.show(block=False)
+                        plt.close('all')
 
-            # plot and save multi-plots
-            if args.multiplot:
-                for curve_list in args.multiplot:
-                    check_plot_param(curve_list, data.count, '--multiplot')
-                for curve_list in args.multiplot:
-                    plot_multiplot(data, None, curve_list)
-                    if args.multiplot_dir is not None:
-                        idx_list = "_".join(str(i) for i in sorted(curve_list))
-                        mplot_name = ("{shot}_curves_{idx_list}.multiplot.png"
-                                      "".format(shot=shot_name,
-                                                idx_list=idx_list))
-                        mplot_path = os.path.join(args.multiplot_dir, mplot_name)
-                        plt.savefig(mplot_path, dpi=400)
-                        if verbose:
-                            print("Multiplot is saved {}".format(mplot_path))
-                    if not args.mp_hide:
-                        plt.show()
-                    else:
-                        plt.show(block=False)
-                    plt.close('all')
+                # plot and save multi-plots
+                if args.multiplot:
+                    for curve_list in args.multiplot:
+                        check_plot_param(curve_list, data.count, '--multiplot')
+                    for curve_list in args.multiplot:
+                        plot_multiplot(data, None, curve_list)
+                        if args.multiplot_dir is not None:
+                            idx_list = "_".join(str(i) for i in sorted(curve_list))
+                            mplot_name = ("{shot}_curves_{idx_list}.multiplot.png"
+                                          "".format(shot=shot_name,
+                                                    idx_list=idx_list))
+                            mplot_path = os.path.join(args.multiplot_dir, mplot_name)
+                            plt.savefig(mplot_path, dpi=400)
+                            if verbose:
+                                print("Multiplot is saved {}".format(mplot_path))
+                        if not args.mp_hide:
+                            plt.show()
+                        else:
+                            plt.show(block=False)
+                        plt.close('all')
 
-            # save data
-            if args.save:
-                file_name = ("{pref}{number}{postf}.csv"
-                             "".format(pref=args.prefix, number=shot_name,
-                                       postf=args.postfix))
-                file_path = os.path.join(args.save_to, file_name)
-                save_signals_csv(file_path, data)
-                if verbose:
-                    max_rows = max(curve.data.shape[0] for curve in
-                                   data.curves.values())
-                    print("Curves count = {}\n"
-                          "Rows count = {} ".format(data.count, max_rows))
-                    print("Saved as {}".format(file_path))
+                # save data
+                if args.save:
+                    file_name = ("{pref}{number}{postf}.csv"
+                                 "".format(pref=args.prefix, number=shot_name,
+                                           postf=args.postfix))
+                    file_path = os.path.join(args.save_to, file_name)
+                    save_signals_csv(file_path, data)
+                    if verbose:
+                        max_rows = max(curve.data.shape[0] for curve in
+                                       data.curves.values())
+                        print("Curves count = {}\n"
+                              "Rows count = {} ".format(data.count, max_rows))
+                        print("Saved as {}".format(file_path))
+        print_duplicates(grouped_files, 30)
     except Exception as e:
         print()
         sys.exit(e)
     # =========================================================================
-
-    # TODO: file duplicates check
     # TODO: add log file with multipliers/delays applied to data saved to CSV
     # TODO: comments
     # TODO: description
