@@ -6,6 +6,7 @@ import os
 import colorsys
 import sys
 import math
+import datetime
 
 import numpy as np
 from scipy.signal import savgol_filter
@@ -843,7 +844,7 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
                  "data files. See help for more details.")
     file_list = get_file_list_by_ext(dir, ext_list, sort=True)
     assert len(file_list) % group_size == 0, \
-        ("The number of .csv files ({}) in the specified folder "
+        ("The number of data files ({}) in the specified folder "
          "is not a multiple of group size ({})."
          "".format(len(file_list), group_size))
     grouped_files = []
@@ -1169,6 +1170,60 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
             s = re.sub(r'nan', '', s)
             lines.append(s)
         fid.writelines(lines)
+
+
+def save_m_log(src, save_as, labels, multiplier=None, delays=None,
+               offset_by_front=None, y_auto_offset=None):
+    now = datetime.datetime.now().strftime("%Y.%m.%d %H:%M:%S")
+    lines = list()
+    lines.append("Modified on {}\n".format(now))
+    src_line = "Source files = {}\n".format(str(src))
+    src_line = re.sub(r"\\\\", "\*", src_line)
+    src_line = re.sub(r"\*", "", src_line)
+
+    lines.append(src_line)
+    lines.append("\n")
+    if multiplier:
+        lines.append("Applied multipliers:\n")
+        lines.append("    Time         Amplitude\n")
+        for pair in zip(multiplier[0:-1:2], multiplier[1:-1:2]):
+            lines.append("{: <15.5e} {:.5e}\n".format(*pair))
+        lines.append("\n")
+    if delays:
+        lines.append("Applied delays:\n")
+        lines.append("Time            Amplitude\n")
+        for pair in zip(delays[0:-1:2], delays[1:-1:2]):
+            lines.append("{: <15.5e} {:.5e}\n".format(*pair))
+        lines.append("\n")
+    if offset_by_front:
+        lines.append("Delays was modified by --offset-by-curve-front "
+                     "option with values:\n")
+        lines.append("Curve idx = {}\n".format(offset_by_front[0]))
+        lines.append("Level     = {}\n".format(offset_by_front[1]))
+        lines.append("Smooth filter window = {}\n"
+                     "".format(offset_by_front[2]))
+        lines.append("Smooth filter polyorder = {}\n"
+                     "".format(offset_by_front[3]))
+        lines.append("\n")
+    if y_auto_offset:
+        lines.append("Delays was modified by --y-auto-zero "
+                     "option with values:\n")
+        for args in y_auto_offset:
+            lines.append("Curve idx = {}     ({})\n"
+                         "".format(args[0], labels[args[0]]))
+            lines.append("Background start time = {}\n".format(args[1]))
+            lines.append("Background stop time  = {}\n".format(args[2]))
+            lines.append("\n")
+    if len(lines) > 3:
+        lines.append("----------------------------------------------------\n")
+        if src == save_as and os.path.isfile(save_as + ".log"):
+            mode = "a"
+        else:
+            mode = "w"
+        with open(save_as + ".log", mode) as f:
+            f.writelines(lines)
+    # TODO: add from file
+    # TODO: check if file is resaveing
 
 
 # ========================================
@@ -2254,6 +2309,7 @@ if __name__ == "__main__":
                                     step=args.partial[1], points=args.partial[2],
                                     labels=args.labels, units=args.units,
                                     time_unit=args.time_unit)
+                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                 if verbose:
                     print("The number of curves = {}".format(data.count))
 
@@ -2344,17 +2400,21 @@ if __name__ == "__main__":
 
                 # save data
                 if args.save:
-                    file_name = ("{pref}{number}{postf}.csv"
+                    save_name = ("{pref}{number}{postf}.csv"
                                  "".format(pref=args.prefix, number=shot_name,
                                            postf=args.postfix))
-                    file_path = os.path.join(args.save_to, file_name)
-                    save_signals_csv(file_path, data)
+                    save_path = os.path.join(args.save_to, save_name)
+                    save_signals_csv(save_path, data)
                     if verbose:
                         max_rows = max(curve.data.shape[0] for curve in
                                        data.curves.values())
                         print("Curves count = {}\n"
                               "Rows count = {} ".format(data.count, max_rows))
-                        print("Saved as {}".format(file_path))
+                        print("Saved as {}".format(save_path))
+                    save_m_log(file_list, save_path, labels, args.multiplier,
+                               args.delay, args.offset_by_front,
+                               args.y_auto_zero)
+
         print_duplicates(grouped_files, 30)
     except Exception as e:
         print()
