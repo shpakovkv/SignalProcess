@@ -1173,7 +1173,7 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
 
 
 def save_m_log(src, save_as, labels, multiplier=None, delays=None,
-               offset_by_front=None, y_auto_offset=None):
+               offset_by_front=None, y_auto_offset=None, partial_params=None):
     """Saves log file describing the changes made to the data.
 
     If the log file exists and any new changes were made to the data and
@@ -1195,7 +1195,18 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
     src_line = re.sub(r"\*", "", src_line)
 
     lines.append(src_line)
+    if not partial_params:
+        partial_str = "start = 0, step = 1, points = all"
+    else:
+        partial_str = ("start = {}, stop = {}, points = "
+                       "".format(partial_params[0], partial_params[1]))
+        if partial_params[2] == -1:
+            partial_str += "all"
+        else:
+            partial_str += str(partial_params[2])
+    lines.append("Partial import: " + partial_str + "\n")
     lines.append("\n")
+
     if multiplier:
         lines.append("Applied multipliers:\n")
         lines.append("    Time         Amplitude\n")
@@ -1237,7 +1248,7 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
     else:
         mode = "w"
     # save log file if changes were made or data was saved as a new file
-    if len(lines) > 6 or src != save_as:
+    if len(lines) > 7 or src != save_as:
         with open(save_as + ".log", mode) as f:
             f.writelines(lines)
 
@@ -1955,9 +1966,12 @@ def plot_multiple_curve(curve_list, peaks=None,
 # ======================================================
 if __name__ == "__main__":
     import argparse
+    prog_discr = ("")
 
-    parser = argparse.ArgumentParser(prog='Process Signals',
-                                     description='', epilog='',
+    prog_epilog = ("")
+
+    parser = argparse.ArgumentParser(prog='python SignalProcess.py',
+                                     description=prog_discr, epilog=prog_epilog,
                                      fromfile_prefix_chars='@')
 
     # input files ------------------------------------------------------------
@@ -1967,7 +1981,7 @@ if __name__ == "__main__":
                         dest='src_dir',
                         default='',
                         help='sets the directory containing data files '
-                             '(default=current folder).'
+                             '(default: current folder).'
                         )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-f', '--input-files',
@@ -1996,8 +2010,7 @@ if __name__ == "__main__":
                         nargs='+',
                         dest='labels',
                         help='specify the labels for all the curves '
-                             'in the data files. Latin letters, numbers and '
-                             'underscore are allowed only.\n'
+                             'in the data files.\n'
                              'Using of non latin letters and special '
                              'characters are allowed but may cause '
                              'an error.'
@@ -2007,14 +2020,15 @@ if __name__ == "__main__":
                         metavar='UNIT',
                         nargs='+',
                         dest='units',
-                        help='specify the units for all the curves '
+                        help='specify the units for each of the curves '
                              'in the data files.'
                         )
     parser.add_argument('--time-unit',
                         action='store',
                         metavar='UNIT',
                         dest='time_unit',
-                        help='specify the unit for time scale.'
+                        help='specify the unit for time scale '
+                             '(uniform for all curves).'
                         )
     parser.add_argument('-g', '--grouped-by',
                         action='store',
@@ -2025,7 +2039,8 @@ if __name__ == "__main__":
                         help='sets the size of the groups (default=1). '
                              'A group is a set of files, corresponding '
                              'to one shot. \nNOTE: if \'-g\' parameter'
-                             'is specified, then all the files in the '
+                             'is specified, then all the files '
+                             '(with specified extensions) in the '
                              'specified directory will be processed.'
                         )
     parser.add_argument('-c', '--ch', '--sorted-by-channel',
@@ -2047,11 +2062,14 @@ if __name__ == "__main__":
                         metavar=('START', 'STEP', 'COUNT'),
                         nargs=3,
                         dest='partial',
-                        help='Specify the index of the data point (lines '
-                             'in the file) with which you need to start '
-                             'the import, the reading step, and the number '
-                             'of points that you want to import (to read '
-                             'to the end of the file, specify -1).'
+                        help='Specify START STEP COUNT after the flag. \n'
+                             'START: the index of the data point '
+                             'with which you need to start '
+                             'the import,\n'
+                             'STEP: the reading step, \n'
+                             'COUNT: the number of points that '
+                             'you want to import (-1 means '
+                             'till the end of the file).'
                         )
 
     # process parameters and options -----------------------------------------
@@ -2059,8 +2077,8 @@ if __name__ == "__main__":
                         action='store',
                         dest='silent',
                         help='enables the silent mode, in which only '
-                             'error messages and input prompts '
-                             'are displayed.')
+                             'most important messages are displayed.'
+                        )
     parser.add_argument('--multiplier',
                         action='store',
                         type=float,
@@ -2070,8 +2088,8 @@ if __name__ == "__main__":
                         default=None,
                         help='the list of multipliers for each data columns.'
                              '\nNOTE: you must enter values for all the '
-                             'columns in data file(s). Two columns (X and Y) '
-                             'are expected for each curve.'
+                             'columns in data file(s). Each curve have two columns:'
+                             'filled with X and Y values correspondingly.'
                         )
     parser.add_argument('--delay',
                         action='store',
@@ -2083,7 +2101,7 @@ if __name__ == "__main__":
                         help='the list of delays (subtrahend) for each data '
                              'columns.\n'
                              'NOTE: the data is first multiplied by '
-                             'a multiplier and then the delay '
+                             'a corresponding multiplier and then the delay '
                              'is subtracted from them.'
                         )
     parser.add_argument('--offset-by-curve-front',
@@ -2100,13 +2118,14 @@ if __name__ == "__main__":
                         nargs=3,
                         dest='y_auto_zero',
                         help='auto zero level correction for curve. '
-                             'Specify curve_idx, bg_start, bg_stop '
-                             'for the curve whose zero level you want '
-                             'to offset.\n'
-                             'Where curve_idx is the zero-based index '
-                             'of the curve; and the time interval '
-                             '[bg_start: bg_stop] does not contain signals '
-                             'or random bursts (background interval).\n'
+                             'Specify CURVE_IDX, BG_START, BG_STOP '
+                             'after the flag. \n'
+                             'CURVE_IDX: the zero-based index '
+                             'of the curve; \n'
+                             'BG_START and BG_STOP are the left and '
+                             'the right bound of the time interval '
+                             'at which the curve does not contain signals '
+                             '(background interval).\n'
                              'You can specify as many --y-auto-zero '
                              'parameters as you want.'
                         )
@@ -2429,7 +2448,7 @@ if __name__ == "__main__":
                         print("Saved as {}".format(save_path))
                     save_m_log(file_list, save_path, labels, args.multiplier,
                                args.delay, args.offset_by_front,
-                               args.y_auto_zero)
+                               args.y_auto_zero, args.partial)
 
         print_duplicates(grouped_files, 30)
     except Exception as e:
