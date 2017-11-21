@@ -1985,7 +1985,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-d', '--scr', '--source-dir',
         action='store',
-        metavar='SOURCE_DIR',
+        metavar='DIR',
         dest='src_dir',
         default='',
         help='specify the directory containing data files.\n'
@@ -1997,7 +1997,7 @@ if __name__ == "__main__":
         '-f', '--input-files',
         action='append',
         nargs='+',
-        metavar='INPUT_FILES',
+        metavar='FILE',
         dest='files',
         help='specify one or more (space separated) input file names \n'
              'after the flag. It is assumed that the files belong to \n'
@@ -2048,7 +2048,7 @@ if __name__ == "__main__":
         '-g', '--grouped-by',
         action='store',
         type=int,
-        metavar='GROUPED_BY',
+        metavar='NUMBER',
         dest='group_size',
         default=1,
         help='specify the size of the files groups. Default=1. \n'
@@ -2088,7 +2088,7 @@ if __name__ == "__main__":
     # process parameters and options -----------------------------------------
     parser.add_argument(
         '--silent',
-        action='store',
+        action='store_true',
         dest='silent',
         help='enables the silent mode, in which only most important\n'
              'messages are displayed.\n\n')
@@ -2142,8 +2142,8 @@ if __name__ == "__main__":
              'To improve accuracy, the signal is smoothed by \n'
              'the savgol filter.\n\n'
              'NOTE: you can enter only two parameters (IDX LEVEL),\n'
-             '      then the interactive mode of filter parameters\n'
-             '      selection will start.\n\n')
+             '      then the interactive mode of the smooth filter\n'
+             '      parameters selection will start.\n\n')
 
     parser.add_argument(
         '--y-auto-zero',
@@ -2157,7 +2157,7 @@ if __name__ == "__main__":
              'of the time interval at which the curve does not\n'
              'contain signals (background interval).\n'
              'You can use as many --y-auto-zero flags\n'
-             'as you want.\n\n')
+             'as you want (one flag for one curve).\n\n')
 
     parser.add_argument(
         '--set-to-zero',
@@ -2180,12 +2180,12 @@ if __name__ == "__main__":
              'have been applied.\n'
              'NOTE: if one shot corresponds to one CSV file, and\n'
              '      the output directory is not specified, the input\n'
-             '      files will be overwritten!\n\n')
+             '      files will be overwritten.\n\n')
 
     parser.add_argument(
         '-t', '--save-to', '--target-dir',
         action='store',
-        metavar='SAVE_TO',
+        metavar='DIR',
         dest='save_to',
         default='',
         help='specify the output directory.\n\n')
@@ -2193,7 +2193,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--prefix',
         action='store',
-        metavar='FILE_PREFIX',
+        metavar='PREFIX',
         dest='prefix',
         default='',
         help='specify the file name prefix. This prefix will be added\n'
@@ -2204,7 +2204,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--postfix',
         action='store',
-        metavar='FILE_POSTFIX',
+        metavar='POSTFIX',
         dest='postfix',
         default='',
         help='specify the file name postfix. This postfix will be\n'
@@ -2213,23 +2213,23 @@ if __name__ == "__main__":
              'Default=\'\'.\n\n')
 
     parser.add_argument(
-        '-o', '--output-files',
+        '-o', '--output',
         action='store',
         nargs='+',
-        metavar='OUTPUT_FILES',
+        metavar='FILE',
         dest='out_names',
         help='specify the list of file names after the flag.\n'
              'The output files with data will be save with the names\n'
              'from this list. This will override the automatic\n'
              'generation of file names.\n'
-             'NOTE: you must enter file names for '
+             'NOTE: you must enter file names for \n'
              '      all the input shots.\n\n')
 
     parser.add_argument(
         '-p', '--plot',
         action='store',
         nargs='+',
-        metavar='CURVE',
+        metavar='CURVE_IDX',
         dest='plot',
         help='specify the indexes of the curves you want to plot\n'
              'or enter \'all\' (without quotes) to plot all the\n'
@@ -2261,6 +2261,7 @@ if __name__ == "__main__":
         '-m', '--multiplot',
         action='append',
         dest='multiplot',
+        metavar='CURVE_IDX',
         nargs='+',
         help='specify the indexes of the curves you want to plot\n'
              'at one graph (one curve under the other with uniform\n'
