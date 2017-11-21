@@ -16,8 +16,12 @@ import wfm_reader_lite as wfm
 import PeakProcess as pp
 
 verbose = True
+global_log = ""
 
 
+# ========================================
+# -----     CLASSES     ------------------
+# ========================================
 class ColorRange:
     """Color code iterator. Generates contrast colors.
     Returns the hexadecimal RGB color code (for example '#ffaa00')
@@ -322,7 +326,7 @@ class SignalsData:
 # -----     CHECKERS     -----------------
 # ========================================
 def check_partial_args(args):
-    """Partial import args validator.
+    """The validator of partial import args.
 
     Returns converted args.
 
@@ -1174,7 +1178,8 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
 
 def save_m_log(src, save_as, labels, multiplier=None, delays=None,
                offset_by_front=None, y_auto_offset=None, partial_params=None):
-    """Saves log file describing the changes made to the data.
+    """Save modifications log. 
+    Saves log file describing the changes made to the data.
 
     If the log file exists and any new changes were made to the data and
     saved at the same data file, appends new lines to the log file.
@@ -1257,9 +1262,10 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
 # -----    WORKFLOW     ------------------
 # ========================================
 def add_to_log(s, print_to_console=True):
+    global global_log
+    global_log += s
     if print_to_console:
         print(s, end="")
-    return s
 
 
 def multiplier_and_delay(data, multiplier, delay):
@@ -1972,275 +1978,313 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(prog='python SignalProcess.py',
                                      description=prog_discr, epilog=prog_epilog,
-                                     fromfile_prefix_chars='@')
+                                     fromfile_prefix_chars='@',
+                                     formatter_class=argparse.RawTextHelpFormatter)
 
     # input files ------------------------------------------------------------
-    parser.add_argument('-d', '--scr', '--source-dir',
-                        action='store',
-                        metavar='SOURCE_DIR',
-                        dest='src_dir',
-                        default='',
-                        help='sets the directory containing data files '
-                             '(default: current folder).'
-                        )
+    parser.add_argument(
+        '-d', '--scr', '--source-dir',
+        action='store',
+        metavar='SOURCE_DIR',
+        dest='src_dir',
+        default='',
+        help='specify the directory containing data files.\n'
+             'Default= the folder containing this code.\n\n')
+
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-f', '--input-files',
-                       action='append',
-                       nargs='+',
-                       metavar='INPUT_FILES',
-                       dest='files',
-                       help='specify one or more (space separated) input '
-                            'file names after the flag. '
-                            'It is assumed that the files belong '
-                            'to the same shot. '
-                            'In order to process multiple shots enter '
-                            'multiple \'-i\' parameters. '
-                       )
-    group.add_argument('-e', '--ext', '--extension',
-                       action='store',
-                       nargs='+',
-                       metavar='EXT',
-                       dest='ext_list',
-                       help='specify one or more (space separated) '
-                            'extensions of the files with data.'
-                       )
-    parser.add_argument('--labels',
-                        action='store',
-                        metavar='LABEL',
-                        nargs='+',
-                        dest='labels',
-                        help='specify the labels for all the curves '
-                             'in the data files.\n'
-                             'Using of non latin letters and special '
-                             'characters are allowed but may cause '
-                             'an error.'
-                        )
-    parser.add_argument('--units',
-                        action='store',
-                        metavar='UNIT',
-                        nargs='+',
-                        dest='units',
-                        help='specify the units for each of the curves '
-                             'in the data files.'
-                        )
-    parser.add_argument('--time-unit',
-                        action='store',
-                        metavar='UNIT',
-                        dest='time_unit',
-                        help='specify the unit for time scale '
-                             '(uniform for all curves).'
-                        )
-    parser.add_argument('-g', '--grouped-by',
-                        action='store',
-                        type=int,
-                        metavar='GROUPED_BY',
-                        dest='group_size',
-                        default=1,
-                        help='sets the size of the groups (default=1). '
-                             'A group is a set of files, corresponding '
-                             'to one shot. \nNOTE: if \'-g\' parameter'
-                             'is specified, then all the files '
-                             '(with specified extensions) in the '
-                             'specified directory will be processed.'
-                        )
-    parser.add_argument('-c', '--ch', '--sorted-by-channel',
-                        action='store_true',
-                        dest='sorted_by_ch',
-                        help='this options tells the program that the files '
-                             'are sorted by the oscilloscope/channel '
-                             '(firstly) and by the shot number (secondly). '
-                             'By default, the program considers that the '
-                             'files are sorted by the shot number (firstly) '
-                             'and by the oscilloscope/channel (secondly).\n'
-                             'ATTENTION: files from all oscilloscopes must '
-                             'be in the same folder and be sorted '
-                             'in one style.'
-                        )
-    parser.add_argument('--partial-import',
-                        action='store',
-                        type=int,
-                        metavar=('START', 'STEP', 'COUNT'),
-                        nargs=3,
-                        dest='partial',
-                        help='Specify START STEP COUNT after the flag. \n'
-                             'START: the index of the data point '
-                             'with which you need to start '
-                             'the import,\n'
-                             'STEP: the reading step, \n'
-                             'COUNT: the number of points that '
-                             'you want to import (-1 means '
-                             'till the end of the file).'
-                        )
+
+    group.add_argument(
+        '-f', '--input-files',
+        action='append',
+        nargs='+',
+        metavar='INPUT_FILES',
+        dest='files',
+        help='specify one or more (space separated) input file names \n'
+             'after the flag. It is assumed that the files belong to \n'
+             'the same shot. In order to process multiple shots enter\n'
+             'multiple \'-f\' parameters.\n\n')
+
+    group.add_argument(
+        '-e', '--ext', '--extension',
+        action='store',
+        nargs='+',
+        metavar='EXT',
+        dest='ext_list',
+        help='specify one or more (space separated) extensions of \n'
+             'the files with data.\n\n')
+
+    parser.add_argument(
+        '--labels',
+        action='store',
+        metavar='LABEL',
+        nargs='+',
+        dest='labels',
+        help='specify the labels for all the curves in the data \n'
+             'files. It is recommended to use only Latin letters, \n'
+             'numbers, dashes and underscores, any other symbols\n'
+             'will be replaced with underscores.\n'
+             'Needed for correct graph labels.\n\n')
+
+    parser.add_argument(
+        '--units',
+        action='store',
+        metavar='UNIT',
+        nargs='+',
+        dest='units',
+        help='specify the units for each of the curves in the \n'
+             'data files. Do not forget to take into account the \n'
+             'influence of the corresponding multiplier value.\n'
+             'Needed for correct graph labels.\n\n')
+
+    parser.add_argument(
+        '--time-unit',
+        action='store',
+        metavar='UNIT',
+        dest='time_unit',
+        help='specify the unit of time scale (uniform for all \n'
+             'curves). Needed for correct graph labels.\n\n')
+
+    parser.add_argument(
+        '-g', '--grouped-by',
+        action='store',
+        type=int,
+        metavar='GROUPED_BY',
+        dest='group_size',
+        default=1,
+        help='specify the size of the files groups. Default=1. \n'
+             'A group is a set of files, corresponding to one shot. \n'
+             'For correct import all shots in folder must consist of\n'
+             'the same number of files.\n'
+             'NOTE: if \'-g\' parameter is specified, then all the \n'
+             '      files (with specified extensions via -e flag) in\n'
+             '      the specified directory will be processed.\n\n')
+
+    parser.add_argument(
+        '-c', '--ch', '--sorted-by-channel',
+        action='store_true',
+        dest='sorted_by_ch',
+        help='this options tells the program that the files are \n'
+             'sorted by the oscilloscope/channel firstly and secondly\n'
+             'by the shot number. By default, the program considers \n'
+             'that the files are sorted by the shot number firstly\n'
+             'and secondly by the oscilloscope/channel.\n\n'
+             'ATTENTION: files from all oscilloscopes must be in the\n'
+             'same folder and be sorted in one style.\n\n')
+
+    parser.add_argument(
+        '--partial-import',
+        action='store',
+        type=int,
+        metavar=('START', 'STEP', 'COUNT'),
+        nargs=3,
+        dest='partial',
+        help='Specify START STEP COUNT after the flag. \n'
+             'START: the index of the data point with which you want\n'
+             'to start the import of data points,\n'
+             'STEP: the reading step, \n'
+             'COUNT: the number of points that you want to import \n'
+             '(-1 means till the end of the file).\n\n')
 
     # process parameters and options -----------------------------------------
-    parser.add_argument('--silent',
-                        action='store',
-                        dest='silent',
-                        help='enables the silent mode, in which only '
-                             'most important messages are displayed.'
-                        )
-    parser.add_argument('--multiplier',
-                        action='store',
-                        type=float,
-                        metavar='MULT',
-                        nargs='+',
-                        dest='multiplier',
-                        default=None,
-                        help='the list of multipliers for each data columns.'
-                             '\nNOTE: you must enter values for all the '
-                             'columns in data file(s). Each curve have two columns:'
-                             'filled with X and Y values correspondingly.'
-                        )
-    parser.add_argument('--delay',
-                        action='store',
-                        type=float,
-                        metavar='DELAY',
-                        nargs='+',
-                        dest='delay',
-                        default=None,
-                        help='the list of delays (subtrahend) for each data '
-                             'columns.\n'
-                             'NOTE: the data is first multiplied by '
-                             'a corresponding multiplier and then the delay '
-                             'is subtracted from them.'
-                        )
-    parser.add_argument('--offset-by-curve-front',
-                        action='store',
-                        metavar='VAL',
-                        nargs='+',
-                        dest='offset_by_front',
-                        default=None,
-                        help=''
-                        )
-    parser.add_argument('--y-auto-zero',
-                        action='append',
-                        metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
-                        nargs=3,
-                        dest='y_auto_zero',
-                        help='auto zero level correction for curve. '
-                             'Specify CURVE_IDX, BG_START, BG_STOP '
-                             'after the flag. \n'
-                             'CURVE_IDX: the zero-based index '
-                             'of the curve; \n'
-                             'BG_START and BG_STOP are the left and '
-                             'the right bound of the time interval '
-                             'at which the curve does not contain signals '
-                             '(background interval).\n'
-                             'You can specify as many --y-auto-zero '
-                             'parameters as you want.'
-                        )
-    parser.add_argument('--set-to-zero',
-                        action='store',
-                        metavar='CURVE_IDX',
-                        nargs='+',
-                        dest='zero',
-                        default=None,
-                        help='Specify the indexes of the fake curves, '
-                             'whose values you want to set to zero.\n'
-                             'Enter \'all\' (without the quotes) to set '
-                             'all curve values to zero.'
-                        )
+    parser.add_argument(
+        '--silent',
+        action='store',
+        dest='silent',
+        help='enables the silent mode, in which only most important\n'
+             'messages are displayed.\n\n')
+
+    parser.add_argument(
+        '--multiplier',
+        action='store',
+        type=float,
+        metavar='MULT',
+        nargs='+',
+        dest='multiplier',
+        default=None,
+        help='the list of multipliers for each data columns.\n'
+             'NOTE: you must enter values for all the columns in\n'
+             '      data file(s). Each curve have two columns: \n'
+             '      filled with X and Y values correspondingly.\n\n')
+
+    parser.add_argument(
+        '--delay',
+        action='store',
+        type=float,
+        metavar='DELAY',
+        nargs='+',
+        dest='delay',
+        default=None,
+        help='the list of delays (subtrahend) for each data columns.\n'
+             'NOTE: the data is first multiplied by a corresponding \n'
+             '      multiplier and then the delay is subtracted \n'
+             '      from them.\n\n')
+
+    parser.add_argument(
+        '--offset-by-curve-front',
+        action='store',
+        metavar='VAL',
+        nargs='+',
+        dest='offset_by_front',
+        default=None,
+        help='Enter: IDX LEVEL WINDOW ORDER, where:\n'
+             'IDX    - the index of the curve\n'
+             'LEVEL  - the amplitude level\n'
+             'WINDOW - length of the filter window (must be an odd \n'
+             '         integer greater than 4)\n'
+             'ORDER  - the order of the polinomial used to fit the\n'
+             '         samples (must be less than window length)\n\n'
+             'Description:\n'
+             '1. Finds the most left front point where the curve\n'
+             'amplitude is greater (lower - for negative peak) than\n'
+             'level value.\n'
+             '2. Makes this point the origin of the time axis for\n'
+             'all signals (changes the list of the delays).\n\n'
+             'To improve accuracy, the signal is smoothed by \n'
+             'the savgol filter.\n\n'
+             'NOTE: you can enter only two parameters (IDX LEVEL),\n'
+             '      then the interactive mode of filter parameters\n'
+             '      selection will start.\n\n')
+
+    parser.add_argument(
+        '--y-auto-zero',
+        action='append',
+        metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
+        nargs=3,
+        dest='y_auto_zero',
+        help='auto zero level correction of the specified curve.\n'
+             'CURVE_IDX is the zero-based index of the curve; \n'
+             'BG_START and BG_STOP are the left and the right bound\n'
+             'of the time interval at which the curve does not\n'
+             'contain signals (background interval).\n'
+             'You can use as many --y-auto-zero flags\n'
+             'as you want.\n\n')
+
+    parser.add_argument(
+        '--set-to-zero',
+        action='store',
+        metavar='CURVE_IDX',
+        nargs='+',
+        dest='zero',
+        default=None,
+        help='specify the indexes of the fake curves, whose values\n'
+             'you want to set to zero.\n'
+             'Enter \'all\' (without the quotes) to set all curves\n'
+             'values to zero.\n\n')
+
     # output settings --------------------------------------------------------
-    parser.add_argument('-s', '--save',
-                        action='store_true',
-                        dest='save',
-                        help='saves data files.\n'
-                             'NOTE: If in the input data one '
-                             'shot corresponds to one file and output '
-                             'directory is not specified, input files '
-                             'will be overwritten!'
-                        )
-    parser.add_argument('-t', '--save-to', '--target-dir',
-                        action='store',
-                        metavar='SAVE_TO',
-                        dest='save_to',
-                        default='',
-                        help='specify the output directory after the flag.'
-                        )
-    parser.add_argument('--prefix',
-                        action='store',
-                        metavar='FILE_PREFIX',
-                        dest='prefix',
-                        default='',
-                        help='specify the prefix after the flag. This prefix '
-                             'will be added to the output file names during '
-                             'the automatic generation of file names. '
-                             'Default=\'\'.'
-                        )
-    parser.add_argument('--postfix',
-                        action='store',
-                        metavar='FILE_POSTFIX',
-                        dest='postfix',
-                        default='',
-                        help='specify the postfix after the flag. This '
-                             'postfix will be added to the output file '
-                             'names during the automatic generation '
-                             'of file names. '
-                             'Default=\'\'.'
-                        )
-    parser.add_argument('-o', '--output-files',
-                        action='store',
-                        nargs='*',
-                        metavar='OUTPUT_FILES',
-                        dest='out_names',
-                        help='specify the list of file names after the flag. '
-                             'The output files with data will be save with '
-                             'the names from this list. '
-                             'This will override the automatic generation '
-                             'of file names.'
-                        )
-    parser.add_argument('-p', '--plot',
-                        action='store',
-                        nargs='+',
-                        metavar='CURVE',
-                        dest='plot',
-                        help='specify the indexes of curves to be plotted '
-                             '(or \'all\' to plot all the curves). Each '
-                             'curve from this list will be plotted '
-                             'separately.\nYou can specify --p-save for '
-                             'saveing them as .png files.'
-                        )
-    parser.add_argument('--p-save', '--save-plots-to',
-                        action='store',
-                        dest='plot_dir',
-                        metavar='PLOT_DIR',
-                        help='specify the directory after the flag. Each '
-                             'curve from the --plot list will be plotted '
-                             'and saved separately as .png file.'
-                        )
-    parser.add_argument('-m', '--multiplot',
-                        action='append',
-                        dest='multiplot',
-                        nargs='+',
-                        help='specify the indexes of curves to be plotted '
-                             'as subplots one under the other. You may use '
-                             'as many \'-m\' flags (with different lists '
-                             'of curves) as you want.'
-                        )
-    parser.add_argument('--mp-save', '--save-multiplot-as',
-                        action='store',
-                        dest='multiplot_dir',
-                        metavar='MULTIPLOT_DIR',
-                        help='specify the directory after the flag. The '
-                             'subplots will be saved as .png file for all '
-                             'the --multiplot lists.'
-                        )
-    parser.add_argument('--mp-hide', '--multiplot-hide',
-                        action='store_true',
-                        dest='mp_hide',
-                        help='if the flag is specified the multiplots '
-                             'will be saved (if the \'--mp-save\' flag was '
-                             'specified as well) but not shown. This '
-                             'option can reduce the runtime of the program.'
-                        )
-    parser.add_argument('--p-hide', '--plot-hide',
-                        action='store_true',
-                        dest='p_hide',
-                        help='if the flag is specified the plots '
-                             'will be saved (if the \'--p-save\' flag was '
-                             'specified as well) but not shown. This '
-                             'option can reduce the runtime of the program.'
-                        )
+    parser.add_argument(
+        '-s', '--save',
+        action='store_true',
+        dest='save',
+        help='saves the shot data to a CSV file after all the changes\n'
+             'have been applied.\n'
+             'NOTE: if one shot corresponds to one CSV file, and\n'
+             '      the output directory is not specified, the input\n'
+             '      files will be overwritten!\n\n')
+
+    parser.add_argument(
+        '-t', '--save-to', '--target-dir',
+        action='store',
+        metavar='SAVE_TO',
+        dest='save_to',
+        default='',
+        help='specify the output directory.\n\n')
+
+    parser.add_argument(
+        '--prefix',
+        action='store',
+        metavar='FILE_PREFIX',
+        dest='prefix',
+        default='',
+        help='specify the file name prefix. This prefix will be added\n'
+             'to the output file names during the automatic\n'
+             'generation of file names.\n'
+             'Default=\'\'.\n\n')
+
+    parser.add_argument(
+        '--postfix',
+        action='store',
+        metavar='FILE_POSTFIX',
+        dest='postfix',
+        default='',
+        help='specify the file name postfix. This postfix will be\n'
+             'added to the output file names during the automatic\n'
+             'generation of file names.\n'
+             'Default=\'\'.\n\n')
+
+    parser.add_argument(
+        '-o', '--output-files',
+        action='store',
+        nargs='+',
+        metavar='OUTPUT_FILES',
+        dest='out_names',
+        help='specify the list of file names after the flag.\n'
+             'The output files with data will be save with the names\n'
+             'from this list. This will override the automatic\n'
+             'generation of file names.\n'
+             'NOTE: you must enter file names for '
+             '      all the input shots.\n\n')
+
+    parser.add_argument(
+        '-p', '--plot',
+        action='store',
+        nargs='+',
+        metavar='CURVE',
+        dest='plot',
+        help='specify the indexes of the curves you want to plot\n'
+             'or enter \'all\' (without quotes) to plot all the\n'
+             'curves).\n'
+             'Each curve from this list will be plotted separately\n'
+             'as a single graph.\n'
+             'You can specify --p-save flag in order to save them\n'
+             'as .png files.\n\n')
+
+    parser.add_argument(
+        '--p-hide', '--plot-hide',
+        action='store_true',
+        dest='p_hide',
+        help='if the --plot, --p-save and this flag is specified\n'
+             'the single plots will be saved but not shown.\n'
+             'This option can reduce the running time of the program.\n\n')
+
+    parser.add_argument(
+        '--p-save', '--save-plots-to',
+        action='store',
+        dest='plot_dir',
+        metavar='PLOT_DIR',
+        help='specify the directory.\n'
+             'Each curve from the list, entered via --plot flag\n'
+             'will be plotted and saved separately as .png file\n'
+             'to this directory.\n\n')
+
+    parser.add_argument(
+        '-m', '--multiplot',
+        action='append',
+        dest='multiplot',
+        nargs='+',
+        help='specify the indexes of the curves you want to plot\n'
+             'at one graph (one curve under the other with uniform\n'
+             'time scale).\n'
+             'You may use as many \'-m\' flags (with different lists\n'
+             'of curves) as you want. One flag for one graph.\n\n')
+
+    parser.add_argument(
+        '--mp-hide', '--multiplot-hide',
+        action='store_true',
+        dest='mp_hide',
+        help='if the --multiplot, --mp-save and this flag is specified\n'
+             'the multiplots will be saved but not shown.\n'
+             'This option can reduce the running time of the program.\n\n')
+
+    parser.add_argument(
+        '--mp-save', '--save-multiplot-as',
+        action='store',
+        dest='multiplot_dir',
+        metavar='MULTIPLOT_DIR',
+        help='specify the directory.\n'
+             'Each multiplot, entered via --multiplot flag(s)\n'
+             'will be plotted and saved separately as .png file\n'
+             'to this directory.\n\n')
 
     args = parser.parse_args()
     verbose = not args.silent
@@ -2281,7 +2325,7 @@ if __name__ == "__main__":
                 it_offset = True
             args.offset_by_front = global_check_front_params(args.offset_by_front)
 
-        # raw check labels
+        # # raw check labels
         # if args.labels:
         #     assert global_check_labels(args.labels), \
         #         "Label value error! Only latin letters, " \
