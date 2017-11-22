@@ -1,4 +1,8 @@
 # Python 2.7
+"""
+Maintainer: Shpakov Konstantin
+Link: https://github.com/shpakovkv/ProcessSignals_Python
+"""
 from __future__ import print_function, with_statement
 
 import re
@@ -26,7 +30,6 @@ class ColorRange:
     """Color code iterator. Generates contrast colors.
     Returns the hexadecimal RGB color code (for example '#ffaa00')
     """
-
     def __init__(self, start_hue=0, hue_step=140, min_hue_diff=20,
                  saturation=(90, 90, 60),
                  luminosity=(55, 30, 50)):
@@ -1129,13 +1132,16 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
 
 
 def save_signals_csv(filename, signals, delimiter=",", precision=18):
-    """
+    """Saves SignalsData to a CSV file.
+    First three lines will be filled with header:
+        1) the labels
+        2) the curves units
+        3) the time unit (only 1 column at this row)
 
-    :param filename:
-    :param signals:
-    :param delimiter:
-    :param precision:
-    :return:
+    filename  -- the full path
+    signals   -- SignalsData instance
+    delimiter -- the CSV file delimiter
+    precision -- the precision of storing numbers
     """
     # check precision value
     table = signals.get_array()
@@ -1146,7 +1152,7 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
         precision = 18
     value_format = '%0.' + str(precision) + 'e'
 
-    # check filename value
+    # check filename
     if len(filename) < 4 or filename[-4:].upper() != ".CSV":
         filename += ".csv"
     folder_path = os.path.dirname(filename)
@@ -1157,6 +1163,8 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
         # add headers
         labels = [signals.curves[idx].label for
                   idx in signals.idx_to_label.keys()]
+
+        # replaces forbidden characters
         labels = [re.sub(r'[^-.\w_]', '_', label) for label in labels]
         labels = delimiter.join(labels) + "\n"
         units = [signals.curves[idx].unit for
@@ -1178,7 +1186,7 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
 
 def save_m_log(src, save_as, labels, multiplier=None, delays=None,
                offset_by_front=None, y_auto_offset=None, partial_params=None):
-    """Save modifications log. 
+    """Saves the log of data modifications. 
     Saves log file describing the changes made to the data.
 
     If the log file exists and any new changes were made to the data and
@@ -1262,6 +1270,7 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
 # -----    WORKFLOW     ------------------
 # ========================================
 def add_to_log(s, print_to_console=True):
+    # not used
     global global_log
     global_log += s
     if print_to_console:
@@ -1596,14 +1605,29 @@ def update_by_y_auto_zero(data, y_auto_zero_params,
 def update_by_front(signals_data, args, multiplier, delay,
                     front_plot_name, interactive=False):
     """
+    1. Finds the most left front point where the curve
+       amplitude is greater (lower - for negative curve) than
+       the level (args[1]) value.
+    2. Makes this point the origin of the time axis for
+       all signals (changes the list of the delays).
+       To improve accuracy, the signal is smoothed by 
+       the savgol filter.
 
-    :param signals_data:
-    :param args:
-    :param multiplier:
-    :param delay:
-    :param front_plot_name:
-    :param interactive:
-    :return:
+    signals_data    -- the SIgnalsData instance
+    args            -- the list of 4 values [idx, level, window, order]:
+                       idx    - the index of the curve
+                       level  - the amplitude level
+                       window - length of the filter window (must be 
+                                an odd integer greater than 4)
+                       order  - (int) the order of the polynomial used 
+                                to fit the samples (must be < window)
+    multiplier      -- list of multipliers not yet applied to data
+    delay           -- list of delays not yet applied to data
+    front_plot_name -- the full path to save the graph with the curve 
+                       and the marked point on the rise front
+                       (fall front - for negative curve)
+    interactive     -- turns on interactive mode of the smooth filter
+                       parameters selection
     """
     cancel = False
 
@@ -1648,18 +1672,17 @@ def update_by_front(signals_data, args, multiplier, delay,
     smoothed_curve = None
     front_point = None
     if interactive:
-        print("\n----------- Interactive offset_by_curve_front process "
-              "--------------\n"
+        print("\n------ Interactive offset_by_curve_front process ------\n"
               "Enter two space separated positive integer value\n"
               "for WINDOW and POLYORDER parameters.\n"
               "\n"
-              "WINDOW must be an odd value greater or equal to 5,\n"
-              "POLYORDER must be >= 0, <= 5 and less than WINDOW.\n"
+              "WINDOW must be an odd integer value >= 5,\n"
+              "POLYORDER must be 0, 1, 2, 3, 4 or 5 and less than WINDOW.\n"
               "\n"
               "The larger the WINDOW value, the greater the smooth effect.\n"
               "\n"
-              "The larger the POLYORDER value, the more accurate the result\n"
-              "of smoothing.\n"
+              "The larger the POLYORDER value, the more accurate \n"
+              "the result of smoothing.\n"
               "\n"
               "Close graph window to continue.")
     # interactive cycle
@@ -1976,9 +1999,12 @@ if __name__ == "__main__":
 
     prog_epilog = ("")
 
-    parser = argparse.ArgumentParser(prog='python SignalProcess.py',
+    usage = ("python %(prog)s.py [options]\n"
+             "       python %(prog)s.py @file_with_options")
+
+    parser = argparse.ArgumentParser(prog='SignalProcess',
                                      description=prog_discr, epilog=prog_epilog,
-                                     fromfile_prefix_chars='@',
+                                     fromfile_prefix_chars='@', usage=usage,
                                      formatter_class=argparse.RawTextHelpFormatter)
 
     # input files ------------------------------------------------------------
@@ -2444,9 +2470,10 @@ if __name__ == "__main__":
                     for curve_idx in args.plot:
                         plot_multiple_curve(data.curves[curve_idx])
                         if args.plot_dir is not None:
-                            plot_name = ("{shot}_curve_{idx}_{label}.plot.png"
-                                         "".format(shot=shot_name, idx=curve_idx,
-                                                   label=data.curves[curve_idx].label))
+                            plot_name = (
+                                "{shot}_curve_{idx}_{label}.plot.png"
+                                "".format(shot=shot_name, idx=curve_idx,
+                                          label=data.curves[curve_idx].label))
                             plot_path = os.path.join(args.plot_dir, plot_name)
                             plt.savefig(plot_path, dpi=400)
                             if verbose:
@@ -2460,18 +2487,23 @@ if __name__ == "__main__":
                 # plot and save multi-plots
                 if args.multiplot:
                     for curve_list in args.multiplot:
-                        check_plot_param(curve_list, data.count, '--multiplot')
+                        check_plot_param(curve_list, data.count,
+                                         '--multiplot')
                     for curve_list in args.multiplot:
                         plot_multiplot(data, None, curve_list)
                         if args.multiplot_dir is not None:
-                            idx_list = "_".join(str(i) for i in sorted(curve_list))
-                            mplot_name = ("{shot}_curves_{idx_list}.multiplot.png"
+                            idx_list = "_".join(str(i) for
+                                                i in sorted(curve_list))
+                            mplot_name = ("{shot}_curves_"
+                                          "{idx_list}.multiplot.png"
                                           "".format(shot=shot_name,
                                                     idx_list=idx_list))
-                            mplot_path = os.path.join(args.multiplot_dir, mplot_name)
+                            mplot_path = os.path.join(args.multiplot_dir,
+                                                      mplot_name)
                             plt.savefig(mplot_path, dpi=400)
                             if verbose:
-                                print("Multiplot is saved {}".format(mplot_path))
+                                print("Multiplot is saved {}"
+                                      "".format(mplot_path))
                         if not args.mp_hide:
                             plt.show()
                         else:
@@ -2499,7 +2531,7 @@ if __name__ == "__main__":
     except Exception as e:
         print()
         sys.exit(e)
-    # =========================================================================
+    # ========================================================================
     # TODO: comments
     # TODO: description
 
