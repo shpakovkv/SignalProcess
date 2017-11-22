@@ -1,0 +1,17 @@
+# PyCharm files
+*.pyc
+*.idea
+
+# Test files with input options
+*.arg
+
+# Test data files
+*.csv
+*.wfm
+*.dat
+*.png
+*test*.py
+*.xml
+data/
+TestShot/
+temp/
