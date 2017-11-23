@@ -995,14 +995,13 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
     valid_delimiters = [',', ';', ' ', ':', '\t']
 
     import csv
-    from csv import Error as CSV_Error
 
     if filename[-3:].upper() != 'WFM':
         with open(filename, "r") as datafile:
             # analyze structure
             try:
                 dialect = csv.Sniffer().sniff(datafile.read(2096))
-            except CSV_Error:
+            except csv.Error:
                 datafile.seek(0)
                 dialect = csv.Sniffer().sniff(datafile.readline())
             datafile.seek(0)
