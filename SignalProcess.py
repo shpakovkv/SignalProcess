@@ -11,6 +11,7 @@ import colorsys
 import sys
 import math
 import datetime
+import argparse
 
 import numpy as np
 from scipy.signal import savgol_filter
@@ -21,6 +22,126 @@ import PeakProcess as pp
 
 verbose = True
 global_log = ""
+
+
+# ========================================
+# -----     CL INTERFACE     -------------
+# ========================================
+def get_base_parser():
+    base_parser = argparse.ArgumentParser(add_help=False,
+                                          formatter_class=argparse.RawTextHelpFormatter)
+
+    # input files ------------------------------------------------------------
+    base_parser.add_argument(
+        '-d', '--scr', '--source-dir',
+        action='store',
+        metavar='DIR',
+        dest='src_dir',
+        default='',
+        help='specify the directory containing data files.\n'
+             'Default= the folder containing this code.\n\n')
+
+    group = base_parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument(
+        '-f', '--input-files',
+        action='append',
+        nargs='+',
+        metavar='FILE',
+        dest='files',
+        help='specify one or more (space separated) input file names \n'
+             'after the flag. It is assumed that the files belong to \n'
+             'the same shot. In order to process multiple shots enter\n'
+             'multiple \'-f\' parameters.\n\n')
+
+    group.add_argument(
+        '-e', '--ext', '--extension',
+        action='store',
+        nargs='+',
+        metavar='EXT',
+        dest='ext_list',
+        help='specify one or more (space separated) extensions of \n'
+             'the files with data.\n\n')
+
+    base_parser.add_argument(
+        '--labels',
+        action='store',
+        metavar='LABEL',
+        nargs='+',
+        dest='labels',
+        help='specify the labels for all the curves in the data \n'
+             'files. It is recommended to use only Latin letters, \n'
+             'numbers, dashes and underscores, any other symbols\n'
+             'will be replaced with underscores.\n'
+             'Needed for correct graph labels.\n\n')
+
+    base_parser.add_argument(
+        '--units',
+        action='store',
+        metavar='UNIT',
+        nargs='+',
+        dest='units',
+        help='specify the units for each of the curves in the \n'
+             'data files. Do not forget to take into account the \n'
+             'influence of the corresponding multiplier value.\n'
+             'Needed for correct graph labels.\n\n')
+
+    base_parser.add_argument(
+        '--time-unit',
+        action='store',
+        metavar='UNIT',
+        dest='time_unit',
+        help='specify the unit of time scale (uniform for all \n'
+             'curves). Needed for correct graph labels.\n\n')
+
+    base_parser.add_argument(
+        '-g', '--grouped-by',
+        action='store',
+        type=int,
+        metavar='NUMBER',
+        dest='group_size',
+        default=1,
+        help='specify the size of the files groups. Default=1. \n'
+             'A group is a set of files, corresponding to one shot. \n'
+             'For correct import all shots in folder must consist of\n'
+             'the same number of files.\n'
+             'NOTE: if \'-g\' parameter is specified, then all the \n'
+             '      files (with specified extensions via -e flag) in\n'
+             '      the specified directory will be processed.\n\n')
+
+    base_parser.add_argument(
+        '-c', '--ch', '--sorted-by-channel',
+        action='store_true',
+        dest='sorted_by_ch',
+        help='this options tells the program that the files are \n'
+             'sorted by the oscilloscope/channel firstly and secondly\n'
+             'by the shot number. By default, the program considers \n'
+             'that the files are sorted by the shot number firstly\n'
+             'and secondly by the oscilloscope/channel.\n\n'
+             'ATTENTION: files from all oscilloscopes must be in the\n'
+             'same folder and be sorted in one style.\n\n')
+
+    base_parser.add_argument(
+        '--partial-import',
+        action='store',
+        type=int,
+        metavar=('START', 'STEP', 'COUNT'),
+        nargs=3,
+        dest='partial',
+        help='Specify START STEP COUNT after the flag. \n'
+             'START: the index of the data point with which you want\n'
+             'to start the import of data points,\n'
+             'STEP: the reading step, \n'
+             'COUNT: the number of points that you want to import \n'
+             '(-1 means till the end of the file).\n\n')
+
+    base_parser.add_argument(
+        '--silent',
+        action='store_true',
+        dest='silent',
+        help='enables the silent mode, in which only most important\n'
+             'messages are displayed.\n\n')
+    return base_parser
 
 
 # ========================================
@@ -1993,130 +2114,18 @@ def plot_multiple_curve(curve_list, peaks=None,
 # --------------   MAIN    ----------------------------------------
 # ======================================================
 if __name__ == "__main__":
-    import argparse
-    prog_discr = ("")
+    p_disc = ("")
 
-    prog_epilog = ("")
+    p_ep = ("")
 
-    usage = ("python %(prog)s.py [options]\n"
-             "       python %(prog)s.py @file_with_options")
+    p_use = ("python %(prog)s [options]\n"
+             "       python %(prog)s @file_with_options")
 
-    parser = argparse.ArgumentParser(prog='SignalProcess',
-                                     description=prog_discr, epilog=prog_epilog,
-                                     fromfile_prefix_chars='@', usage=usage,
-                                     formatter_class=argparse.RawTextHelpFormatter)
-
-    # input files ------------------------------------------------------------
-    parser.add_argument(
-        '-d', '--scr', '--source-dir',
-        action='store',
-        metavar='DIR',
-        dest='src_dir',
-        default='',
-        help='specify the directory containing data files.\n'
-             'Default= the folder containing this code.\n\n')
-
-    group = parser.add_mutually_exclusive_group(required=True)
-
-    group.add_argument(
-        '-f', '--input-files',
-        action='append',
-        nargs='+',
-        metavar='FILE',
-        dest='files',
-        help='specify one or more (space separated) input file names \n'
-             'after the flag. It is assumed that the files belong to \n'
-             'the same shot. In order to process multiple shots enter\n'
-             'multiple \'-f\' parameters.\n\n')
-
-    group.add_argument(
-        '-e', '--ext', '--extension',
-        action='store',
-        nargs='+',
-        metavar='EXT',
-        dest='ext_list',
-        help='specify one or more (space separated) extensions of \n'
-             'the files with data.\n\n')
-
-    parser.add_argument(
-        '--labels',
-        action='store',
-        metavar='LABEL',
-        nargs='+',
-        dest='labels',
-        help='specify the labels for all the curves in the data \n'
-             'files. It is recommended to use only Latin letters, \n'
-             'numbers, dashes and underscores, any other symbols\n'
-             'will be replaced with underscores.\n'
-             'Needed for correct graph labels.\n\n')
-
-    parser.add_argument(
-        '--units',
-        action='store',
-        metavar='UNIT',
-        nargs='+',
-        dest='units',
-        help='specify the units for each of the curves in the \n'
-             'data files. Do not forget to take into account the \n'
-             'influence of the corresponding multiplier value.\n'
-             'Needed for correct graph labels.\n\n')
-
-    parser.add_argument(
-        '--time-unit',
-        action='store',
-        metavar='UNIT',
-        dest='time_unit',
-        help='specify the unit of time scale (uniform for all \n'
-             'curves). Needed for correct graph labels.\n\n')
-
-    parser.add_argument(
-        '-g', '--grouped-by',
-        action='store',
-        type=int,
-        metavar='NUMBER',
-        dest='group_size',
-        default=1,
-        help='specify the size of the files groups. Default=1. \n'
-             'A group is a set of files, corresponding to one shot. \n'
-             'For correct import all shots in folder must consist of\n'
-             'the same number of files.\n'
-             'NOTE: if \'-g\' parameter is specified, then all the \n'
-             '      files (with specified extensions via -e flag) in\n'
-             '      the specified directory will be processed.\n\n')
-
-    parser.add_argument(
-        '-c', '--ch', '--sorted-by-channel',
-        action='store_true',
-        dest='sorted_by_ch',
-        help='this options tells the program that the files are \n'
-             'sorted by the oscilloscope/channel firstly and secondly\n'
-             'by the shot number. By default, the program considers \n'
-             'that the files are sorted by the shot number firstly\n'
-             'and secondly by the oscilloscope/channel.\n\n'
-             'ATTENTION: files from all oscilloscopes must be in the\n'
-             'same folder and be sorted in one style.\n\n')
-
-    parser.add_argument(
-        '--partial-import',
-        action='store',
-        type=int,
-        metavar=('START', 'STEP', 'COUNT'),
-        nargs=3,
-        dest='partial',
-        help='Specify START STEP COUNT after the flag. \n'
-             'START: the index of the data point with which you want\n'
-             'to start the import of data points,\n'
-             'STEP: the reading step, \n'
-             'COUNT: the number of points that you want to import \n'
-             '(-1 means till the end of the file).\n\n')
-
-    # process parameters and options -----------------------------------------
-    parser.add_argument(
-        '--silent',
-        action='store_true',
-        dest='silent',
-        help='enables the silent mode, in which only most important\n'
-             'messages are displayed.\n\n')
+    parser = argparse.ArgumentParser(parents=[get_base_parser()],
+                                     prog='SignalProcess.py',
+                                     description=p_disc,
+                                     epilog=p_ep,
+                                     fromfile_prefix_chars='@', usage=p_use)
 
     parser.add_argument(
         '--multiplier',
@@ -2351,7 +2360,8 @@ if __name__ == "__main__":
                 it_offset = True
             args.offset_by_front = global_check_front_params(args.offset_by_front)
 
-        # # raw check labels
+        # # raw check labels not used
+        # # instead: the forbidden symbols are replaced during CSV saving
         # if args.labels:
         #     assert global_check_labels(args.labels), \
         #         "Label value error! Only latin letters, " \
