@@ -6,6 +6,9 @@ from matplotlib import pyplot
 import os
 import bisect
 import scipy.integrate as integrate
+import argparse
+
+import SignalProcess as sp
 
 
 pos_polarity_labels = {'pos', 'positive', '+'}
@@ -578,10 +581,23 @@ def group_peaks(data, window):
     # print peak_time
     # print num_peak_in_gr
     return peak_data, peak_map
+# ===============================================================================================================
+
 
 
 if __name__ == '__main__':
-    print('Done!!!')
+    base_parser = sp.get_base_parser()
+    p_use = ('python %(prog)s [options]\n'
+             '       python %(prog)s @file_with_options')
+    p_desc = ('')
+    p_ep = ('')
+
+    parser = argparse.ArgumentParser(parents=[base_parser],
+                                     prog='PeakProcess.py', usage=p_use,
+                                     description=p_desc, epilog=p_ep)
+
+    args = parser.parse_args()
+    verbose = not args.silent
 
     # TODO: reformat lines PEP8
     # TODO: English comments
@@ -591,3 +607,4 @@ if __name__ == '__main__':
     # TODO: cl peak finder
     # TODO: cl peak reader
     # TODO: cl replot peak multiplots
+    print('Done!!!')
