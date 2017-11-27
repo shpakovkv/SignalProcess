@@ -4,9 +4,10 @@ from __future__ import print_function
 
 from matplotlib import pyplot
 import os
+import sys
 import bisect
-import scipy.integrate as integrate
 import argparse
+import scipy.integrate as integrate
 
 import SignalProcess as sp
 
@@ -599,9 +600,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     verbose = not args.silent
 
+    try:
+        args = sp.global_check(args)
+    except Exception as e:
+        print()
+        sys.exit(e)
+
     # TODO: reformat lines PEP8
     # TODO: English comments
-    # TODO: command line args from SP
     # TODO: cl args original
     # TODO: cl read/save/plot (copy from SP)
     # TODO: cl peak finder
