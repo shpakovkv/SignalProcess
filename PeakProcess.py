@@ -17,6 +17,8 @@ neg_polarity_labels = {'neg', 'negative', '-'}
 
 
 class SinglePeak:
+    """Peak object.
+    """
     def __init__(self, time=None, value=None, index=None,
                  sqr_l=0, sqr_r=0):
         self.time = time
@@ -42,10 +44,11 @@ class SinglePeak:
         self.idx = data[2]
 
     def set_data_full(self, data):
-        if len(data) != 5:
+        count = 5
+        if len(data) != count:
             raise ValueError("Wrong number of values to unpack. "
-                             "3 expected, " + str(len(data)) +
-                             " given.")
+                             "{} expected, {} given."
+                             "".format(count, len(data)))
         self.time = data[0]
         self.val = data[1]
         self.idx = data[2]
@@ -70,14 +73,20 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
     """
     Returns the index of the value closest to 'value'
     
-    sorted_arr -- sorted array/list of ints or floats
-    value -- the number to which the closest value should be found
-    side -- 'left': search among values that are lower then X
-            'right': search among values that are greater then X
-            'auto': handle all values (default)
-
-    If two numbers are equally close and side='auto', 
-    returns the index of the smallest one.
+    :param sorted_arr: sorted array/list of ints or floats
+    :param value: the int/float number to which the 
+                  closest value should be found
+    :param side: 'left': search among values that are lower then X
+                 'right': search among values that are greater then X
+                 'auto': handle all values (default)
+    :type sorted_arr: array-like
+    :type value: int, float
+    :type side: str ('left', 'right', 'auto')
+    :return: the index of the value closest to 'value'
+    :rtype: int
+    
+    .. note:: if two numbers are equally close and side='auto', 
+           returns the index of the smallest one.
     """
 
     idx = bisect.bisect_left(sorted_arr, value)
@@ -109,27 +118,34 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
 
 def level_excess_check(x, y, level, start=0, step=1,
                        window=0, is_positive=True):
-    '''
-    Checks if 'Y' values excess 'level' value 
+    """Checks if 'Y' values excess 'level' value 
     for 'X' in range from X(start) to X(start) + window
     OR for x in range from X(start) - window to X(start)
     
-    x -- array with X data
-    y -- array with Y data
-    level -- level value
-    start -- start index of data
-    step -- the step with which elements of the array are traversed
-        step > 0: checks elements to the RIGHT from start index
-        step < 0: checks elements to the LEFT from start index
-    window -- check window width
-    is_positive -- the derection of the check
-        True: checks whether the 'Y' value rises above 'level'
-        False: checks whether the 'Y' value comes down below 'level'
-    
-    returns True and an index of first Y element 
-            that are bigger/lower 'level'
-    OR returns False and an index of the last checked element
-    '''
+    :param x:           array with X data
+    :param y:           array with Y data
+    :param level:       level value
+    :param start:       start index of data
+    :param step:        step with which elements of the array are traversed
+                        step > 0: checks elements to the RIGHT from start idx
+                        step < 0: checks elements to the LEFT from start idx
+    :param window:      check window width
+    :param is_positive: the direction of the check
+                        True: checks whether the 'Y' value rises above 'level'
+                        False: checks whether the 'Y' value 
+                        comes down below 'level'
+    :type x:            array-like
+    :type y:            array-like
+    :type level:        float, int ''same as param y''
+    :type start:        int
+    :type step:         int
+    :type window:       float, int ''same as param x''
+    :type is_positive:  bool
+    :return:            True and an index of first Y element that are 
+                        bigger/lower 'level' OR returns False and 
+                        an index of the last checked element
+    :rtype:             tuple ''(bool, int)''
+    """
 
     idx = start          # zero-based index
     if window == 0:      # window default value
@@ -147,6 +163,14 @@ def level_excess_check(x, y, level, start=0, step=1,
     return False, idx
 
 def is_pos(polarity):
+    """Checks if the (str) 'polarity' is positive.
+    
+    :param polarity:    word denoting polarity
+    :type polarity:     str
+    :return:            True if the polarity is positive, 
+                        otherwise returns False
+    :rtype:             bool
+    """
     global pos_polarity_labels
     global neg_polarity_labels
     if polarity.lower() in pos_polarity_labels:
@@ -158,6 +182,14 @@ def is_pos(polarity):
 
 
 def is_neg(polarity):
+    """Checks if the (str) 'polarity' is negative.
+
+    :param polarity:    word denoting polarity
+    :type polarity:     str
+    :return:            True if the polarity is negative, 
+                        otherwise returns False
+    :rtype:             bool
+    """
     global pos_polarity_labels
     global neg_polarity_labels
     if polarity.lower() in pos_polarity_labels:
@@ -169,6 +201,17 @@ def is_neg(polarity):
 
 
 def check_polarity(curve, time_bounds=(None, None)):
+    """Checks whether the curve is mostly positive or negative 
+    on a certain interval.
+    
+    :param curve:       curve data
+    :param time_bounds: the left and the right boundaries of 
+                        the specified interval
+    :type curve:        SignalProcess.SingleCurve
+    :type time_bounds:  tuple, list ''(float, float)''
+    :return:            the word denoting polarity
+    :rtype:             str 
+    """
     if time_bounds[0] is None:
         time_bounds = (0, time_bounds[1])
     if time_bounds[1] is None:
@@ -186,10 +229,24 @@ def find_curve_front(curve,
                        polarity='auto',
                        save_plot=False,
                        plot_name="voltage_front.png"):
-    # Find x (time) of voltage front on specific level
-    # Default: Negative polarity, -0.2 MV level
-    # PeakProcess.level_excess_check(x, y, level, start=0, step=1,
-    # window=0, is_positive=True):
+    """Find x (time) of voltage front on specific level
+    Default: Negative polarity, -0.2 MV level
+    PeakProcess.level_excess_check(x, y, level, start=0, step=1,
+    window=0, is_positive=True):
+    
+    :param curve: 
+    :param level: 
+    :param polarity: 
+    :param save_plot: 
+    :param plot_name: 
+    :type curve: 
+    :type level: 
+    :type polarity: 
+    :type save_plot: 
+    :type plot_name: 
+    :return: 
+    """
+
     if polarity=='auto':
         polarity = check_polarity(curve)
         if is_pos(polarity):
