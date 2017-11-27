@@ -27,12 +27,13 @@ global_log = ""
 # ========================================
 # -----     CL INTERFACE     -------------
 # ========================================
-def get_base_parser():
-    base_parser = argparse.ArgumentParser(add_help=False,
-                                          formatter_class=argparse.RawTextHelpFormatter)
+def get_input_files_opt_parser():
+    parser = argparse.ArgumentParser(add_help=False,
+                                     formatter_class=
+                                     argparse.RawTextHelpFormatter)
 
     # input files ------------------------------------------------------------
-    base_parser.add_argument(
+    parser.add_argument(
         '-d', '--scr', '--source-dir',
         action='store',
         metavar='DIR',
@@ -41,7 +42,7 @@ def get_base_parser():
         help='specify the directory containing data files.\n'
              'Default= the folder containing this code.\n\n')
 
-    group = base_parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
 
     group.add_argument(
         '-f', '--input-files',
@@ -63,7 +64,7 @@ def get_base_parser():
         help='specify one or more (space separated) extensions of \n'
              'the files with data.\n\n')
 
-    base_parser.add_argument(
+    parser.add_argument(
         '--labels',
         action='store',
         metavar='LABEL',
@@ -75,7 +76,7 @@ def get_base_parser():
              'will be replaced with underscores.\n'
              'Needed for correct graph labels.\n\n')
 
-    base_parser.add_argument(
+    parser.add_argument(
         '--units',
         action='store',
         metavar='UNIT',
@@ -86,7 +87,7 @@ def get_base_parser():
              'influence of the corresponding multiplier value.\n'
              'Needed for correct graph labels.\n\n')
 
-    base_parser.add_argument(
+    parser.add_argument(
         '--time-unit',
         action='store',
         metavar='UNIT',
@@ -94,7 +95,7 @@ def get_base_parser():
         help='specify the unit of time scale (uniform for all \n'
              'curves). Needed for correct graph labels.\n\n')
 
-    base_parser.add_argument(
+    parser.add_argument(
         '-g', '--grouped-by',
         action='store',
         type=int,
@@ -109,7 +110,7 @@ def get_base_parser():
              '      files (with specified extensions via -e flag) in\n'
              '      the specified directory will be processed.\n\n')
 
-    base_parser.add_argument(
+    parser.add_argument(
         '-c', '--ch', '--sorted-by-channel',
         action='store_true',
         dest='sorted_by_ch',
@@ -121,7 +122,7 @@ def get_base_parser():
              'ATTENTION: files from all oscilloscopes must be in the\n'
              'same folder and be sorted in one style.\n\n')
 
-    base_parser.add_argument(
+    parser.add_argument(
         '--partial-import',
         action='store',
         type=int,
@@ -135,13 +136,190 @@ def get_base_parser():
              'COUNT: the number of points that you want to import \n'
              '(-1 means till the end of the file).\n\n')
 
-    base_parser.add_argument(
+    parser.add_argument(
         '--silent',
         action='store_true',
         dest='silent',
         help='enables the silent mode, in which only most important\n'
              'messages are displayed.\n\n')
-    return base_parser
+    return parser
+
+
+def get_mult_del_opt_parser():
+    """Returns multiplier and delay options parser.
+    """
+    parser = argparse.ArgumentParser(add_help=False,
+                                     formatter_class=
+                                     argparse.RawTextHelpFormatter)
+
+    parser.add_argument(
+        '--multiplier',
+        action='store',
+        type=float,
+        metavar='MULT',
+        nargs='+',
+        dest='multiplier',
+        default=None,
+        help='the list of multipliers for each data columns.\n'
+             'NOTE: you must enter values for all the columns in\n'
+             '      data file(s). Each curve have two columns: \n'
+             '      filled with X and Y values correspondingly.\n\n')
+
+    parser.add_argument(
+        '--delay',
+        action='store',
+        type=float,
+        metavar='DELAY',
+        nargs='+',
+        dest='delay',
+        default=None,
+        help='the list of delays (subtrahend) for each data columns.\n'
+             'NOTE: the data is first multiplied by a corresponding \n'
+             '      multiplier and then the delay is subtracted \n'
+             '      from them.\n\n')
+    return parser
+
+
+def get_data_corr_opt_parser():
+    """Returns data manipulation options parser.
+    """
+    parser = argparse.ArgumentParser(add_help=False,
+                                     formatter_class=
+                                     argparse.RawTextHelpFormatter)
+
+    parser.add_argument(
+        '--offset-by-curve-front',
+        action='store',
+        metavar='VAL',
+        nargs='+',
+        dest='offset_by_front',
+        default=None,
+        help='Enter: IDX LEVEL WINDOW ORDER, where:\n'
+             'IDX    - the index of the curve\n'
+             'LEVEL  - the amplitude level\n'
+             'WINDOW - length of the filter window (must be an odd \n'
+             '         integer greater than 4)\n'
+             'ORDER  - the order of the polinomial used to fit the\n'
+             '         samples (must be less than window length)\n\n'
+             'Description:\n'
+             '1. Finds the most left front point where the curve\n'
+             'amplitude is greater (lower - for negative peak) than\n'
+             'level value.\n'
+             '2. Makes this point the origin of the time axis for\n'
+             'all signals (changes the list of the delays).\n\n'
+             'To improve accuracy, the signal is smoothed by \n'
+             'the savgol filter.\n\n'
+             'NOTE: you can enter only two parameters (IDX LEVEL),\n'
+             '      then the interactive mode of the smooth filter\n'
+             '      parameters selection will start.\n\n')
+
+    parser.add_argument(
+        '--y-auto-zero',
+        action='append',
+        metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
+        nargs=3,
+        dest='y_auto_zero',
+        help='auto zero level correction of the specified curve.\n'
+             'CURVE_IDX is the zero-based index of the curve; \n'
+             'BG_START and BG_STOP are the left and the right bound\n'
+             'of the time interval at which the curve does not\n'
+             'contain signals (background interval).\n'
+             'You can use as many --y-auto-zero flags\n'
+             'as you want (one flag for one curve).\n\n')
+
+    parser.add_argument(
+        '--set-to-zero',
+        action='store',
+        metavar='CURVE_IDX',
+        nargs='+',
+        dest='zero',
+        default=None,
+        help='specify the indexes of the fake curves, whose values\n'
+             'you want to set to zero.\n'
+             'Enter \'all\' (without the quotes) to set all curves\n'
+             'values to zero.\n\n')
+    return parser
+
+
+def get_plot_opt_parser():
+    """Returns plot options parser.
+    """
+    parser = argparse.ArgumentParser(add_help=False,
+                                     formatter_class=
+                                     argparse.RawTextHelpFormatter)
+
+    parser.add_argument(
+        '-p', '--plot',
+        action='store',
+        nargs='+',
+        metavar='CURVE_IDX',
+        dest='plot',
+        help='specify the indexes of the curves you want to plot\n'
+             'or enter \'all\' (without quotes) to plot all the\n'
+             'curves).\n'
+             'Each curve from this list will be plotted separately\n'
+             'as a single graph.\n'
+             'You can specify --p-save flag in order to save them\n'
+             'as .png files.\n\n')
+
+    parser.add_argument(
+        '--p-hide', '--plot-hide',
+        action='store_true',
+        dest='p_hide',
+        help='if the --plot, --p-save and this flag is specified\n'
+             'the single plots will be saved but not shown.\n'
+             'This option can reduce the running time of the program.\n\n')
+
+    parser.add_argument(
+        '--p-save', '--save-plots-to',
+        action='store',
+        dest='plot_dir',
+        metavar='PLOT_DIR',
+        help='specify the directory.\n'
+             'Each curve from the list, entered via --plot flag\n'
+             'will be plotted and saved separately as .png file\n'
+             'to this directory.\n\n')
+
+    parser.add_argument(
+        '-m', '--multiplot',
+        action='append',
+        dest='multiplot',
+        metavar='CURVE_IDX',
+        nargs='+',
+        help='specify the indexes of the curves you want to plot\n'
+             'at one graph (one curve under the other with uniform\n'
+             'time scale).\n'
+             'You may use as many \'-m\' flags (with different lists\n'
+             'of curves) as you want. One flag for one graph.\n\n')
+
+    parser.add_argument(
+        '--mp-hide', '--multiplot-hide',
+        action='store_true',
+        dest='mp_hide',
+        help='if the --multiplot, --mp-save and this flag is specified\n'
+             'the multiplots will be saved but not shown.\n'
+             'This option can reduce the running time of the program.\n\n')
+
+    parser.add_argument(
+        '--mp-save', '--save-multiplot-as',
+        action='store',
+        dest='multiplot_dir',
+        metavar='MULTIPLOT_DIR',
+        help='specify the directory.\n'
+             'Each multiplot, entered via --multiplot flag(s)\n'
+             'will be plotted and saved separately as .png file\n'
+             'to this directory.\n\n')
+    return parser
+
+
+def get_base_parser():
+    """Returns base parser.
+    """
+    return argparse.ArgumentParser(parents=[get_input_files_opt_parser(),
+                                            get_mult_del_opt_parser(),
+                                            get_data_corr_opt_parser(),
+                                            get_plot_opt_parser()],
+                                   add_help=False)
 
 
 # ========================================
@@ -309,8 +487,6 @@ class SignalsData:
         units      -- the list of labels for the added curves
         time_unit  -- the unit of the time scale
         """
-        # appends one or more new SingleCurves to the self.curves list
-        # and updates the corresponding self parameters
         new_data = np.array(input_data, dtype=float, order='F')
         self.check_input(new_data)
         if new_data.shape[1] % 2 != 0:
@@ -903,9 +1079,7 @@ def numbering_parser(group):
     if len(group) == 1:
         return 0, len(names[0])
 
-    numbers = []
-    # for idx in range(2):
-    #     numbers.append(parse_filename(names[idx]))
+    numbers = []  # list of lists of dictionaries
     for name in names:
         numbers.append(parse_filename(name))
 
@@ -2094,20 +2268,98 @@ def plot_multiple_curve(curve_list, peaks=None,
                     facecolors='none', linewidths=2)
         plt.scatter(peak_x, peak_y, s=150, edgecolors='none',
                     facecolors='#133cac', linewidths=1.5, marker='x')
-        # plt.scatter(peak_x, peak_y, s=40, edgecolors='#ff5511',
-        #           facecolors='none', linewidths=2)
-        # plt.scatter(peak_x, peak_y, s=100, edgecolors='#133cac',
-        #           facecolors='none', linewidths=2)
-        # plt.scatter(peak_x, peak_y, s=160, edgecolors='#62e200',
-        #           facecolors='none', linewidths=1.5)
-        # if save_as is not None:
-        #     if not os.path.isdir(os.path.dirname(save_as)):
-        #         os.makedirs(os.path.dirname(save_as))
-        #     # print("Saveing " + save_as)
-        #     plt.savefig(save_as, dpi=400)
-        # if show:
-        #     plt.show()
-        # plt.close('all')
+
+
+def global_check(options):
+    """Input options global check.
+    
+    Returns changed options with converted values.
+    
+    options -- namespace with options 
+    """
+    # input directory and files check
+    if options.src_dir:
+        options.src_dir = options.src_dir.strip()
+        assert os.path.isdir(options.src_dir), \
+            "Can not find directory {}".format(options.src_dir)
+    if options.files:
+        gr_files = check_file_list(options.src_dir, options.files)
+        if not options.src_dir:
+            options.src_dir = os.path.dirname(gr_files[0][0])
+    else:
+        gr_files = get_grouped_file_list(options.src_dir,
+                                              options.ext_list,
+                                              options.group_size,
+                                              options.sorted_by_ch)
+    args.gr_files = gr_files
+
+    # Now we have the list of files, grouped by shots:
+    # gr_files == [
+    #               ['shot001_osc01.wfm', 'shot001_osc02.csv', ...],
+    #               ['shot002_osc01.wfm', 'shot002_osc02.csv', ...],
+    #               ...etc.
+    #             ]
+
+    # check partial import options
+    options.partial = check_partial_args(options.partial)
+
+    # raw check offset_by_voltage parameters (types)
+    options.it_offset = False  # interactive offset process
+    if options.offset_by_front:
+        assert len(options.offset_by_front) in [2, 4], \
+            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
+             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
+             "".format(arg_name="--offset-by-curve_level"))
+        if len(options.offset_by_front) < 4:
+            options.it_offset = True
+        options.offset_by_front = \
+            global_check_front_params(options.offset_by_front)
+
+    # # raw check labels not used
+    # # instead: the forbidden symbols are replaced during CSV saving
+    # if options.labels:
+    #     assert global_check_labels(options.labels), \
+    #         "Label value error! Only latin letters, " \
+    #         "numbers and underscore are allowed."
+
+    options.plot_dir = check_param_path(options.plot_dir, '--p_save')
+    options.multiplot_dir = check_param_path(options.multiplot_dir,
+                                             '--mp-save')
+    options.save_to = check_param_path(options.save_to, '--save-to')
+    if not options.save_to:
+        options.save_to = os.path.dirname(gr_files[0][0])
+
+    # checks if postfix and prefix can be used in filename
+    if options.prefix:
+        options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
+    if options.postfix:
+        options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
+
+    # check and convert plot and multiplot options
+    if options.plot:
+        options.plot = global_check_idx_list(options.plot, '--plot',
+                                          allow_all=True)
+    if options.multiplot:
+        for idx, m_param in enumerate(options.multiplot):
+            options.multiplot[idx] = global_check_idx_list(m_param,
+                                                        '--multiplot')
+
+    # raw check y_auto_zero parameters (types)
+    if options.y_auto_zero:
+        options.y_auto_zero = global_check_y_auto_zero_params(options.y_auto_zero)
+
+    # check and convert set-to-zero options
+    if options.zero:
+        options.zero = global_check_idx_list(options.zero, '--set-to-zero',
+                                          allow_all=True)
+
+    # raw check multiplier and delay
+    if options.multiplier is not None and options.delay is not None:
+        assert len(options.multiplier) == len(options.delay), \
+            ("The number of multipliers ({}) is not equal"
+             " to the number of delays ({})."
+             "".format(len(options.multiplier), len(options.delay)))
+    return options
 
 
 # ============================================================================
@@ -2126,84 +2378,6 @@ if __name__ == "__main__":
                                      description=p_disc,
                                      epilog=p_ep,
                                      fromfile_prefix_chars='@', usage=p_use)
-
-    parser.add_argument(
-        '--multiplier',
-        action='store',
-        type=float,
-        metavar='MULT',
-        nargs='+',
-        dest='multiplier',
-        default=None,
-        help='the list of multipliers for each data columns.\n'
-             'NOTE: you must enter values for all the columns in\n'
-             '      data file(s). Each curve have two columns: \n'
-             '      filled with X and Y values correspondingly.\n\n')
-
-    parser.add_argument(
-        '--delay',
-        action='store',
-        type=float,
-        metavar='DELAY',
-        nargs='+',
-        dest='delay',
-        default=None,
-        help='the list of delays (subtrahend) for each data columns.\n'
-             'NOTE: the data is first multiplied by a corresponding \n'
-             '      multiplier and then the delay is subtracted \n'
-             '      from them.\n\n')
-
-    parser.add_argument(
-        '--offset-by-curve-front',
-        action='store',
-        metavar='VAL',
-        nargs='+',
-        dest='offset_by_front',
-        default=None,
-        help='Enter: IDX LEVEL WINDOW ORDER, where:\n'
-             'IDX    - the index of the curve\n'
-             'LEVEL  - the amplitude level\n'
-             'WINDOW - length of the filter window (must be an odd \n'
-             '         integer greater than 4)\n'
-             'ORDER  - the order of the polinomial used to fit the\n'
-             '         samples (must be less than window length)\n\n'
-             'Description:\n'
-             '1. Finds the most left front point where the curve\n'
-             'amplitude is greater (lower - for negative peak) than\n'
-             'level value.\n'
-             '2. Makes this point the origin of the time axis for\n'
-             'all signals (changes the list of the delays).\n\n'
-             'To improve accuracy, the signal is smoothed by \n'
-             'the savgol filter.\n\n'
-             'NOTE: you can enter only two parameters (IDX LEVEL),\n'
-             '      then the interactive mode of the smooth filter\n'
-             '      parameters selection will start.\n\n')
-
-    parser.add_argument(
-        '--y-auto-zero',
-        action='append',
-        metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
-        nargs=3,
-        dest='y_auto_zero',
-        help='auto zero level correction of the specified curve.\n'
-             'CURVE_IDX is the zero-based index of the curve; \n'
-             'BG_START and BG_STOP are the left and the right bound\n'
-             'of the time interval at which the curve does not\n'
-             'contain signals (background interval).\n'
-             'You can use as many --y-auto-zero flags\n'
-             'as you want (one flag for one curve).\n\n')
-
-    parser.add_argument(
-        '--set-to-zero',
-        action='store',
-        metavar='CURVE_IDX',
-        nargs='+',
-        dest='zero',
-        default=None,
-        help='specify the indexes of the fake curves, whose values\n'
-             'you want to set to zero.\n'
-             'Enter \'all\' (without the quotes) to set all curves\n'
-             'values to zero.\n\n')
 
     # output settings --------------------------------------------------------
     parser.add_argument(
@@ -2259,153 +2433,13 @@ if __name__ == "__main__":
              'NOTE: you must enter file names for \n'
              '      all the input shots.\n\n')
 
-    parser.add_argument(
-        '-p', '--plot',
-        action='store',
-        nargs='+',
-        metavar='CURVE_IDX',
-        dest='plot',
-        help='specify the indexes of the curves you want to plot\n'
-             'or enter \'all\' (without quotes) to plot all the\n'
-             'curves).\n'
-             'Each curve from this list will be plotted separately\n'
-             'as a single graph.\n'
-             'You can specify --p-save flag in order to save them\n'
-             'as .png files.\n\n')
-
-    parser.add_argument(
-        '--p-hide', '--plot-hide',
-        action='store_true',
-        dest='p_hide',
-        help='if the --plot, --p-save and this flag is specified\n'
-             'the single plots will be saved but not shown.\n'
-             'This option can reduce the running time of the program.\n\n')
-
-    parser.add_argument(
-        '--p-save', '--save-plots-to',
-        action='store',
-        dest='plot_dir',
-        metavar='PLOT_DIR',
-        help='specify the directory.\n'
-             'Each curve from the list, entered via --plot flag\n'
-             'will be plotted and saved separately as .png file\n'
-             'to this directory.\n\n')
-
-    parser.add_argument(
-        '-m', '--multiplot',
-        action='append',
-        dest='multiplot',
-        metavar='CURVE_IDX',
-        nargs='+',
-        help='specify the indexes of the curves you want to plot\n'
-             'at one graph (one curve under the other with uniform\n'
-             'time scale).\n'
-             'You may use as many \'-m\' flags (with different lists\n'
-             'of curves) as you want. One flag for one graph.\n\n')
-
-    parser.add_argument(
-        '--mp-hide', '--multiplot-hide',
-        action='store_true',
-        dest='mp_hide',
-        help='if the --multiplot, --mp-save and this flag is specified\n'
-             'the multiplots will be saved but not shown.\n'
-             'This option can reduce the running time of the program.\n\n')
-
-    parser.add_argument(
-        '--mp-save', '--save-multiplot-as',
-        action='store',
-        dest='multiplot_dir',
-        metavar='MULTIPLOT_DIR',
-        help='specify the directory.\n'
-             'Each multiplot, entered via --multiplot flag(s)\n'
-             'will be plotted and saved separately as .png file\n'
-             'to this directory.\n\n')
-
     args = parser.parse_args()
     verbose = not args.silent
 
     try:
-        # input directory and files check
-        if args.src_dir:
-            args.src_dir = args.src_dir.strip()
-            assert os.path.isdir(args.src_dir), \
-                "Can not find directory {}".format(args.src_dir)
-        if args.files:
-            grouped_files = check_file_list(args.src_dir, args.files)
-            if not args.src_dir:
-                args.src_dir = os.path.dirname(grouped_files[0][0])
-        else:
-            grouped_files = get_grouped_file_list(args.src_dir, args.ext_list,
-                                                  args.group_size,
-                                                  args.sorted_by_ch)
-
-        # Now we have the list of files, grouped by shots:
-        # grouped_files == [
-        #                    ['shot001_osc01.wfm', 'shot001_osc02.csv', ...],
-        #                    ['shot002_osc01.wfm', 'shot002_osc02.csv', ...],
-        #                    ...etc.
-        #                  ]
-
-        # check partial import args
-        args.partial = check_partial_args(args.partial)
-
-        # raw check offset_by_voltage parameters (types)
-        it_offset = False  # interactive offset process
-        if args.offset_by_front:
-            assert len(args.offset_by_front) in [2, 4], \
-                ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
-                 "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
-                 "".format(arg_name="--offset-by-curve_level"))
-            if len(args.offset_by_front) < 4:
-                it_offset = True
-            args.offset_by_front = global_check_front_params(args.offset_by_front)
-
-        # # raw check labels not used
-        # # instead: the forbidden symbols are replaced during CSV saving
-        # if args.labels:
-        #     assert global_check_labels(args.labels), \
-        #         "Label value error! Only latin letters, " \
-        #         "numbers and underscore are allowed."
-
-        args.plot_dir = check_param_path(args.plot_dir, '--p_save')
-        args.multiplot_dir = check_param_path(args.multiplot_dir, '--mp-save')
-        args.save_to = check_param_path(args.save_to, '--save-to')
-        if not args.save_to:
-            args.save_to = os.path.dirname(grouped_files[0][0])
-
-        # checks if postfix and prefix can be used in filename
-        if args.prefix:
-            args.prefix = re.sub(r'[^-.\w]', '_', args.prefix)
-        if args.postfix:
-            args.postfix = re.sub(r'[^-.\w]', '_', args.postfix)
-
-        # check and convert plot and multiplot args
-        if args.plot:
-            args.plot = global_check_idx_list(args.plot, '--plot',
-                                          allow_all=True)
-        if args.multiplot:
-            for idx, m_param in enumerate(args.multiplot):
-                args.multiplot[idx] = global_check_idx_list(m_param,
-                                                            '--multiplot')
-
-        # raw check y_auto_zero parameters (types)
-        if args.y_auto_zero:
-            args.y_auto_zero = global_check_y_auto_zero_params(args.y_auto_zero)
-
-        # check and convert set-to-zero args
-        if args.zero:
-            args.zero = global_check_idx_list(args.zero, '--set-to-zero',
-                                              allow_all=True)
-
-        # raw check multiplier and delay
-        if args.multiplier is not None and args.delay is not None:
-            assert len(args.multiplier) == len(args.delay), \
-                ("The number of multipliers ({}) is not equal"
-                 " to the number of delays ({})."
-                 "".format(len(args.multiplier), len(args.delay)))
-
+        args = global_check(args)
         number_start, number_end = numbering_parser([files[0] for
-                                                    files in grouped_files])
+                                                    files in args.gr_files])
         labels_dict = {'labels': args.labels, 'units': args.units,
                        'time': args.time_unit}
 
@@ -2415,7 +2449,7 @@ if __name__ == "__main__":
                 args.multiplot or
                 args.offset_by_front):
 
-            for shot_idx, file_list in enumerate(grouped_files):
+            for shot_idx, file_list in enumerate(args.gr_files):
                 # get current shot name (number)
                 shot_name = os.path.basename(file_list[0])[number_start:number_end]
                 shot_name = trim_ext(shot_name, args.ext_list)
@@ -2456,7 +2490,7 @@ if __name__ == "__main__":
                     args.delay = update_by_front(data, args.offset_by_front,
                                                  args.multiplier, args.delay,
                                                  front_plot_name,
-                                                 interactive=it_offset)
+                                                 interactive=args.it_offset)
 
                 # reset to zero
                 if args.zero:
@@ -2536,12 +2570,11 @@ if __name__ == "__main__":
                                args.delay, args.offset_by_front,
                                args.y_auto_zero, args.partial)
 
-        print_duplicates(grouped_files, 30)
+        print_duplicates(args.gr_files, 30)
     except Exception as e:
         print()
         sys.exit(e)
     # ========================================================================
-    # TODO: comments
     # TODO: description
 
     # print(args.y_auto_zero)
