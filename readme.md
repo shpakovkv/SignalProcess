@@ -11,7 +11,7 @@ Key features:
 * multiplying by the specified multiplier and subtracting the specified delay independently for each signal
 * alignment of the time origin on the front edge of the selected signal (binding)
 * automatic subtraction of a constant component from the amplitude of selected signals
-* search for signal peaks with flexible adjustment of search parameters
+* search for signals' peaks with flexible adjustment of search parameters
 * automatic grouping of peaks (from different signals), coinciding (with the specified tolerance) in time
 * plotting of signals' graphs (preview)
 * construction of graphs with several signals and their peaks (with one axis of time, and several axes of amplitudes)
