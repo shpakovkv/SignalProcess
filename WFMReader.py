@@ -1,11 +1,11 @@
 """
 NAME
-    wfm_reader_lite - WFM files converter
+    WFMReader - WFM files converter
         
 SYNOPSIS
-    wfm_reader_lite [OPTION=OPT_VALUE]... -i FILE1 [FILE2 ...]
-    wfm_reader_lite [OPTION=OPT_VALUE]... -g=NUMBER
-    wfm_reader_lite [OPTION=OPT_VALUE]... -s=SETUPFILE
+    WFMReader [OPTION=OPT_VALUE]... -i FILE1 [FILE2 ...]
+    WFMReader [OPTION=OPT_VALUE]... -g=NUMBER
+    WFMReader [OPTION=OPT_VALUE]... -s=SETUPFILE
     
 DESCRIPTION
     Converts WFM files to CSV files.

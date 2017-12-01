@@ -17,7 +17,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 from matplotlib import pyplot as plt
 
-import wfm_reader_lite as wfm
+import WFMReader as wfm
 import PeakProcess as pp
 
 verbose = True
