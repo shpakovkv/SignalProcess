@@ -12,6 +12,4 @@
 *.png
 *test*.py
 *.xml
-data/
-TestShot/
-temp/
+untracked/
