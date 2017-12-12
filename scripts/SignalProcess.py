@@ -27,6 +27,76 @@ global_log = ""
 # ========================================
 # -----     CL INTERFACE     -------------
 # ========================================
+def get_parser():
+    p_disc = ("")
+
+    p_ep = ("")
+
+    p_use = ("python %(prog)s [options]\n"
+             "       python %(prog)s @file_with_options")
+
+    parser = argparse.ArgumentParser(parents=[get_base_parser()],
+                                     prog='SignalProcess.py',
+                                     description=p_disc,
+                                     epilog=p_ep,
+                                     fromfile_prefix_chars='@', usage=p_use)
+
+    # output settings --------------------------------------------------------
+    parser.add_argument(
+        '-s', '--save',
+        action='store_true',
+        dest='save',
+        help='saves the shot data to a CSV file after all the changes\n'
+             'have been applied.\n'
+             'NOTE: if one shot corresponds to one CSV file, and\n'
+             '      the output directory is not specified, the input\n'
+             '      files will be overwritten.\n\n')
+
+    parser.add_argument(
+        '-t', '--save-to', '--target-dir',
+        action='store',
+        metavar='DIR',
+        dest='save_to',
+        default='',
+        help='specify the output directory.\n\n')
+
+    parser.add_argument(
+        '--prefix',
+        action='store',
+        metavar='PREFIX',
+        dest='prefix',
+        default='',
+        help='specify the file name prefix. This prefix will be added\n'
+             'to the output file names during the automatic\n'
+             'generation of file names.\n'
+             'Default=\'\'.\n\n')
+
+    parser.add_argument(
+        '--postfix',
+        action='store',
+        metavar='POSTFIX',
+        dest='postfix',
+        default='',
+        help='specify the file name postfix. This postfix will be\n'
+             'added to the output file names during the automatic\n'
+             'generation of file names.\n'
+             'Default=\'\'.\n\n')
+
+    parser.add_argument(
+        '-o', '--output',
+        action='store',
+        nargs='+',
+        metavar='FILE',
+        dest='out_names',
+        help='specify the list of file names after the flag.\n'
+             'The output files with data will be save with the names\n'
+             'from this list. This will override the automatic\n'
+             'generation of file names.\n'
+             'NOTE: you must enter file names for \n'
+             '      all the input shots.\n\n')
+    return parser
+
+
 def get_input_files_opt_parser():
     parser = argparse.ArgumentParser(add_help=False,
                                      formatter_class=
@@ -1425,6 +1495,37 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
     return headers
 
 
+def do_save(signals_data, cl_args, shot_name, verbose=False):
+    """Makes filename, saves changed data, 
+    prints info about saving process.
+    
+    :param signals_data: SignalsData instance
+    :param cl_args: user-entered arguments (namespace from parser)
+    :param shot_name: shot number, needed for saving
+    :param verbose: show additional information or no
+    
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+    :type shot_name: str
+    :type verbose: bool
+    
+    :return: filename (full path)
+    :rtype: str
+    """
+    save_name = ("{pref}{number}{postf}.csv"
+                 "".format(pref=cl_args.prefix, number=shot_name,
+                           postf=cl_args.postfix))
+    save_path = os.path.join(cl_args.save_to, save_name)
+    save_signals_csv(save_path, signals_data)
+    if verbose:
+        max_rows = max(curve.data.shape[0] for curve in
+                       signals_data.curves.values())
+        print("Curves count = {}\n"
+              "Rows count = {} ".format(signals_data.count, max_rows))
+        print("Saved as {}".format(save_path))
+    return save_path
+
+
 def save_signals_csv(filename, signals, delimiter=",", precision=18):
     """Saves SignalsData to a CSV file.
     First three lines will be filled with header:
@@ -2116,6 +2217,50 @@ def calc_ylim(time, y, time_bounds=None, reserve=0.1):
     return y_min - reserve, y_max + reserve
 
 
+def do_multoplots(signals_data, cl_args, shot_name, verbose=False):
+    """Plots all the multiplot graphs specified by the user.
+    Saves the graphs that the user specified to save.
+    
+    :param signals_data: SignalsData instance
+    :param cl_args: user-entered arguments (namespace from parser)
+    :param shot_name: shot number, needed for saving
+    :param verbose: show additional information or no
+    
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+    :type shot_name: str
+    :type verbose: bool
+    
+    :return: None
+    
+    """
+    for curve_list in cl_args.multiplot:
+        check_plot_param(curve_list, signals_data.count,
+                         '--multiplot')
+    for curve_list in cl_args.multiplot:
+        plot_multiplot(signals_data, None, curve_list)
+        if cl_args.multiplot_dir is not None:
+            idx_list = "_".join(str(i) for
+                                i in sorted(curve_list))
+            mplot_name = ("{shot}_curves_"
+                          "{idx_list}.multiplot.png"
+                          "".format(shot=shot_name,
+                                    idx_list=idx_list))
+            mplot_path = os.path.join(cl_args.multiplot_dir,
+                                      mplot_name)
+            plt.savefig(mplot_path, dpi=400)
+            if verbose:
+                print("Multiplot is saved {}"
+                      "".format(mplot_path))
+        if not cl_args.mp_hide:
+            plt.show()
+        else:
+            # draw plot, but don't pause the process
+            # the plot will be closed as soon as drawn
+            plt.show(block=False)
+        plt.close('all')
+
+
 def plot_multiplot(data, peak_data, curves_list,
                    xlim=None, amp_unit=None,
                    time_unit=None, title=None):
@@ -2199,6 +2344,43 @@ def plot_multiplot(data, peak_data, curves_list,
                                      edgecolors='none', facecolors=color,
                                      linewidths=1.5, marker='x')
     fig.subplots_adjust(hspace=0)
+
+
+def do_plots(signals_data, cl_args, shot_name, verbose=False):
+    """Plots all the single curve graphs specified by the user.
+    Saves the graphs that the user specified to save.
+    
+    :param signals_data: SignalsData instance
+    :param cl_args: user-entered arguments (namespace from parser)
+    :param shot_name: shot number, needed for saving
+    :param verbose: show additional information or no
+    
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+    :type shot_name: str
+    :type verbose: bool
+    
+    :return: None
+    """
+    if cl_args.plot[0] == -1:  # 'all'
+        cl_args.plot = list(range(0, signals_data.count))
+    else:
+        check_plot_param(cl_args.plot, signals_data.count, '--plot')
+    for curve_idx in cl_args.plot:
+        plot_multiple_curve(signals_data.curves[curve_idx])
+        if cl_args.plot_dir is not None:
+            plot_name = (
+                "{shot}_curve_{idx}_{label}.plot.png"
+                "".format(shot=shot_name, idx=curve_idx,
+                          label=signals_data.curves[curve_idx].label))
+            plot_path = os.path.join(cl_args.plot_dir, plot_name)
+            plt.savefig(plot_path, dpi=400)
+            if verbose:
+                print("Plot is saved as {}".format(plot_path))
+        if not cl_args.p_hide:
+            plt.show()
+        else:
+            plt.show(block=False)
 
 
 def plot_multiple_curve(curve_list, peaks=None,
@@ -2366,82 +2548,19 @@ def global_check(options):
 # --------------   MAIN    ----------------------------------------
 # ======================================================
 if __name__ == "__main__":
-    p_disc = ("")
 
-    p_ep = ("")
-
-    p_use = ("python %(prog)s [options]\n"
-             "       python %(prog)s @file_with_options")
-
-    parser = argparse.ArgumentParser(parents=[get_base_parser()],
-                                     prog='SignalProcess.py',
-                                     description=p_disc,
-                                     epilog=p_ep,
-                                     fromfile_prefix_chars='@', usage=p_use)
-
-    # output settings --------------------------------------------------------
-    parser.add_argument(
-        '-s', '--save',
-        action='store_true',
-        dest='save',
-        help='saves the shot data to a CSV file after all the changes\n'
-             'have been applied.\n'
-             'NOTE: if one shot corresponds to one CSV file, and\n'
-             '      the output directory is not specified, the input\n'
-             '      files will be overwritten.\n\n')
-
-    parser.add_argument(
-        '-t', '--save-to', '--target-dir',
-        action='store',
-        metavar='DIR',
-        dest='save_to',
-        default='',
-        help='specify the output directory.\n\n')
-
-    parser.add_argument(
-        '--prefix',
-        action='store',
-        metavar='PREFIX',
-        dest='prefix',
-        default='',
-        help='specify the file name prefix. This prefix will be added\n'
-             'to the output file names during the automatic\n'
-             'generation of file names.\n'
-             'Default=\'\'.\n\n')
-
-    parser.add_argument(
-        '--postfix',
-        action='store',
-        metavar='POSTFIX',
-        dest='postfix',
-        default='',
-        help='specify the file name postfix. This postfix will be\n'
-             'added to the output file names during the automatic\n'
-             'generation of file names.\n'
-             'Default=\'\'.\n\n')
-
-    parser.add_argument(
-        '-o', '--output',
-        action='store',
-        nargs='+',
-        metavar='FILE',
-        dest='out_names',
-        help='specify the list of file names after the flag.\n'
-             'The output files with data will be save with the names\n'
-             'from this list. This will override the automatic\n'
-             'generation of file names.\n'
-             'NOTE: you must enter file names for \n'
-             '      all the input shots.\n\n')
-
+    parser = get_parser()
     args = parser.parse_args()
     verbose = not args.silent
 
     try:
         args = global_check(args)
+        # gets shot number from file names
         number_start, number_end = numbering_parser([files[0] for
                                                     files in args.gr_files])
-        labels_dict = {'labels': args.labels, 'units': args.units,
-                       'time': args.time_unit}
+        # # not in use
+        # labels_dict = {'labels': args.labels, 'units': args.units,
+        #                'time': args.time_unit}
 
         # MAIN LOOP
         if (args.save or
@@ -2497,7 +2616,7 @@ if __name__ == "__main__":
                     check_idx_list(args.zero, data.count - 1, "--set-to-zero")
                     if verbose:
                         print("Resetting to zero the values of the curves "
-                              "with index in {}".format(args.zero))
+                              "with indexes: {}".format(args.zero))
                     data = zero_curves(data, args.zero)
 
                 # multiplier and delay
@@ -2505,68 +2624,16 @@ if __name__ == "__main__":
 
                 # plot preview and save
                 if args.plot:
-                    # args.plot = check_plot(args.plot)
-                    if args.plot[0] == -1:  # 'all'
-                        args.plot = list(range(0, data.count))
-                    else:
-                        check_plot_param(args.plot, data.count, '--plot')
-                    for curve_idx in args.plot:
-                        plot_multiple_curve(data.curves[curve_idx])
-                        if args.plot_dir is not None:
-                            plot_name = (
-                                "{shot}_curve_{idx}_{label}.plot.png"
-                                "".format(shot=shot_name, idx=curve_idx,
-                                          label=data.curves[curve_idx].label))
-                            plot_path = os.path.join(args.plot_dir, plot_name)
-                            plt.savefig(plot_path, dpi=400)
-                            if verbose:
-                                print("Plot is saved as {}".format(plot_path))
-                        if not args.p_hide:
-                            plt.show()
-                        else:
-                            plt.show(block=False)
-                        plt.close('all')
+                    do_plots(data, args, shot_name, verbose)
 
                 # plot and save multi-plots
                 if args.multiplot:
-                    for curve_list in args.multiplot:
-                        check_plot_param(curve_list, data.count,
-                                         '--multiplot')
-                    for curve_list in args.multiplot:
-                        plot_multiplot(data, None, curve_list)
-                        if args.multiplot_dir is not None:
-                            idx_list = "_".join(str(i) for
-                                                i in sorted(curve_list))
-                            mplot_name = ("{shot}_curves_"
-                                          "{idx_list}.multiplot.png"
-                                          "".format(shot=shot_name,
-                                                    idx_list=idx_list))
-                            mplot_path = os.path.join(args.multiplot_dir,
-                                                      mplot_name)
-                            plt.savefig(mplot_path, dpi=400)
-                            if verbose:
-                                print("Multiplot is saved {}"
-                                      "".format(mplot_path))
-                        if not args.mp_hide:
-                            plt.show()
-                        else:
-                            plt.show(block=False)
-                        plt.close('all')
+                    do_multoplots(data, args, shot_name, verbose)
 
                 # save data
                 if args.save:
-                    save_name = ("{pref}{number}{postf}.csv"
-                                 "".format(pref=args.prefix, number=shot_name,
-                                           postf=args.postfix))
-                    save_path = os.path.join(args.save_to, save_name)
-                    save_signals_csv(save_path, data)
-                    if verbose:
-                        max_rows = max(curve.data.shape[0] for curve in
-                                       data.curves.values())
-                        print("Curves count = {}\n"
-                              "Rows count = {} ".format(data.count, max_rows))
-                        print("Saved as {}".format(save_path))
-                    save_m_log(file_list, save_path, labels, args.multiplier,
+                    saved_as = do_save(data, args, shot_name, verbose)
+                    save_m_log(file_list, saved_as, labels, args.multiplier,
                                args.delay, args.offset_by_front,
                                args.y_auto_zero, args.partial)
 
