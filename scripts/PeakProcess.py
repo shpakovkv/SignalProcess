@@ -16,6 +16,108 @@ pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
 
 
+def get_parser():
+    """Returns final CL args parser.
+
+    :return: argparse.parser
+    """
+    base_parser = sp.get_base_parser()
+    p_use = ('python %(prog)s [options]\n'
+             '       python %(prog)s @file_with_options')
+    p_desc = ('')
+    p_ep = ('')
+
+    parser = argparse.ArgumentParser(parents=[base_parser],
+                                     prog='PeakProcess.py', usage=p_use,
+                                     description=p_desc, epilog=p_ep)
+    parser.add_argument(
+        '--peak',
+        action='store',
+        dest='save',
+        metavar=('LEVEL', 'DIFF_TIME'),
+        nargs='+',
+        type=float,
+        help='description in development\n\n')
+
+    parser.add_argument(
+        '--time-bounds',
+        action='store',
+        dest='save',
+        metavar=('LEFT', 'RIGHT'),
+        nargs=2,
+        type=float,
+        help='description in development\n\n')
+
+    parser.add_argument(
+        '--t-noise',
+        action='store',
+        dest='save',
+        metavar='T',
+        type=float,
+        help='description in development\n\n')
+
+    parser.add_argument(
+        '--noise-attenuation',
+        action='store',
+        dest='save',
+        type=float,
+        help='description in development\n\n')
+
+    parser.add_argument(
+        '-s', '--save',
+        action='store_true',
+        dest='save',
+        help='saves the shot data to a CSV file after all the changes\n'
+             'have been applied.\n'
+             'NOTE: if one shot corresponds to one CSV file, and\n'
+             '      the output directory is not specified, the input\n'
+             '      files will be overwritten.\n\n')
+
+    parser.add_argument(
+        '-t', '--save-to', '--target-dir',
+        action='store',
+        metavar='DIR',
+        dest='save_to',
+        default='',
+        help='specify the output directory.\n\n')
+
+    parser.add_argument(
+        '--prefix',
+        action='store',
+        metavar='PREFIX',
+        dest='prefix',
+        default='',
+        help='specify the file name prefix. This prefix will be added\n'
+             'to the output file names during the automatic\n'
+             'generation of file names.\n'
+             'Default=\'\'.\n\n')
+
+    parser.add_argument(
+        '--postfix',
+        action='store',
+        metavar='POSTFIX',
+        dest='postfix',
+        default='',
+        help='specify the file name postfix. This postfix will be\n'
+             'added to the output file names during the automatic\n'
+             'generation of file names.\n'
+             'Default=\'\'.\n\n')
+
+    parser.add_argument(
+        '-o', '--output',
+        action='store',
+        nargs='+',
+        metavar='FILE',
+        dest='out_names',
+        help='specify the list of file names after the flag.\n'
+             'The output files with data will be save with the names\n'
+             'from this list. This will override the automatic\n'
+             'generation of file names.\n'
+             'NOTE: you must enter file names for \n'
+             '      all the input shots.\n\n')
+    return parser
+
+
 class SinglePeak:
     """Peak object.
     """
@@ -644,15 +746,7 @@ def group_peaks(data, window):
 
 
 if __name__ == '__main__':
-    base_parser = sp.get_base_parser()
-    p_use = ('python %(prog)s [options]\n'
-             '       python %(prog)s @file_with_options')
-    p_desc = ('')
-    p_ep = ('')
-
-    parser = argparse.ArgumentParser(parents=[base_parser],
-                                     prog='PeakProcess.py', usage=p_use,
-                                     description=p_desc, epilog=p_ep)
+    parser = get_parser()
 
     args = parser.parse_args()
     verbose = not args.silent
