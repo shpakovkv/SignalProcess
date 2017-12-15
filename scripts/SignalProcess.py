@@ -1129,6 +1129,16 @@ def add_zeros_to_filename(full_path, count):
     return os.path.join(folder_path, name)
 
 
+def get_shot_number_str(filename, num_mask, ext_list):
+    # get current shot name (number)
+    shot_name = os.path.basename(filename)
+    shot_name = shot_name[num_mask[0]:num_mask[1]]
+
+    # in case of full file name
+    shot_name = trim_ext(shot_name, ext_list)
+    return shot_name
+
+
 def numbering_parser(group):
     """
     Finds serial number (substring) in the file name string.
@@ -1997,6 +2007,17 @@ def update_by_y_auto_zero(data, y_auto_zero_params,
     return new_delay
 
 
+def do_y_zero_offset(signals_data, cl_args):
+    check_y_auto_zero_params(signals_data, cl_args.y_auto_zero)
+
+    # updates delays with accordance to Y zero offset
+    cl_args.delay = update_by_y_auto_zero(signals_data, cl_args.y_auto_zero,
+                                          cl_args.multiplier,
+                                          cl_args.delay,
+                                          verbose=True)
+    return cl_args
+
+
 def update_by_front(signals_data, args, multiplier, delay,
                     front_plot_name, interactive=False):
     """
@@ -2150,6 +2171,21 @@ def update_by_front(signals_data, args, multiplier, delay,
     return new_delay
 
 
+def do_offset_by_front(signals_data, cl_args, shot_name):
+    # check_offset_by_front(data, args.offset_by_front)
+    check_idx_list(cl_args.offset_by_front[0], signals_data.count - 1,
+                   "--offset-by-curve-front")
+
+    # updates delay values with accordance to voltage front
+    front_plot_name = get_front_plot_name(cl_args.offset_by_front,
+                                          cl_args.save_to, shot_name)
+    cl_args.delay = update_by_front(signals_data, cl_args.offset_by_front,
+                                    cl_args.multiplier, cl_args.delay,
+                                    front_plot_name,
+                                    interactive=cl_args.it_offset)
+    return cl_args
+
+
 def zero_one_curve(curve, max_rows=30):
     """Reesets the y values to 0, leaves first 'max_rows' rows
     and deletes the others.
@@ -2181,6 +2217,15 @@ def zero_curves(signals, curve_indexes, max_rows=30):
     for idx in curve_indexes:
         signals.curves[idx] = zero_one_curve(signals.curves[idx], max_rows)
     return data
+
+
+def do_reset_to_zero(signals_data, cl_args, verbose):
+    check_idx_list(cl_args.zero, signals_data.count - 1, "--set-to-zero")
+    if verbose:
+        print("Resetting to zero the values of the curves "
+              "with indexes: {}".format(cl_args.zero))
+    signals_data = zero_curves(signals_data, cl_args.zero)
+    return signals_data
 
 
 # ========================================
@@ -2555,9 +2600,29 @@ if __name__ == "__main__":
 
     try:
         args = global_check(args)
-        # gets shot number from file names
-        number_start, number_end = numbering_parser([files[0] for
-                                                    files in args.gr_files])
+
+        '''
+        num_mask (tuple) - contains the first and last index of 
+        the substring in the file name that contains the shot number.
+        The last idx is excluded: [first, last)
+
+        Example of the data file of experiment number 137
+        Experiment_0137_Ch02_specific_environment.wfm
+                  /    \
+               first   last
+        'first' numeral is '0' with idx = 11, 'last' is '7' with idx = 14
+        The interval (num_mask) = [11, 15)
+
+        The 'Ch02' is the oscilloscope channel number 
+        whose data is written to that file. 
+        In most cases the channel number have 2 digits, 
+        while the shot number have 4 or more digits.
+        '''
+        num_mask = numbering_parser([files[0] for
+                                    files in args.gr_files])
+
+        # number_start, number_end = numbering_parser([files[0] for
+        #                                             files in args.gr_files])
         # # not in use
         # labels_dict = {'labels': args.labels, 'units': args.units,
         #                'time': args.time_unit}
@@ -2569,19 +2634,19 @@ if __name__ == "__main__":
                 args.offset_by_front):
 
             for shot_idx, file_list in enumerate(args.gr_files):
-                # get current shot name (number)
-                shot_name = os.path.basename(file_list[0])[number_start:number_end]
-                shot_name = trim_ext(shot_name, args.ext_list)
+                shot_name = get_shot_number_str(file_list[0], num_mask,
+                                                args.ext_list)
+
                 # get SignalsData
                 data = read_signals(file_list, start=args.partial[0],
                                     step=args.partial[1], points=args.partial[2],
                                     labels=args.labels, units=args.units,
                                     time_unit=args.time_unit)
-                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                 if verbose:
                     print("The number of curves = {}".format(data.count))
 
-                # checks multipliers, delays and labels numbers
+                # checks the number of columns with data,
+                # as well as the number of multipliers, delays, labels
                 check_coeffs_number(data.count * 2, ["multiplier", "delay"],
                                     args.multiplier, args.delay)
                 check_coeffs_number(data.count, ["label", "unit"],
@@ -2589,35 +2654,15 @@ if __name__ == "__main__":
 
                 # check y_zero_offset parameters (if idx is out of range)
                 if args.y_auto_zero:
-                    check_y_auto_zero_params(data, args.y_auto_zero)
-
-                    # updates delays with accordance to Y zero offset
-                    args.delay = update_by_y_auto_zero(data, args.y_auto_zero,
-                                                       args.multiplier,
-                                                       args.delay,
-                                                       verbose=True)
+                    args = do_y_zero_offset(data, args)
 
                 # check offset_by_voltage parameters (if idx is out of range)
                 if args.offset_by_front:
-                    # check_offset_by_front(data, args.offset_by_front)
-                    check_idx_list(args.offset_by_front[0], data.count - 1,
-                                   "--offset-by-curve-front")
-
-                    # updates delay values with accordance to voltage front
-                    front_plot_name = get_front_plot_name(args.offset_by_front,
-                                                          args.save_to, shot_name)
-                    args.delay = update_by_front(data, args.offset_by_front,
-                                                 args.multiplier, args.delay,
-                                                 front_plot_name,
-                                                 interactive=args.it_offset)
+                    args = do_offset_by_front(data, args, shot_name)
 
                 # reset to zero
                 if args.zero:
-                    check_idx_list(args.zero, data.count - 1, "--set-to-zero")
-                    if verbose:
-                        print("Resetting to zero the values of the curves "
-                              "with indexes: {}".format(args.zero))
-                    data = zero_curves(data, args.zero)
+                    data = do_reset_to_zero(data, args, verbose)
 
                 # multiplier and delay
                 data = multiplier_and_delay(data, args.multiplier, args.delay)
@@ -2633,6 +2678,7 @@ if __name__ == "__main__":
                 # save data
                 if args.save:
                     saved_as = do_save(data, args, shot_name, verbose)
+                    labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                     save_m_log(file_list, saved_as, labels, args.multiplier,
                                args.delay, args.offset_by_front,
                                args.y_auto_zero, args.partial)
