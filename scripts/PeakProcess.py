@@ -21,17 +21,87 @@ def get_parser():
 
     :return: argparse.parser
     """
-    base_parser = sp.get_base_parser()
     p_use = ('python %(prog)s [options]\n'
              '       python %(prog)s @file_with_options')
     p_desc = ('')
     p_ep = ('')
 
     parser = argparse.ArgumentParser(
-        parents=[base_parser], prog='PeakProcess.py', usage=p_use,
-        description=p_desc, epilog=p_ep,
+        parents=[sp.get_input_files_args_parser(),
+                 sp.get_mult_del_args_parser(),
+                 sp.get_plot_args_parser(),
+                 get_peak_args_parser(),
+                 get_pk_save_args_parser()],
+        prog='SignalProcess.py',
+        description=p_desc, epilog=p_ep, usage=p_use,
+        fromfile_prefix_chars='@',
         formatter_class=argparse.RawTextHelpFormatter)
+    return parser
 
+
+def get_pk_save_args_parser():
+    """Returns peak save options parser.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
+    # parser.add_argument(
+    #     '-s', '--save',
+    #     action='store_true',
+    #     dest='save',
+    #     help='saves the shot data to a CSV file after all the changes\n'
+    #          'have been applied.\n'
+    #          'NOTE: if one shot corresponds to one CSV file, and\n'
+    #          '      the output directory is not specified, the input\n'
+    #          '      files will be overwritten.\n\n')
+
+    parser.add_argument(
+        '-t', '--save-to', '--target-dir',
+        action='store',
+        metavar='DIR',
+        dest='save_to',
+        default='',
+        help='specify the output directory.\n\n')
+
+    # parser.add_argument(
+    #     '--prefix',
+    #     action='store',
+    #     metavar='PREFIX',
+    #     dest='prefix',
+    #     default='',
+    #     help='specify the file name prefix. This prefix will be added\n'
+    #          'to the output file names during the automatic\n'
+    #          'generation of file names.\n'
+    #          'Default=\'\'.\n\n')
+    #
+    # parser.add_argument(
+    #     '--postfix',
+    #     action='store',
+    #     metavar='POSTFIX',
+    #     dest='postfix',
+    #     default='',
+    #     help='specify the file name postfix. This postfix will be\n'
+    #          'added to the output file names during the automatic\n'
+    #          'generation of file names.\n'
+    #          'Default=\'\'.\n\n')
+
+    # parser.add_argument(
+    #     '-o', '--output',
+    #     action='store',
+    #     nargs='+',
+    #     metavar='FILE',
+    #     dest='out_names',
+    #     help='specify the list of file names after the flag.\n'
+    #          'The output files with data will be save with the names\n'
+    #          'from this list. This will override the automatic\n'
+    #          'generation of file names.\n'
+    #          'NOTE: you must enter file names for \n'
+    #          '      all the input shots.\n\n')
+    return parser
+
+
+def get_peak_args_parser():
+    """Returns peak search options parser.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         '--peak',
         action='store',
@@ -64,59 +134,6 @@ def get_parser():
         dest='save',
         type=float,
         help='description in development\n\n')
-
-    parser.add_argument(
-        '-s', '--save',
-        action='store_true',
-        dest='save',
-        help='saves the shot data to a CSV file after all the changes\n'
-             'have been applied.\n'
-             'NOTE: if one shot corresponds to one CSV file, and\n'
-             '      the output directory is not specified, the input\n'
-             '      files will be overwritten.\n\n')
-
-    parser.add_argument(
-        '-t', '--save-to', '--target-dir',
-        action='store',
-        metavar='DIR',
-        dest='save_to',
-        default='',
-        help='specify the output directory.\n\n')
-
-    parser.add_argument(
-        '--prefix',
-        action='store',
-        metavar='PREFIX',
-        dest='prefix',
-        default='',
-        help='specify the file name prefix. This prefix will be added\n'
-             'to the output file names during the automatic\n'
-             'generation of file names.\n'
-             'Default=\'\'.\n\n')
-
-    parser.add_argument(
-        '--postfix',
-        action='store',
-        metavar='POSTFIX',
-        dest='postfix',
-        default='',
-        help='specify the file name postfix. This postfix will be\n'
-             'added to the output file names during the automatic\n'
-             'generation of file names.\n'
-             'Default=\'\'.\n\n')
-
-    parser.add_argument(
-        '-o', '--output',
-        action='store',
-        nargs='+',
-        metavar='FILE',
-        dest='out_names',
-        help='specify the list of file names after the flag.\n'
-             'The output files with data will be save with the names\n'
-             'from this list. This will override the automatic\n'
-             'generation of file names.\n'
-             'NOTE: you must enter file names for \n'
-             '      all the input shots.\n\n')
     return parser
 
 
@@ -755,6 +772,69 @@ if __name__ == '__main__':
 
     try:
         args = sp.global_check(args)
+        '''
+                num_mask (tuple) - contains the first and last index
+                of substring of filename
+                That substring contains the shot number.
+                The last idx is excluded: [first, last).
+                Read numbering_parser docstring for more info.
+                '''
+        num_mask = sp.numbering_parser([files[0] for
+                                       files in args.gr_files])
+
+        # MAIN LOOP
+        if (args.save or
+                args.plot or
+                args.multiplot or
+                args.offset_by_front):
+
+            for shot_idx, file_list in enumerate(args.gr_files):
+                shot_name = sp.get_shot_number_str(file_list[0], num_mask,
+                                                   args.ext_list)
+
+                # get SignalsData
+                data = sp.read_signals(file_list, start=args.partial[0],
+                                       step=args.partial[1], points=args.partial[2],
+                                       labels=args.labels, units=args.units,
+                                       time_unit=args.time_unit)
+                if verbose:
+                    print("The number of curves = {}".format(data.count))
+
+                # checks the number of columns with data,
+                # as well as the number of multipliers, delays, labels
+                sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+                                       args.multiplier, args.delay)
+                sp.check_coeffs_number(data.count, ["label", "unit"],
+                                       args.labels, args.units)
+
+                # multiplier and delay
+                data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
+
+                # find peaks
+
+                # group peaks
+
+                # save peaks
+
+                # or read peaks from file
+
+                # plot preview and save
+                if args.plot:
+                    sp.do_plots(data, args, shot_name, verbose)
+
+                # plot and save multi-plots
+                if args.multiplot:
+                    sp.do_multoplots(data, args, shot_name, verbose)
+
+                # save data
+                if args.save:
+                    saved_as = sp.do_save(data, args, shot_name, verbose)
+                    labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+                    sp.save_m_log(file_list, saved_as, labels, args.multiplier,
+                                  args.delay, args.offset_by_front,
+                                  args.y_auto_zero, args.partial)
+
+        sp.print_duplicates(args.gr_files, 30)
     except Exception as e:
         print()
         sys.exit(e)
