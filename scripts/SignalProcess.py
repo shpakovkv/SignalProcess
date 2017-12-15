@@ -28,6 +28,8 @@ global_log = ""
 # -----     CL INTERFACE     -------------
 # ========================================
 def get_parser():
+    """Returns final parser.
+    """
     p_disc = ("")
 
     p_ep = ("")
@@ -36,12 +38,20 @@ def get_parser():
              "       python %(prog)s @file_with_options")
 
     parser = argparse.ArgumentParser(
-        parents=[get_base_parser()], prog='SignalProcess.py',
+        parents=[get_input_files_args_parser(), get_mult_del_args_parser(),
+                 get_data_corr_args_parser(), get_plot_args_parser(),
+                 get_output_args_parser()],
+        prog='SignalProcess.py',
         description=p_disc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
         formatter_class=argparse.RawTextHelpFormatter)
+    return parser
 
-    # output settings --------------------------------------------------------
+
+def get_output_args_parser():
+    """Returns the parser of parameters of save data.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         '-s', '--save',
         action='store_true',
@@ -97,10 +107,10 @@ def get_parser():
     return parser
 
 
-def get_input_files_opt_parser():
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+def get_input_files_args_parser():
+    """Returns the parser of parameters of read data.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
 
     # input files ------------------------------------------------------------
     parser.add_argument(
@@ -215,12 +225,10 @@ def get_input_files_opt_parser():
     return parser
 
 
-def get_mult_del_opt_parser():
+def get_mult_del_args_parser():
     """Returns multiplier and delay options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument(
         '--multiplier',
@@ -250,12 +258,10 @@ def get_mult_del_opt_parser():
     return parser
 
 
-def get_data_corr_opt_parser():
+def get_data_corr_args_parser():
     """Returns data manipulation options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument(
         '--offset-by-curve-front',
@@ -311,12 +317,10 @@ def get_data_corr_opt_parser():
     return parser
 
 
-def get_plot_opt_parser():
+def get_plot_args_parser():
     """Returns plot options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument(
         '-p', '--plot',
@@ -380,16 +384,6 @@ def get_plot_opt_parser():
              'will be plotted and saved separately as .png file\n'
              'to this directory.\n\n')
     return parser
-
-
-def get_base_parser():
-    """Returns base parser.
-    """
-    return argparse.ArgumentParser(parents=[get_input_files_opt_parser(),
-                                            get_mult_del_opt_parser(),
-                                            get_data_corr_opt_parser(),
-                                            get_plot_opt_parser()],
-                                   add_help=False)
 
 
 # ========================================
