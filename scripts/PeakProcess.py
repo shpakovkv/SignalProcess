@@ -27,9 +27,11 @@ def get_parser():
     p_desc = ('')
     p_ep = ('')
 
-    parser = argparse.ArgumentParser(parents=[base_parser],
-                                     prog='PeakProcess.py', usage=p_use,
-                                     description=p_desc, epilog=p_ep)
+    parser = argparse.ArgumentParser(
+        parents=[base_parser], prog='PeakProcess.py', usage=p_use,
+        description=p_desc, epilog=p_ep,
+        formatter_class=argparse.RawTextHelpFormatter)
+
     parser.add_argument(
         '--peak',
         action='store',

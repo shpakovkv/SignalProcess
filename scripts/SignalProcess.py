@@ -35,11 +35,11 @@ def get_parser():
     p_use = ("python %(prog)s [options]\n"
              "       python %(prog)s @file_with_options")
 
-    parser = argparse.ArgumentParser(parents=[get_base_parser()],
-                                     prog='SignalProcess.py',
-                                     description=p_disc,
-                                     epilog=p_ep,
-                                     fromfile_prefix_chars='@', usage=p_use)
+    parser = argparse.ArgumentParser(
+        parents=[get_base_parser()], prog='SignalProcess.py',
+        description=p_disc, epilog=p_ep, usage=p_use,
+        fromfile_prefix_chars='@',
+        formatter_class=argparse.RawTextHelpFormatter)
 
     # output settings --------------------------------------------------------
     parser.add_argument(
