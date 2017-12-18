@@ -136,7 +136,7 @@ def get_peak_args_parser():
         dest='curves',
         metavar='CURVE',
         nargs='+',
-        type=float,
+        type=int,
         help='description in development\n\n')
 
     parser.add_argument(
@@ -146,6 +146,7 @@ def get_peak_args_parser():
         metavar=('LEFT', 'RIGHT'),
         nargs=2,
         type=float,
+        default=(None, None),
         help='description in development\n\n')
 
     parser.add_argument(
@@ -922,107 +923,113 @@ if __name__ == '__main__':
             The last idx is excluded: [first, last).
             Read numbering_parser docstring for more info.
             '''
-    num_mask = sp.numbering_parser([files[0] for
-                                   files in args.gr_files])
+    # num_mask = sp.numbering_parser([files[0] for
+    #                                files in args.gr_files])
+    num_mask = (0, 4)
 
     # MAIN LOOP
-    print("Loop")
-    if (args.save or
-            args.plot or
-            args.multiplot or
-            args.offset_by_front):
-        print("in loop")
-        for shot_idx, file_list in enumerate(args.gr_files):
-            shot_name = sp.get_shot_number_str(file_list[0], num_mask,
-                                               args.ext_list)
+    # if (args.save or
+    #         args.plot or
+    #         args.multiplot or
+    #         args.offset_by_front):
+    print(len(args.gr_files))
+    print("\n".join(args.gr_files[0]))
+    print("---------------------------------------------------")
+    for shot_idx, file_list in enumerate(args.gr_files):
+        shot_name = sp.get_shot_number_str(file_list[0], num_mask,
+                                           args.ext_list)
 
-            # get SignalsData
-            data = sp.read_signals(file_list, start=args.partial[0],
-                                   step=args.partial[1], points=args.partial[2],
-                                   labels=args.labels, units=args.units,
-                                   time_unit=args.time_unit)
+        # get SignalsData
+        data = sp.read_signals(file_list, start=args.partial[0],
+                               step=args.partial[1], points=args.partial[2])
+        # data = sp.read_signals(file_list, start=args.partial[0],
+        #                        step=args.partial[1], points=args.partial[2],
+        #                        labels=args.labels, units=args.units,
+        #                        time_unit=args.time_unit)
+        print(data.count)
+        if verbose:
+            print("The number of curves = {}".format(data.count))
+
+        # checks the number of columns with data,
+        # as well as the number of multipliers, delays, labels
+        sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+                               args.multiplier, args.delay)
+        sp.check_coeffs_number(data.count, ["label", "unit"],
+                               args.labels, args.units)
+
+        # multiplier and delay
+        data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
+
+        # find peaks
+        # TODO enter peak finder condition
+        if True:
+            unsorted_peaks = []
+            for idx in args.curves:
+                if verbose:
+                    print("Curve #" + str(idx))
+                is_negative = is_neg(check_polarity(data.curves[idx]))
+                new_peaks, peak_log = peak_finder(
+                    data.time(idx), data.value(idx),
+                    level=args.level, diff_time=args.diff,
+                    time_bounds=args.t_bounds, tnoise=args.t_noise,
+                    is_negative=is_negative, noise_attenuation=args.noise_att,
+                    graph=False
+                )
+                # TODO single graph with peaks
+
+                unsorted_peaks.append(new_peaks)
+                if verbose:
+                    print(peak_log)
+
+            # step 7 - group peaks [and plot all curves with peaks]
+            peak_data, peak_map = group_peaks(unsorted_peaks, args.gr_diff)
+
+            # step 8 - save peaks data
             if verbose:
-                print("The number of curves = {}".format(data.count))
+                print("Saving peak data...")
+            # TODO peaks_filename (del data file ext)
+            pk_filename = os.path.join(args.save_to, peaks_dir,
+                                       os.path.basename(file_list[0])[:-4])
+            save_peaks_csv(pk_filename, peak_data)
 
-            # checks the number of columns with data,
-            # as well as the number of multipliers, delays, labels
-            sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
-                                   args.multiplier, args.delay)
-            sp.check_coeffs_number(data.count, ["label", "unit"],
-                                   args.labels, args.units)
+            # step 9 - save multicurve plot
+            multiplot_name = pk_filename[:]
+            multiplot_name = multiplot_name + ".plot.png"
+            multiplot_name = os.path.join(args.save_to, multiplot_name)
 
-            # multiplier and delay
-            data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
+            if verbose:
+                print("Saving all peaks as " + multiplot_name)
+            sp.plot_multiplot(
+                data, peak_data, args.curves,
+                xlim=args.t_bounds)
+            # TODO save multiplot
+            pyplot.show()
 
-            # find peaks
-            if args.peak:
-                unsorted_peaks = []
-                for idx in args.curves:
-                    if verbose:
-                        print("Curve #" + str(idx))
-                    is_negative = is_neg(check_polarity(data.curves[idx]))
-                    new_peaks, peak_log = peak_finder(
-                        data.time(idx), data.value(idx),
-                        level=args.level, diff_time=args.diff,
-                        time_bounds=args.t_bounds, tnoise=args.t_noise,
-                        is_negative=is_negative, noise_attenuation=args.noise_att,
-                        graph=False
-                    )
-                    # TODO single graph with peaks
+            # plot_peaks_all(data, peak_data, args.curves,
+            #                xlim=params.get("time_bounds", None),
+            #                show=True, save=True, save_as=multiplot_name)
 
-                    unsorted_peaks.append(new_peaks)
-                    if verbose:
-                        print(peak_log)
+        # group peaks
 
-                # step 7 - group peaks [and plot all curves with peaks]
-                peak_data, peak_map = group_peaks(unsorted_peaks, args.gr_diff)
+        # save peaks
 
-                # step 8 - save peaks data
-                if verbose:
-                    print("Saving peak data...")
-                # TODO peaks_filename (del data file ext)
-                pk_filename = os.path.join(args.save_to, peaks_dir,
-                                           os.path.basename(file_list[0])[:-4])
-                save_peaks_csv(pk_filename, peak_data)
+        # or read peaks from file
 
-                # step 9 - save multicurve plot
-                multiplot_name = pk_filename[:]
-                multiplot_name = multiplot_name + ".plot.png"
-                multiplot_name = os.path.join(args.save_to, multiplot_name)
+        # plot preview and save
+        if args.plot:
+            sp.do_plots(data, args, shot_name, verbose)
 
-                if verbose:
-                    print("Saving all peaks as " + multiplot_name)
-                sp.plot_multiplot(
-                    data, peak_data, args.curves,
-                    xlim=args.t_bounds)
-                # TODO save multiplot
-                pyplot.show()
+        # plot and save multi-plots
+        if args.multiplot:
+            sp.do_multoplots(data, args, shot_name, verbose)
 
-                # plot_peaks_all(data, peak_data, args.curves,
-                #                xlim=params.get("time_bounds", None),
-                #                show=True, save=True, save_as=multiplot_name)
-
-            # group peaks
-
-            # save peaks
-
-            # or read peaks from file
-
-            # plot preview and save
-            if args.plot:
-                sp.do_plots(data, args, shot_name, verbose)
-
-            # plot and save multi-plots
-            if args.multiplot:
-                sp.do_multoplots(data, args, shot_name, verbose)
-
-            # save data
-            if args.save:
-                saved_as = sp.do_save(data, args, shot_name, verbose)
-                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
-                sp.save_m_log(file_list, saved_as, labels, args.multiplier,
-                              args.delay, args.offset_by_front,
-                              args.y_auto_zero, args.partial)
+        # save data
+        if args.save:
+            saved_as = sp.do_save(data, args, shot_name, verbose)
+            labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+            sp.save_m_log(file_list, saved_as, labels, args.multiplier,
+                          args.delay, args.offset_by_front,
+                          args.y_auto_zero, args.partial)
 
     sp.print_duplicates(args.gr_files, 30)
     # except Exception as e:
