@@ -1370,7 +1370,11 @@ def read_signals(file_list, start=0, step=1, points=-1,
         if time_unit:
             current_time_unit = time_unit
         elif new_header:
-            current_time_unit = check_header_label(new_header[2], 1)[0]
+            head = check_header_label(new_header[2], 1)
+            if head:
+                current_time_unit = head[0]
+            else:
+                current_time_unit = None
 
         data.append(new_data, current_labels, current_units, current_time_unit)
 
