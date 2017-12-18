@@ -114,7 +114,7 @@ def get_input_files_args_parser():
 
     # input files ------------------------------------------------------------
     parser.add_argument(
-        '-d', '--scr', '--source-dir',
+        '-d', '--src', '--source-dir',
         action='store',
         metavar='DIR',
         dest='src_dir',
@@ -2598,7 +2598,7 @@ def global_check(options):
                                               options.ext_list,
                                               options.group_size,
                                               options.sorted_by_ch)
-    args.gr_files = gr_files
+    options.gr_files = gr_files
 
     # Now we have the list of files, grouped by shots:
     # gr_files == [
@@ -2609,18 +2609,6 @@ def global_check(options):
 
     # check partial import options
     options.partial = check_partial_args(options.partial)
-
-    # raw check offset_by_voltage parameters (types)
-    options.it_offset = False  # interactive offset process
-    if options.offset_by_front:
-        assert len(options.offset_by_front) in [2, 4], \
-            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
-             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
-             "".format(arg_name="--offset-by-curve_level"))
-        if len(options.offset_by_front) < 4:
-            options.it_offset = True
-        options.offset_by_front = \
-            global_check_front_params(options.offset_by_front)
 
     # # raw check labels not used
     # # instead: the forbidden symbols are replaced during CSV saving
@@ -2636,12 +2624,6 @@ def global_check(options):
     if not options.save_to:
         options.save_to = os.path.dirname(gr_files[0][0])
 
-    # checks if postfix and prefix can be used in filename
-    if options.prefix:
-        options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
-    if options.postfix:
-        options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
-
     # check and convert plot and multiplot options
     if options.plot:
         options.plot = global_check_idx_list(options.plot, '--plot',
@@ -2650,6 +2632,24 @@ def global_check(options):
         for idx, m_param in enumerate(options.multiplot):
             options.multiplot[idx] = global_check_idx_list(m_param,
                                                         '--multiplot')
+
+    # checks if postfix and prefix can be used in filename
+    if options.prefix:
+        options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
+    if options.postfix:
+        options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
+
+    # raw check offset_by_voltage parameters (types)
+    options.it_offset = False  # interactive offset process
+    if options.offset_by_front:
+        assert len(options.offset_by_front) in [2, 4], \
+            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
+             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
+             "".format(arg_name="--offset-by-curve_level"))
+        if len(options.offset_by_front) < 4:
+            options.it_offset = True
+        options.offset_by_front = \
+            global_check_front_params(options.offset_by_front)
 
     # raw check y_auto_zero parameters (types)
     if options.y_auto_zero:
