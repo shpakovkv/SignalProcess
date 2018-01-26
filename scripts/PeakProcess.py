@@ -4,6 +4,7 @@ from __future__ import print_function
 
 from matplotlib import pyplot
 import os
+import re
 import sys
 import bisect
 import argparse
@@ -21,45 +22,120 @@ def get_parser():
 
     :return: argparse.parser
     """
-    base_parser = sp.get_base_parser()
     p_use = ('python %(prog)s [options]\n'
              '       python %(prog)s @file_with_options')
     p_desc = ('')
     p_ep = ('')
 
-    parser = argparse.ArgumentParser(parents=[base_parser],
-                                     prog='PeakProcess.py', usage=p_use,
-                                     description=p_desc, epilog=p_ep)
+    parser = argparse.ArgumentParser(
+        parents=[sp.get_input_files_args_parser(),
+                 sp.get_mult_del_args_parser(),
+                 sp.get_plot_args_parser(),
+                 get_peak_args_parser(),
+                 get_pk_save_args_parser()],
+        prog='SignalProcess.py',
+        description=p_desc, epilog=p_ep, usage=p_use,
+        fromfile_prefix_chars='@',
+        formatter_class=argparse.RawTextHelpFormatter)
+    return parser
+
+
+def get_pk_save_args_parser():
+    """Returns peak save options parser.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
+    # parser.add_argument(
+    #     '-s', '--save',
+    #     action='store_true',
+    #     dest='save',
+    #     help='saves the shot data to a CSV file after all the changes\n'
+    #          'have been applied.\n'
+    #          'NOTE: if one shot corresponds to one CSV file, and\n'
+    #          '      the output directory is not specified, the input\n'
+    #          '      files will be overwritten.\n\n')
+
+    # TODO default directory to save peaks
     parser.add_argument(
-        '--peak',
+        '-t', '--save-to', '--target-dir',
         action='store',
-        dest='save',
-        metavar=('LEVEL', 'DIFF_TIME'),
+        metavar='DIR',
+        dest='save_to',
+        default='',
+        help='specify the output directory.\n\n')
+
+    # parser.add_argument(
+    #     '--prefix',
+    #     action='store',
+    #     metavar='PREFIX',
+    #     dest='prefix',
+    #     default='',
+    #     help='specify the file name prefix. This prefix will be added\n'
+    #          'to the output file names during the automatic\n'
+    #          'generation of file names.\n'
+    #          'Default=\'\'.\n\n')
+    #
+    # parser.add_argument(
+    #     '--postfix',
+    #     action='store',
+    #     metavar='POSTFIX',
+    #     dest='postfix',
+    #     default='',
+    #     help='specify the file name postfix. This postfix will be\n'
+    #          'added to the output file names during the automatic\n'
+    #          'generation of file names.\n'
+    #          'Default=\'\'.\n\n')
+
+    # parser.add_argument(
+    #     '-o', '--output',
+    #     action='store',
+    #     nargs='+',
+    #     metavar='FILE',
+    #     dest='out_names',
+    #     help='specify the list of file names after the flag.\n'
+    #          'The output files with data will be save with the names\n'
+    #          'from this list. This will override the automatic\n'
+    #          'generation of file names.\n'
+    #          'NOTE: you must enter file names for \n'
+    #          '      all the input shots.\n\n')
+    return parser
+
+
+def get_peak_args_parser():
+    """Returns peak search options parser.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
+    # parser.add_argument(
+    #     '--peak',
+    #     action='store',
+    #     dest='peak',
+    #     metavar=('LEVEL', 'DIFF_TIME'),
+    #     nargs=2,
+    #     type=float,
+    #     help='description in development\n\n')
+
+    parser.add_argument(
+        '--level',
+        action='store',
+        dest='level',
+        metavar='LEVEL',
+        type=float,
+        help='description in development\n\n')
+
+    # TODO default value for diff_time
+    parser.add_argument(
+        '--diff', '--diff-time',
+        action='store',
+        dest='diff',
+        metavar='DIFF_TIME',
+        type=float,
+        help='description in development\n\n')
+
+    parser.add_argument(
+        '--curves',
+        action='store',
+        dest='curves',
+        metavar='CURVE',
         nargs='+',
-        type=float,
-        help='description in development\n\n')
-
-    parser.add_argument(
-        '--time-bounds',
-        action='store',
-        dest='save',
-        metavar=('LEFT', 'RIGHT'),
-        nargs=2,
-        type=float,
-        help='description in development\n\n')
-
-    parser.add_argument(
-        '--t-noise',
-        action='store',
-        dest='save',
-        metavar='T',
-        type=float,
-        help='description in development\n\n')
-
-    parser.add_argument(
-        '--noise-attenuation',
-        action='store',
-        dest='save',
         type=float,
         help='description in development\n\n')
 
@@ -71,46 +147,37 @@ def get_parser():
 
     parser.add_argument(
         '-t', '--save-to', '--target-dir',
+        '--bounds', '--time-bounds',
         action='store',
-        metavar='DIR',
-        dest='save_to',
-        default='',
-        help='specify the output directory.\n\n')
+        dest='t_bounds',
+        metavar=('LEFT', 'RIGHT'),
+        nargs=2,
+        type=float,
+        help='description in development\n\n')
 
     parser.add_argument(
-        '--prefix',
+        '--t-noise',
         action='store',
-        metavar='PREFIX',
-        dest='prefix',
-        default='',
-        help='specify the file name prefix. This prefix will be added\n'
-             'to the output file names during the automatic\n'
-             'generation of file names.\n'
-             'Default=\'\'.\n\n')
+        dest='t_noise',
+        metavar='T',
+        type=float,
+        help='description in development\n\n')
 
     parser.add_argument(
-        '--postfix',
+        '--noise-attenuation',
         action='store',
-        metavar='POSTFIX',
-        dest='postfix',
-        default='',
-        help='specify the file name postfix. This postfix will be\n'
-             'added to the output file names during the automatic\n'
-             'generation of file names.\n'
-             'Default=\'\'.\n\n')
+        dest='noise_att',
+        type=float,
+        help='description in development\n\n')
 
     parser.add_argument(
-        '-o', '--output',
+        '--gr-diff',
         action='store',
-        nargs='+',
-        metavar='FILE',
-        dest='out_names',
-        help='specify the list of file names after the flag.\n'
-             'The output files with data will be save with the names\n'
-             'from this list. This will override the automatic\n'
-             'generation of file names.\n'
-             'NOTE: you must enter file names for \n'
-             '      all the input shots.\n\n')
+        dest='gr_diff',
+        metavar='GR_DIFF',
+        type=float,
+        help='description in development\n\n')
+
     return parser
 
 
@@ -172,6 +239,40 @@ class SinglePeak:
     data_full = property(get_data_full, set_data_full,
                          doc="Get/set [time, value, index, "
                              "sqr_l, sqr_r] of peak.")
+
+
+def save_peaks_csv(filename, peaks):
+    """Saves peaks data.
+
+    :param filename: the peak data file name prefix
+    :param peaks: the list of list of peaks [curve_idx][peak_idx]
+    :return: None
+    """
+    folder_path = os.path.dirname(filename)
+    if folder_path and not os.path.isdir(folder_path):
+        os.makedirs(folder_path)
+
+    if len(filename) > 4 and filename[-4:].upper() == ".CSV":
+        filename = filename[0:-4]
+
+    for gr in range(len(peaks[0])):
+        content = ""
+        for wf in range(len(peaks)):
+            pk = peaks[wf][gr]
+            if pk is None:
+                pk = SinglePeak(0, 0, 0)
+            content = (content +
+                       "{:3d},{:0.18e},{:0.18e},"
+                       "{:0.3f},{:0.3f},{:0.3f}\n".format(
+                           wf, pk.time, pk.val,
+                           pk.sqr_l, pk.sqr_r, pk.sqr_l + pk.sqr_r
+                       )
+                       )
+        postfix = "_peak{:03d}.csv".format(gr + 1)
+        # print("Saving " + filename + postfix)
+        with open(filename + postfix, 'w') as fid:
+            fid.writelines(content)
+            # print("Done!")
 
 
 def find_nearest_idx(sorted_arr, value, side='auto'):
@@ -713,18 +814,200 @@ def group_peaks(data, window):
     return peak_data, peak_map
 
 
+def global_check(options):
+    """Input options global check.
+
+    Returns changed options with converted values.
+
+    options -- namespace with options
+    """
+    # input directory and files check
+    if options.src_dir:
+        options.src_dir = options.src_dir.strip()
+        assert os.path.isdir(options.src_dir), \
+            "Can not find directory {}".format(options.src_dir)
+    if options.files:
+        gr_files = sp.check_file_list(options.src_dir, options.files)
+        if not options.src_dir:
+            options.src_dir = os.path.dirname(gr_files[0][0])
+    else:
+        gr_files = sp.get_grouped_file_list(options.src_dir,
+                                         options.ext_list,
+                                         options.group_size,
+                                         options.sorted_by_ch)
+    options.gr_files = gr_files
+
+    # Now we have the list of files, grouped by shots:
+    # gr_files == [
+    #               ['shot001_osc01.wfm', 'shot001_osc02.csv', ...],
+    #               ['shot002_osc01.wfm', 'shot002_osc02.csv', ...],
+    #               ...etc.
+    #             ]
+
+    # check partial import options
+    options.partial = sp.check_partial_args(options.partial)
+
+    # # raw check labels not used
+    # # instead: the forbidden symbols are replaced during CSV saving
+    # if options.labels:
+    #     assert global_check_labels(options.labels), \
+    #         "Label value error! Only latin letters, " \
+    #         "numbers and underscore are allowed."
+
+    options.plot_dir = sp.check_param_path(options.plot_dir, '--p_save')
+    options.multiplot_dir = sp.check_param_path(options.multiplot_dir,
+                                             '--mp-save')
+    options.save_to = sp.check_param_path(options.save_to, '--save-to')
+    if not options.save_to:
+        options.save_to = os.path.dirname(gr_files[0][0])
+
+    # check and convert plot and multiplot options
+    if options.plot:
+        options.plot = sp.global_check_idx_list(options.plot, '--plot',
+                                             allow_all=True)
+    if options.multiplot:
+        for idx, m_param in enumerate(options.multiplot):
+            options.multiplot[idx] = sp.global_check_idx_list(m_param,
+                                                           '--multiplot')
+
+    # # checks if postfix and prefix can be used in filename
+    # TODO include OR exclude file prefix and postfix
+    # if options.prefix:
+    #     options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
+    # if options.postfix:
+    #     options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
+
+    # raw check multiplier and delay
+    if options.multiplier is not None and options.delay is not None:
+        assert len(options.multiplier) == len(options.delay), \
+            ("The number of multipliers ({}) is not equal"
+             " to the number of delays ({})."
+             "".format(len(options.multiplier), len(options.delay)))
+    return options
+
 
 if __name__ == '__main__':
     parser = get_parser()
 
     args = parser.parse_args()
     verbose = not args.silent
+    peaks_dir = "Peaks"
 
-    try:
-        args = sp.global_check(args)
-    except Exception as e:
-        print()
-        sys.exit(e)
+    # try:
+    args = global_check(args)
+    '''
+            num_mask (tuple) - contains the first and last index
+            of substring of filename
+            That substring contains the shot number.
+            The last idx is excluded: [first, last).
+            Read numbering_parser docstring for more info.
+            '''
+    num_mask = sp.numbering_parser([files[0] for
+                                   files in args.gr_files])
+
+    # MAIN LOOP
+    print("Loop")
+    if (args.save or
+            args.plot or
+            args.multiplot or
+            args.offset_by_front):
+        print("in loop")
+        for shot_idx, file_list in enumerate(args.gr_files):
+            shot_name = sp.get_shot_number_str(file_list[0], num_mask,
+                                               args.ext_list)
+
+            # get SignalsData
+            data = sp.read_signals(file_list, start=args.partial[0],
+                                   step=args.partial[1], points=args.partial[2],
+                                   labels=args.labels, units=args.units,
+                                   time_unit=args.time_unit)
+            if verbose:
+                print("The number of curves = {}".format(data.count))
+
+            # checks the number of columns with data,
+            # as well as the number of multipliers, delays, labels
+            sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+                                   args.multiplier, args.delay)
+            sp.check_coeffs_number(data.count, ["label", "unit"],
+                                   args.labels, args.units)
+
+            # multiplier and delay
+            data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
+
+            # find peaks
+            if args.peak:
+                unsorted_peaks = []
+                for idx in args.curves:
+                    if verbose:
+                        print("Curve #" + str(idx))
+                    is_negative = is_neg(check_polarity(data.curves[idx]))
+                    new_peaks, peak_log = peak_finder(
+                        data.time(idx), data.value(idx),
+                        level=args.level, diff_time=args.diff,
+                        time_bounds=args.t_bounds, tnoise=args.t_noise,
+                        is_negative=is_negative, noise_attenuation=args.noise_att,
+                        graph=False
+                    )
+                    # TODO single graph with peaks
+
+                    unsorted_peaks.append(new_peaks)
+                    if verbose:
+                        print(peak_log)
+
+                # step 7 - group peaks [and plot all curves with peaks]
+                peak_data, peak_map = group_peaks(unsorted_peaks, args.gr_diff)
+
+                # step 8 - save peaks data
+                if verbose:
+                    print("Saving peak data...")
+                # TODO peaks_filename (del data file ext)
+                pk_filename = os.path.join(args.save_to, peaks_dir,
+                                           os.path.basename(file_list[0])[:-4])
+                save_peaks_csv(pk_filename, peak_data)
+
+                # step 9 - save multicurve plot
+                multiplot_name = pk_filename[:]
+                multiplot_name = multiplot_name + ".plot.png"
+                multiplot_name = os.path.join(args.save_to, multiplot_name)
+
+                if verbose:
+                    print("Saving all peaks as " + multiplot_name)
+                sp.plot_multiplot(
+                    data, peak_data, args.curves,
+                    xlim=args.t_bounds)
+                # TODO save multiplot
+                pyplot.show()
+
+                # plot_peaks_all(data, peak_data, args.curves,
+                #                xlim=params.get("time_bounds", None),
+                #                show=True, save=True, save_as=multiplot_name)
+
+            # group peaks
+
+            # save peaks
+
+            # or read peaks from file
+
+            # plot preview and save
+            if args.plot:
+                sp.do_plots(data, args, shot_name, verbose)
+
+            # plot and save multi-plots
+            if args.multiplot:
+                sp.do_multoplots(data, args, shot_name, verbose)
+
+            # save data
+            if args.save:
+                saved_as = sp.do_save(data, args, shot_name, verbose)
+                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+                sp.save_m_log(file_list, saved_as, labels, args.multiplier,
+                              args.delay, args.offset_by_front,
+                              args.y_auto_zero, args.partial)
+
+    sp.print_duplicates(args.gr_files, 30)
+    # except Exception as e:
+    #     print()
+    #     sys.exit(e)
 
     # TODO: reformat lines PEP8
     # TODO: English comments

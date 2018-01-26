@@ -18,7 +18,7 @@ from scipy.signal import savgol_filter
 from matplotlib import pyplot as plt
 
 import WFMReader as wfm
-import PeakProcess as pp
+import PeakProcess
 
 verbose = True
 global_log = ""
@@ -28,6 +28,8 @@ global_log = ""
 # -----     CL INTERFACE     -------------
 # ========================================
 def get_parser():
+    """Returns final parser.
+    """
     p_disc = ("")
 
     p_ep = ("")
@@ -35,13 +37,21 @@ def get_parser():
     p_use = ("python %(prog)s [options]\n"
              "       python %(prog)s @file_with_options")
 
-    parser = argparse.ArgumentParser(parents=[get_base_parser()],
-                                     prog='SignalProcess.py',
-                                     description=p_disc,
-                                     epilog=p_ep,
-                                     fromfile_prefix_chars='@', usage=p_use)
+    parser = argparse.ArgumentParser(
+        parents=[get_input_files_args_parser(), get_mult_del_args_parser(),
+                 get_data_corr_args_parser(), get_plot_args_parser(),
+                 get_output_args_parser()],
+        prog='SignalProcess.py',
+        description=p_disc, epilog=p_ep, usage=p_use,
+        fromfile_prefix_chars='@',
+        formatter_class=argparse.RawTextHelpFormatter)
+    return parser
 
-    # output settings --------------------------------------------------------
+
+def get_output_args_parser():
+    """Returns the parser of parameters of save data.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         '-s', '--save',
         action='store_true',
@@ -97,14 +107,14 @@ def get_parser():
     return parser
 
 
-def get_input_files_opt_parser():
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+def get_input_files_args_parser():
+    """Returns the parser of parameters of read data.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
 
     # input files ------------------------------------------------------------
     parser.add_argument(
-        '-d', '--scr', '--source-dir',
+        '-d', '--src', '--source-dir',
         action='store',
         metavar='DIR',
         dest='src_dir',
@@ -215,12 +225,10 @@ def get_input_files_opt_parser():
     return parser
 
 
-def get_mult_del_opt_parser():
+def get_mult_del_args_parser():
     """Returns multiplier and delay options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument(
         '--multiplier',
@@ -250,12 +258,10 @@ def get_mult_del_opt_parser():
     return parser
 
 
-def get_data_corr_opt_parser():
+def get_data_corr_args_parser():
     """Returns data manipulation options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument(
         '--offset-by-curve-front',
@@ -311,12 +317,10 @@ def get_data_corr_opt_parser():
     return parser
 
 
-def get_plot_opt_parser():
+def get_plot_args_parser():
     """Returns plot options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False,
-                                     formatter_class=
-                                     argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(add_help=False)
 
     parser.add_argument(
         '-p', '--plot',
@@ -380,16 +384,6 @@ def get_plot_opt_parser():
              'will be plotted and saved separately as .png file\n'
              'to this directory.\n\n')
     return parser
-
-
-def get_base_parser():
-    """Returns base parser.
-    """
-    return argparse.ArgumentParser(parents=[get_input_files_opt_parser(),
-                                            get_mult_del_opt_parser(),
-                                            get_data_corr_opt_parser(),
-                                            get_plot_opt_parser()],
-                                   add_help=False)
 
 
 # ========================================
@@ -1129,24 +1123,64 @@ def add_zeros_to_filename(full_path, count):
     return os.path.join(folder_path, name)
 
 
-def numbering_parser(group):
+def get_shot_number_str(filename, num_mask, ext_list):
+    """Returns the string contains the shot number.
+    That string is the substring of the file name.
+
+    NOTE: may return the full name of the file without the extension.
+          Read numbering_parser docstring for more info.
+
+    :param filename: the name of the file with experiments data.
+                     That filename contains the number of the shot.
+    :param num_mask: contains the first and last index of substring
+                     of filename. See numbering_parser docstring for
+                     more details.
+    :param ext_list: the list of extension of data files
+
+    :type filename: str
+    :type num_mask: tuple/list
+    :type ext_list: tuple/list
+
+    :return: the string with the shot name
+    :rtype: str
     """
-    Finds serial number (substring) in the file name string.
+    # get current shot name (number)
+    shot_name = os.path.basename(filename)
+    shot_name = shot_name[num_mask[0]:num_mask[1]]
 
-    group -- list of files (each file must corresponds
-             to different shot)
+    # in case of full file name
+    shot_name = trim_ext(shot_name, ext_list)
+    return shot_name
 
-    return -- (start, end), where:
-        start -- index of the first digit of the serial number
-                 in a file name
-        end -- index of the last digit of the serial number
+
+def numbering_parser(group_of_files):
+    """Finds serial number (shot number) in the file name string.
+
+    :param group_of_files: a list of files. Each file must corresponds
+                           to different shot. All file names must have
+                           the same length.
+
+    :return: a tuple that contains the first and last index of
+             the substring in the file name that contains the shot number.
+             The last idx is excluded: [first, last)
+             Example of the data file of experiment number 137
+             Experiment_0137_Ch02_specific_environment.wfm
+                       /    \
+                    first   last
+             'first' numeral is '0' with idx = 11, 'last' is '7' with idx = 14
+             The interval (num_mask) = [11, 15)
+             The 'Ch02' is the oscilloscope channel number
+             whose data is written to that file.
+             In most cases the channel number have 2 digits,
+             while the shot number have 4 or more digits.
+    :rtype: tuple
     """
     names = []
-    for raw in group:
+    for raw in group_of_files:
         names.append(os.path.basename(raw))
     assert all(len(name) for name in names), \
         "Error! All file names must have the same length"
-    if len(group) == 1:
+    if len(group_of_files) == 1:
         return 0, len(names[0])
 
     numbers = []  # list of lists of dictionaries
@@ -1165,7 +1199,7 @@ def numbering_parser(group):
                 start = numbers[num][match_idx]['start']
                 end = numbers[num][match_idx]['end']
                 if num != name_idx and (numbers[num][match_idx]['num'] ==
-                                            names[name_idx][start:end]):
+                                        names[name_idx][start:end]):
                     unique = False
                     break
             if not unique:
@@ -1739,7 +1773,7 @@ def multiplier_and_delay_peak(peaks, multiplier, delay, curve_idx):
     curve_idx   -- the index of the curve to which the peaks belong
     """
     for peak in peaks:
-        if not isinstance(peak, pp.SinglePeak):
+        if not isinstance(peak, PeakProcess.SinglePeak):
             raise ValueError("'peaks' must be a list of "
                              "the SinglePeak instance.")
     if not multiplier and not delay:
@@ -1758,9 +1792,9 @@ def multiplier_and_delay_peak(peaks, multiplier, delay, curve_idx):
     amp_mult = multiplier[curve_idx * 2 + 1]
     amp_del = delay[curve_idx * 2 + 1]
     for peak in peaks:
-        corr_peaks.append(pp.SinglePeak(peak.time * time_mult - time_del,
-                                        peak.val * amp_mult - amp_del,
-                                        peak.idx, peak.sqr_l, peak.sqr_r))
+        corr_peaks.append(PeakProcess.SinglePeak(peak.time * time_mult - time_del,
+                                                 peak.val * amp_mult - amp_del,
+                                                 peak.idx, peak.sqr_l, peak.sqr_r))
     return corr_peaks
 
 
@@ -1854,8 +1888,8 @@ def y_zero_offset(curve, start_x, stop_x):
          "".format(start_x, stop_x))
     if start_x > curve.time[-1] or stop_x < curve.time[0]:
         return 0
-    start_idx = pp.find_nearest_idx(curve.time, start_x, side='right')
-    stop_idx = pp.find_nearest_idx(curve.time, stop_x, side='left')
+    start_idx = PeakProcess.find_nearest_idx(curve.time, start_x, side='right')
+    stop_idx = PeakProcess.find_nearest_idx(curve.time, stop_x, side='left')
     amp_sum = 0.0
     for val in curve.val[start_idx:stop_idx + 1]:
         amp_sum += val
@@ -1957,10 +1991,6 @@ def update_by_y_auto_zero(data, y_auto_zero_params,
     the corresponding items of the original list of delays.
     The new list of delays is returned.
 
-    NOTE: adjusting the delay values before applying
-    the multipliers and the delays to the input data,
-    decreases the execution time of the code.
-
     data                -- SignalsData instance
     y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
                            argument's hep for more detail)
@@ -1997,35 +2027,67 @@ def update_by_y_auto_zero(data, y_auto_zero_params,
     return new_delay
 
 
-def update_by_front(signals_data, args, multiplier, delay,
+def do_y_zero_offset(signals_data, cl_args):
+    """Analyzes the signal fragment in the selected time interval and
+    finds the value of the DC component.
+    Subtracts the constant component of the signal.
+
+    NOTE: this function only changes the delay list. Apply it to
+    the signals data via multiplier_and_delay function.
+
+    :param signals_data: SignalsData instance with curves data
+    :param cl_args: command line arguments, entered by the user
+
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+
+    :return: changed cl_args
+    :rtype: argparse.Namespace
+    """
+    check_y_auto_zero_params(signals_data, cl_args.y_auto_zero)
+
+    # updates delays with accordance to Y zero offset
+    cl_args.delay = update_by_y_auto_zero(signals_data, cl_args.y_auto_zero,
+                                          cl_args.multiplier,
+                                          cl_args.delay,
+                                          verbose=True)
+    return cl_args
+
+
+def get_front_point(signals_data, args, multiplier, delay,
                     front_plot_name, interactive=False):
-    """
-    1. Finds the most left front point where the curve
-       amplitude is greater (lower - for negative curve) than
-       the level (args[1]) value.
-    2. Makes this point the origin of the time axis for
-       all signals (changes the list of the delays).
-       To improve accuracy, the signal is smoothed by 
-       the savgol filter.
+    """Finds the most left front point where the curve
+    amplitude is greater (lower - for negative curve) than
+    the level (args[1]) value.
+    To improve accuracy, the signal is smoothed by
+    the savgol filter.
 
-    signals_data    -- the SIgnalsData instance
-    args            -- the list of 4 values [idx, level, window, order]:
-                       idx    - the index of the curve
-                       level  - the amplitude level
-                       window - length of the filter window (must be 
-                                an odd integer greater than 4)
-                       order  - (int) the order of the polynomial used 
-                                to fit the samples (must be < window)
-    multiplier      -- list of multipliers not yet applied to data
-    delay           -- list of delays not yet applied to data
-    front_plot_name -- the full path to save the graph with the curve 
-                       and the marked point on the rise front
-                       (fall front - for negative curve)
-    interactive     -- turns on interactive mode of the smooth filter
-                       parameters selection
-    """
-    cancel = False
+    :param signals_data: the SignalsData instance
+    :param args: the list of 4 values [idx, level, window, order]:
+                 idx    - the index of the curve
+                 level  - the amplitude level
+                 window - length of the filter window (must be
+                          an odd integer greater than 4)
+                 order  - (int) the order of the polynomial used
+                          to fit the samples (must be < window)
+    :param multiplier: list of multipliers not yet applied to data
+    :param delay: list of delays not yet applied to data
+    :param front_plot_name: the full path to save the graph with the curve
+                            and the marked point on the rise front
+                            (fall front - for negative curve)
+    :param interactive: turns on interactive mode of the smooth filter
+                        parameters selection
 
+    :type signals_data: SignalsData
+    :type args: tuple/list
+    :type multiplier: tuple/list
+    :type delay: tuple/list
+    :type front_plot_name: str
+    :type interactive: bool
+
+    :return: front point
+    :rtype: PeakProcess.SinglePeak
+    """
     if not os.path.isdir(os.path.dirname(front_plot_name)):
         os.makedirs(os.path.dirname(front_plot_name))
 
@@ -2034,8 +2096,8 @@ def update_by_front(signals_data, args, multiplier, delay,
     window = args[2]
     poly_order = args[3]
 
-    polarity = pp.check_polarity(signals_data.curves[curve_idx])
-    if pp.is_pos(polarity):
+    polarity = PeakProcess.check_polarity(signals_data.curves[curve_idx])
+    if PeakProcess.is_pos(polarity):
         level = abs(level)
     else:
         level = -abs(level)
@@ -2080,7 +2142,8 @@ def update_by_front(signals_data, args, multiplier, delay,
               "the result of smoothing.\n"
               "\n"
               "Close graph window to continue.")
-    # interactive cycle
+    cancel = False
+    # interactive cycle is performed at least once
     while not cancel:
         # smooth curve
         data_y_smooth = smooth_voltage(data_y, window, poly_order)
@@ -2088,34 +2151,36 @@ def update_by_front(signals_data, args, multiplier, delay,
                                      curve.label, curve.unit,
                                      curve.time_unit)
         # find front
-        front_x, front_y = pp.find_curve_front(smoothed_curve,
-                                               level, polarity)
+        front_x, front_y = PeakProcess.find_curve_front(smoothed_curve,
+                                                        level, polarity)
         plot_title = ("Curve[{idx}] \"{label}\"\n"
                       "".format(idx=curve_idx, label=curve.label))
         if front_x:
-            front_point = pp.SinglePeak(front_x, front_y, 0)
+            front_point = PeakProcess.SinglePeak(front_x, front_y, 0)
             plot_title += "Found front at [{},  {}]".format(front_x, front_y)
         else:
             plot_title += "No front found."
             front_point = None
 
-        # get input
         if interactive:
-            # plot
+            # visualize for user
             plot_multiple_curve([curve, smoothed_curve],
                                 [front_point], title=plot_title)
 
             print("\nPrevious values:  {win}  {ord}\n"
                   "".format(win=window, ord=poly_order))
             plt.show()
-            print("Press enter without entering values to save t"
-                  "he last values and quit.")
+            print("Press enter, without entering a value "
+                  "to exit the interactive mode. "
+                  "The previously entered values will be used.")
             while True:
+                # get user input
                 try:
                     print("Enter WINDOW POLYORDER >>>", end="")
                     user_input = sys.stdin.readline().strip()
                     if user_input == "":
-                        # breaks both cycles
+                        # exit interactive mode,
+                        # and use previously entered parameters
                         cancel = True
                         break
                     user_input = user_input.split()
@@ -2134,11 +2199,6 @@ def update_by_front(signals_data, args, multiplier, delay,
         else:
             break
 
-    # update delays
-    new_delay = delay[:]
-    if front_point is not None:
-        for idx in range(0, len(delay), 2):
-            new_delay[idx] += front_point.time
     # save final version of the plot
     plot_multiple_curve([curve, smoothed_curve],
                         [front_point], title=plot_title)
@@ -2147,7 +2207,49 @@ def update_by_front(signals_data, args, multiplier, delay,
     plt.show(block=False)
     plt.close('all')
 
-    return new_delay
+    return front_point
+
+
+def do_offset_by_front(signals_data, cl_args, shot_name):
+    """Finds the most left front point where the curve
+    amplitude is greater (lower - for negative curve) than
+    the 'level' value (cl_args.offset_by_front[1]).
+    To improve accuracy, the signal is smoothed by
+    the savgol filter.
+
+    Saves a curve plot with the point on the front.
+
+    Makes the point the origin of the time axis for
+    all signals (changes the list of the delays, but not applies it).
+
+    :param signals_data: SignalsData instance with curves data
+    :param cl_args: command line arguments, entered by the user
+    :param shot_name: the current shot number (needed for graph save)
+
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+    :type shot_name: str
+
+    :return: changed cl_args
+    :rtype: argparse.Namespace
+    """
+
+    check_idx_list(cl_args.offset_by_front[0], signals_data.count - 1,
+                   "--offset-by-curve-front")
+
+    front_plot_name = get_front_plot_name(cl_args.offset_by_front,
+                                          cl_args.save_to, shot_name)
+    front_point = get_front_point(signals_data, cl_args.offset_by_front,
+                                  cl_args.multiplier, cl_args.delay,
+                                  front_plot_name,
+                                  interactive=cl_args.it_offset)
+    # update delays
+    new_delay = cl_args.delay[:]
+    if front_point is not None:
+        for idx in range(0, len(cl_args.delay), 2):
+            new_delay[idx] += front_point.time
+    cl_args.delay = new_delay
+    return cl_args
 
 
 def zero_one_curve(curve, max_rows=30):
@@ -2183,6 +2285,29 @@ def zero_curves(signals, curve_indexes, max_rows=30):
     return data
 
 
+def do_reset_to_zero(signals_data, cl_args, verbose):
+    """Resets the curve amplitude values to zero
+    (only for chosen curves).
+
+    :param signals_data: SignalsData instance with curves data
+    :param cl_args: command line arguments, entered by the user
+    :param verbose: shows more info during the process
+
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+    :type verbose: bool
+
+    :return: changed cl_args
+    :rtype: argparse.Namespace
+    """
+    check_idx_list(cl_args.zero, signals_data.count - 1, "--set-to-zero")
+    if verbose:
+        print("Resetting to zero the values of the curves "
+              "with indexes: {}".format(cl_args.zero))
+    signals_data = zero_curves(signals_data, cl_args.zero)
+    return signals_data
+
+
 # ========================================
 # -----    PLOT     ----------------------
 # ========================================
@@ -2205,8 +2330,8 @@ def calc_ylim(time, y, time_bounds=None, reserve=0.1):
         time_bounds = (time[0], time_bounds[1])
     if time_bounds[1] is None:
         time_bounds = (time_bounds[0], time[-1])
-    start = pp.find_nearest_idx(time, time_bounds[0], side='right')
-    stop = pp.find_nearest_idx(time, time_bounds[1], side='left')
+    start = PeakProcess.find_nearest_idx(time, time_bounds[0], side='right')
+    stop = PeakProcess.find_nearest_idx(time, time_bounds[1], side='left')
     y_max = np.amax(y[start:stop])
     y_min = np.amin(y[start:stop])
     y_range = y_max - y_min
@@ -2473,7 +2598,7 @@ def global_check(options):
                                               options.ext_list,
                                               options.group_size,
                                               options.sorted_by_ch)
-    args.gr_files = gr_files
+    options.gr_files = gr_files
 
     # Now we have the list of files, grouped by shots:
     # gr_files == [
@@ -2511,12 +2636,6 @@ def global_check(options):
     if not options.save_to:
         options.save_to = os.path.dirname(gr_files[0][0])
 
-    # checks if postfix and prefix can be used in filename
-    if options.prefix:
-        options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
-    if options.postfix:
-        options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
-
     # check and convert plot and multiplot options
     if options.plot:
         options.plot = global_check_idx_list(options.plot, '--plot',
@@ -2525,6 +2644,24 @@ def global_check(options):
         for idx, m_param in enumerate(options.multiplot):
             options.multiplot[idx] = global_check_idx_list(m_param,
                                                         '--multiplot')
+
+    # checks if postfix and prefix can be used in filename
+    if options.prefix:
+        options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
+    if options.postfix:
+        options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
+
+    # raw check offset_by_voltage parameters (types)
+    options.it_offset = False  # interactive offset process
+    if options.offset_by_front:
+        assert len(options.offset_by_front) in [2, 4], \
+            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
+             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
+             "".format(arg_name="--offset-by-curve_level"))
+        if len(options.offset_by_front) < 4:
+            options.it_offset = True
+        options.offset_by_front = \
+            global_check_front_params(options.offset_by_front)
 
     # raw check y_auto_zero parameters (types)
     if options.y_auto_zero:
@@ -2556,12 +2693,15 @@ if __name__ == "__main__":
     try:
         args = global_check(args)
 
-        # gets shot number from file names
-        number_start, number_end = numbering_parser([files[0] for
-                                                    files in args.gr_files])
-        # # not in use
-        # labels_dict = {'labels': args.labels, 'units': args.units,
-        #                'time': args.time_unit}
+        '''
+        num_mask (tuple) - contains the first and last index
+        of substring of filename
+        That substring contains the shot number.
+        The last idx is excluded: [first, last).
+        Read numbering_parser docstring for more info.
+        '''
+        num_mask = numbering_parser([files[0] for
+                                    files in args.gr_files])
 
         # MAIN LOOP
         if (args.save or
@@ -2570,19 +2710,19 @@ if __name__ == "__main__":
                 args.offset_by_front):
 
             for shot_idx, file_list in enumerate(args.gr_files):
-                # get current shot name (number)
-                shot_name = os.path.basename(file_list[0])[number_start:number_end]
-                shot_name = trim_ext(shot_name, args.ext_list)
+                shot_name = get_shot_number_str(file_list[0], num_mask,
+                                                args.ext_list)
+
                 # get SignalsData
                 data = read_signals(file_list, start=args.partial[0],
                                     step=args.partial[1], points=args.partial[2],
                                     labels=args.labels, units=args.units,
                                     time_unit=args.time_unit)
-                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                 if verbose:
                     print("The number of curves = {}".format(data.count))
 
-                # checks multipliers, delays and labels numbers
+                # checks the number of columns with data,
+                # as well as the number of multipliers, delays, labels
                 check_coeffs_number(data.count * 2, ["multiplier", "delay"],
                                     args.multiplier, args.delay)
                 check_coeffs_number(data.count, ["label", "unit"],
@@ -2590,35 +2730,15 @@ if __name__ == "__main__":
 
                 # check y_zero_offset parameters (if idx is out of range)
                 if args.y_auto_zero:
-                    check_y_auto_zero_params(data, args.y_auto_zero)
-
-                    # updates delays with accordance to Y zero offset
-                    args.delay = update_by_y_auto_zero(data, args.y_auto_zero,
-                                                       args.multiplier,
-                                                       args.delay,
-                                                       verbose=True)
+                    args = do_y_zero_offset(data, args)
 
                 # check offset_by_voltage parameters (if idx is out of range)
                 if args.offset_by_front:
-                    # check_offset_by_front(data, args.offset_by_front)
-                    check_idx_list(args.offset_by_front[0], data.count - 1,
-                                   "--offset-by-curve-front")
-
-                    # updates delay values with accordance to voltage front
-                    front_plot_name = get_front_plot_name(args.offset_by_front,
-                                                          args.save_to, shot_name)
-                    args.delay = update_by_front(data, args.offset_by_front,
-                                                 args.multiplier, args.delay,
-                                                 front_plot_name,
-                                                 interactive=args.it_offset)
+                    args = do_offset_by_front(data, args, shot_name)
 
                 # reset to zero
                 if args.zero:
-                    check_idx_list(args.zero, data.count - 1, "--set-to-zero")
-                    if verbose:
-                        print("Resetting to zero the values of the curves "
-                              "with indexes: {}".format(args.zero))
-                    data = zero_curves(data, args.zero)
+                    data = do_reset_to_zero(data, args, verbose)
 
                 # multiplier and delay
                 data = multiplier_and_delay(data, args.multiplier, args.delay)
@@ -2634,6 +2754,7 @@ if __name__ == "__main__":
                 # save data
                 if args.save:
                     saved_as = do_save(data, args, shot_name, verbose)
+                    labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                     save_m_log(file_list, saved_as, labels, args.multiplier,
                                args.delay, args.offset_by_front,
                                args.y_auto_zero, args.partial)
