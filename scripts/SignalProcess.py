@@ -2497,7 +2497,7 @@ def global_check(options):
         options.offset_by_front = \
             global_check_front_params(options.offset_by_front)
 
-    # # raw check labels not used
+    # # raw check labels (not used)
     # # instead: the forbidden symbols are replaced during CSV saving
     # if options.labels:
     #     assert global_check_labels(options.labels), \
@@ -2555,6 +2555,7 @@ if __name__ == "__main__":
 
     try:
         args = global_check(args)
+
         # gets shot number from file names
         number_start, number_end = numbering_parser([files[0] for
                                                     files in args.gr_files])
@@ -2643,7 +2644,3 @@ if __name__ == "__main__":
         sys.exit(e)
     # ========================================================================
     # TODO: description
-
-    # print(args.y_auto_zero)
-    print()
-    print(args)
