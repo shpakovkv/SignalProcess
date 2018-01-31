@@ -1,5 +1,4 @@
-#!/usr/bin/python
-# -*- coding: Windows-1251 -*-
+"""Peak handle functions."""
 from __future__ import print_function
 
 from matplotlib import pyplot
@@ -103,8 +102,8 @@ def get_pk_save_args_parser():
 def get_peak_args_parser():
     """Returns peak search options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False)
-    # parser.add_argument(
+    peak_args_parser = argparse.ArgumentParser(add_help=False)
+    # peak_args_parser.add_argument(
     #     '--peak',
     #     action='store',
     #     dest='peak',
@@ -113,7 +112,7 @@ def get_peak_args_parser():
     #     type=float,
     #     help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '--level',
         action='store',
         dest='level',
@@ -121,8 +120,8 @@ def get_peak_args_parser():
         type=float,
         help='description in development\n\n')
 
-    # TODO default value for diff_time
-    parser.add_argument(
+    # TODO default value for peak diff_time
+    peak_args_parser.add_argument(
         '--diff', '--diff-time',
         action='store',
         dest='diff',
@@ -130,7 +129,7 @@ def get_peak_args_parser():
         type=float,
         help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '--curves',
         action='store',
         dest='curves',
@@ -139,14 +138,13 @@ def get_peak_args_parser():
         type=float,
         help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '-s', '--save',
         action='store_true',
         dest='save',
         help='description in development\n\n')
 
-    parser.add_argument(
-        '-t', '--save-to', '--target-dir',
+    peak_args_parser.add_argument(
         '--bounds', '--time-bounds',
         action='store',
         dest='t_bounds',
@@ -155,7 +153,7 @@ def get_peak_args_parser():
         type=float,
         help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '--t-noise',
         action='store',
         dest='t_noise',
@@ -163,22 +161,22 @@ def get_peak_args_parser():
         type=float,
         help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '--noise-attenuation',
         action='store',
         dest='noise_att',
         type=float,
         help='description in development\n\n')
 
-    parser.add_argument(
-        '--gr-diff',
+    peak_args_parser.add_argument(
+        '--group-diff',
         action='store',
         dest='gr_diff',
         metavar='GR_DIFF',
         type=float,
         help='description in development\n\n')
 
-    return parser
+    return peak_args_parser
 
 
 class SinglePeak:
@@ -489,7 +487,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                               with a polarity reversal (noise). If too many 
                               noise maxima are defined as real peaks, 
                               reduce this value.
-    :param debug: debug mode (outputs additional information while searching for peaks)
+    :param debug: debug mode (outputs additional information)
      
     :type x: numpy.ndarray
     :type y: numpy.ndarray
@@ -502,7 +500,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     :type noise_attenuation: float
     :type debug: bool
 
-    :return: a list 
+    :return: list 
     """
 
     # Checkout the inputs
@@ -539,8 +537,6 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     if start_idx is None or stop_idx is None:
         peak_log += "Time bounds is out of range.\n"
         return peak_list, peak_log
-    # ==========================================================================
-    # print('Starting peaks search...')
 
     i = start_idx
     while i < stop_idx :
@@ -765,7 +761,8 @@ def group_peaks(data, window):
             when curve[i]'s peak[j] is in
             +/-dt interval from peaks of group[gr]
             '''
-            if gr < len(peak_time) and abs(peak_time[gr] - data[wf][pk].time) <= dt:
+            if gr < len(peak_time) \
+                    and abs(peak_time[gr] - data[wf][pk].time) <= dt:
                 if (len(data[wf]) > pk + 1 and
                         (abs(peak_time[gr] - data[wf][pk].time) >
                          abs(peak_time[gr] - data[wf][pk + 1].time))):
@@ -811,15 +808,54 @@ def group_peaks(data, window):
             if gr < len(peak_time) - 1:
                 gr += 1
 
-    return peak_data, peak_map
+    # return peak_data, peak_map
+    return peak_data
+
+
+def get_peaks(data, args, verbose):
+    """Searches for peaks using parameters from args namespace.
+    
+    :param data:    SignalsData instance
+    :param args:    argparse.namespace with arguments
+    :param verbose: shows more info during the process
+    
+    :return:        three-dimensional array containing data 
+                    on all the peaks of curves with index in args.curves list
+                    The array structure:
+                    data[curve_idx][peak_idx] == SinglePeak instance
+                    For curves not in the args.curves list:
+                    data[curve_idx] == None
+    """
+    unsorted_peaks = [None] * data.count
+    for idx in args.curves:
+        if verbose:
+            print("Curve #" + str(idx))
+        is_negative = is_neg(check_polarity(data.curves[idx]))
+        new_peaks, peak_log = peak_finder(
+            data.time(idx), data.value(idx),
+            level=args.level, diff_time=args.diff,
+            time_bounds=args.t_bounds, tnoise=args.t_noise,
+            is_negative=is_negative,
+            noise_attenuation=args.noise_att,
+            graph=False
+        )
+        # TODO single graph with peaks
+
+        unsorted_peaks[idx] = new_peaks
+        if verbose:
+            print(peak_log)
+    return unsorted_peaks
 
 
 def global_check(options):
     """Input options global check.
+    
+    Checks the input arguments and converts them to the required format.
 
-    Returns changed options with converted values.
-
-    options -- namespace with options
+    :param options: namespace with options
+    :type options:   argparse.namespace
+    
+    :return: changed namespace with converted values
     """
     # input directory and files check
     if options.src_dir:
@@ -906,12 +942,12 @@ if __name__ == '__main__':
                                    files in args.gr_files])
 
     # MAIN LOOP
-    print("Loop")
+    print("Loop")  # debugging
     if (args.save or
             args.plot or
             args.multiplot or
             args.offset_by_front):
-        print("in loop")
+        print("in loop")  # debugging
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = sp.get_shot_number_str(file_list[0], num_mask,
                                                args.ext_list)
@@ -925,37 +961,34 @@ if __name__ == '__main__':
                 print("The number of curves = {}".format(data.count))
 
             # checks the number of columns with data,
-            # as well as the number of multipliers, delays, labels
+            # and the number of multipliers, delays, labels
             sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
                                    args.multiplier, args.delay)
             sp.check_coeffs_number(data.count, ["label", "unit"],
                                    args.labels, args.units)
 
+            # check y_zero_offset parameters (if idx is out of range)
+            if args.y_auto_zero:
+                args = sp.do_y_zero_offset(data, args)
+
+            # check offset_by_voltage parameters (if idx is out of range)
+            if args.offset_by_front:
+                args = sp.do_offset_by_front(data, args, shot_name)
+
+            # reset to zero
+            if args.zero:
+                data = sp.do_reset_to_zero(data, args, verbose)
+
             # multiplier and delay
             data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
 
             # find peaks
-            if args.peak:
-                unsorted_peaks = []
-                for idx in args.curves:
-                    if verbose:
-                        print("Curve #" + str(idx))
-                    is_negative = is_neg(check_polarity(data.curves[idx]))
-                    new_peaks, peak_log = peak_finder(
-                        data.time(idx), data.value(idx),
-                        level=args.level, diff_time=args.diff,
-                        time_bounds=args.t_bounds, tnoise=args.t_noise,
-                        is_negative=is_negative, noise_attenuation=args.noise_att,
-                        graph=False
-                    )
-                    # TODO single graph with peaks
-
-                    unsorted_peaks.append(new_peaks)
-                    if verbose:
-                        print(peak_log)
+            if args.level:
+                unsorted_peaks = get_peaks(data, args, verbose)
 
                 # step 7 - group peaks [and plot all curves with peaks]
-                peak_data, peak_map = group_peaks(unsorted_peaks, args.gr_diff)
+                peak_data = group_peaks(unsorted_peaks, args.gr_diff)
+                # TODO access to peak_data via curve id
 
                 # step 8 - save peaks data
                 if verbose:
@@ -972,21 +1005,12 @@ if __name__ == '__main__':
 
                 if verbose:
                     print("Saving all peaks as " + multiplot_name)
-                sp.plot_multiplot(
-                    data, peak_data, args.curves,
-                    xlim=args.t_bounds)
+                sp.plot_multiplot(data, peak_data, args.curves,
+                                  xlim=args.t_bounds)
                 # TODO save multiplot
                 pyplot.show()
 
-                # plot_peaks_all(data, peak_data, args.curves,
-                #                xlim=params.get("time_bounds", None),
-                #                show=True, save=True, save_as=multiplot_name)
-
-            # group peaks
-
-            # save peaks
-
-            # or read peaks from file
+            # read peaks from file
 
             # plot preview and save
             if args.plot:
@@ -994,7 +1018,7 @@ if __name__ == '__main__':
 
             # plot and save multi-plots
             if args.multiplot:
-                sp.do_multoplots(data, args, shot_name, verbose)
+                sp.do_multiplots(data, args, shot_name, verbose)
 
             # save data
             if args.save:
@@ -1009,13 +1033,14 @@ if __name__ == '__main__':
     #     print()
     #     sys.exit(e)
 
-    # TODO: reformat lines PEP8
-    # TODO: English comments
+    # TODO check group_peak for error with curves not in args.curves list
     # TODO: cl args original
     # TODO: cl read/save/plot (copy from SP)
     # TODO: cl peak finder
     # TODO: cl peak reader
     # TODO: cl replot peak multiplots
     # TODO: cl description
-    # TODO: cl args discription
-    print('Done!!!')
+    # TODO: cl args description
+    # TODO exception handle (via sys.exit(e))
+
+    print('Done!!!')  # debugging
