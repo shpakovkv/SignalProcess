@@ -17,7 +17,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 from matplotlib import pyplot as plt
 
-import WFMReader as wfm
+import WFMReader
 import PeakProcess
 
 verbose = True
@@ -30,14 +30,14 @@ global_log = ""
 def get_parser():
     """Returns final parser.
     """
-    p_disc = ("")
+    p_disc = ""
 
-    p_ep = ("")
+    p_ep = ""
 
     p_use = ("python %(prog)s [options]\n"
              "       python %(prog)s @file_with_options")
 
-    parser = argparse.ArgumentParser(
+    final_parser = argparse.ArgumentParser(
         parents=[get_input_files_args_parser(), get_mult_del_args_parser(),
                  get_data_corr_args_parser(), get_plot_args_parser(),
                  get_output_args_parser()],
@@ -45,14 +45,14 @@ def get_parser():
         description=p_disc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
         formatter_class=argparse.RawTextHelpFormatter)
-    return parser
+    return final_parser
 
 
 def get_output_args_parser():
     """Returns the parser of parameters of save data.
     """
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument(
+    output_params_parser = argparse.ArgumentParser(add_help=False)
+    output_params_parser.add_argument(
         '-s', '--save',
         action='store_true',
         dest='save',
@@ -62,7 +62,7 @@ def get_output_args_parser():
              '      the output directory is not specified, the input\n'
              '      files will be overwritten.\n\n')
 
-    parser.add_argument(
+    output_params_parser.add_argument(
         '-t', '--save-to', '--target-dir',
         action='store',
         metavar='DIR',
@@ -70,7 +70,7 @@ def get_output_args_parser():
         default='',
         help='specify the output directory.\n\n')
 
-    parser.add_argument(
+    output_params_parser.add_argument(
         '--prefix',
         action='store',
         metavar='PREFIX',
@@ -81,7 +81,7 @@ def get_output_args_parser():
              'generation of file names.\n'
              'Default=\'\'.\n\n')
 
-    parser.add_argument(
+    output_params_parser.add_argument(
         '--postfix',
         action='store',
         metavar='POSTFIX',
@@ -92,7 +92,7 @@ def get_output_args_parser():
              'generation of file names.\n'
              'Default=\'\'.\n\n')
 
-    parser.add_argument(
+    output_params_parser.add_argument(
         '-o', '--output',
         action='store',
         nargs='+',
@@ -104,16 +104,16 @@ def get_output_args_parser():
              'generation of file names.\n'
              'NOTE: you must enter file names for \n'
              '      all the input shots.\n\n')
-    return parser
+    return output_params_parser
 
 
 def get_input_files_args_parser():
     """Returns the parser of parameters of read data.
     """
-    parser = argparse.ArgumentParser(add_help=False)
+    input_params_parser = argparse.ArgumentParser(add_help=False)
 
     # input files ------------------------------------------------------------
-    parser.add_argument(
+    input_params_parser.add_argument(
         '-d', '--src', '--source-dir',
         action='store',
         metavar='DIR',
@@ -122,7 +122,7 @@ def get_input_files_args_parser():
         help='specify the directory containing data files.\n'
              'Default= the folder containing this code.\n\n')
 
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = input_params_parser.add_mutually_exclusive_group(required=True)
 
     group.add_argument(
         '-f', '--input-files',
@@ -144,7 +144,7 @@ def get_input_files_args_parser():
         help='specify one or more (space separated) extensions of \n'
              'the files with data.\n\n')
 
-    parser.add_argument(
+    input_params_parser.add_argument(
         '--labels',
         action='store',
         metavar='LABEL',
@@ -156,7 +156,7 @@ def get_input_files_args_parser():
              'will be replaced with underscores.\n'
              'Needed for correct graph labels.\n\n')
 
-    parser.add_argument(
+    input_params_parser.add_argument(
         '--units',
         action='store',
         metavar='UNIT',
@@ -167,7 +167,7 @@ def get_input_files_args_parser():
              'influence of the corresponding multiplier value.\n'
              'Needed for correct graph labels.\n\n')
 
-    parser.add_argument(
+    input_params_parser.add_argument(
         '--time-unit',
         action='store',
         metavar='UNIT',
@@ -175,7 +175,7 @@ def get_input_files_args_parser():
         help='specify the unit of time scale (uniform for all \n'
              'curves). Needed for correct graph labels.\n\n')
 
-    parser.add_argument(
+    input_params_parser.add_argument(
         '-g', '--grouped-by',
         action='store',
         type=int,
@@ -190,7 +190,7 @@ def get_input_files_args_parser():
              '      files (with specified extensions via -e flag) in\n'
              '      the specified directory will be processed.\n\n')
 
-    parser.add_argument(
+    input_params_parser.add_argument(
         '-c', '--ch', '--sorted-by-channel',
         action='store_true',
         dest='sorted_by_ch',
@@ -202,7 +202,7 @@ def get_input_files_args_parser():
              'ATTENTION: files from all oscilloscopes must be in the\n'
              'same folder and be sorted in one style.\n\n')
 
-    parser.add_argument(
+    input_params_parser.add_argument(
         '--partial-import',
         action='store',
         type=int,
@@ -216,21 +216,21 @@ def get_input_files_args_parser():
              'COUNT: the number of points that you want to import \n'
              '(-1 means till the end of the file).\n\n')
 
-    parser.add_argument(
+    input_params_parser.add_argument(
         '--silent',
         action='store_true',
         dest='silent',
         help='enables the silent mode, in which only most important\n'
              'messages are displayed.\n\n')
-    return parser
+    return input_params_parser
 
 
 def get_mult_del_args_parser():
     """Returns multiplier and delay options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False)
+    coeffs_parser = argparse.ArgumentParser(add_help=False)
 
-    parser.add_argument(
+    coeffs_parser.add_argument(
         '--multiplier',
         action='store',
         type=float,
@@ -243,7 +243,7 @@ def get_mult_del_args_parser():
              '      data file(s). Each curve have two columns: \n'
              '      filled with X and Y values correspondingly.\n\n')
 
-    parser.add_argument(
+    coeffs_parser.add_argument(
         '--delay',
         action='store',
         type=float,
@@ -255,15 +255,15 @@ def get_mult_del_args_parser():
              'NOTE: the data is first multiplied by a corresponding \n'
              '      multiplier and then the delay is subtracted \n'
              '      from them.\n\n')
-    return parser
+    return coeffs_parser
 
 
 def get_data_corr_args_parser():
     """Returns data manipulation options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False)
+    data_corr_args_parser = argparse.ArgumentParser(add_help=False)
 
-    parser.add_argument(
+    data_corr_args_parser.add_argument(
         '--offset-by-curve-front',
         action='store',
         metavar='VAL',
@@ -289,7 +289,7 @@ def get_data_corr_args_parser():
              '      then the interactive mode of the smooth filter\n'
              '      parameters selection will start.\n\n')
 
-    parser.add_argument(
+    data_corr_args_parser.add_argument(
         '--y-auto-zero',
         action='append',
         metavar=('CURVE_IDX', 'BG_START', 'BG_STOP'),
@@ -303,7 +303,7 @@ def get_data_corr_args_parser():
              'You can use as many --y-auto-zero flags\n'
              'as you want (one flag for one curve).\n\n')
 
-    parser.add_argument(
+    data_corr_args_parser.add_argument(
         '--set-to-zero',
         action='store',
         metavar='CURVE_IDX',
@@ -314,15 +314,15 @@ def get_data_corr_args_parser():
              'you want to set to zero.\n'
              'Enter \'all\' (without the quotes) to set all curves\n'
              'values to zero.\n\n')
-    return parser
+    return data_corr_args_parser
 
 
 def get_plot_args_parser():
     """Returns plot options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False)
+    plot_args_parser = argparse.ArgumentParser(add_help=False)
 
-    parser.add_argument(
+    plot_args_parser.add_argument(
         '-p', '--plot',
         action='store',
         nargs='+',
@@ -336,7 +336,7 @@ def get_plot_args_parser():
              'You can specify --p-save flag in order to save them\n'
              'as .png files.\n\n')
 
-    parser.add_argument(
+    plot_args_parser.add_argument(
         '--p-hide', '--plot-hide',
         action='store_true',
         dest='p_hide',
@@ -344,7 +344,7 @@ def get_plot_args_parser():
              'the single plots will be saved but not shown.\n'
              'This option can reduce the running time of the program.\n\n')
 
-    parser.add_argument(
+    plot_args_parser.add_argument(
         '--p-save', '--save-plots-to',
         action='store',
         dest='plot_dir',
@@ -354,7 +354,7 @@ def get_plot_args_parser():
              'will be plotted and saved separately as .png file\n'
              'to this directory.\n\n')
 
-    parser.add_argument(
+    plot_args_parser.add_argument(
         '-m', '--multiplot',
         action='append',
         dest='multiplot',
@@ -366,7 +366,7 @@ def get_plot_args_parser():
              'You may use as many \'-m\' flags (with different lists\n'
              'of curves) as you want. One flag for one graph.\n\n')
 
-    parser.add_argument(
+    plot_args_parser.add_argument(
         '--mp-hide', '--multiplot-hide',
         action='store_true',
         dest='mp_hide',
@@ -374,7 +374,7 @@ def get_plot_args_parser():
              'the multiplots will be saved but not shown.\n'
              'This option can reduce the running time of the program.\n\n')
 
-    parser.add_argument(
+    plot_args_parser.add_argument(
         '--mp-save', '--save-multiplot-as',
         action='store',
         dest='multiplot_dir',
@@ -383,7 +383,7 @@ def get_plot_args_parser():
              'Each multiplot, entered via --multiplot flag(s)\n'
              'will be plotted and saved separately as .png file\n'
              'to this directory.\n\n')
-    return parser
+    return plot_args_parser
 
 
 # ========================================
@@ -424,7 +424,8 @@ class ColorRange:
                 start_list.append(new_start)
         return count
 
-    def hsl_to_rgb_code(self, hue, saturation, luminosity):
+    @staticmethod
+    def hsl_to_rgb_code(hue, saturation, luminosity):
         hue = float(hue) / 360.0
         saturation = saturation / 100.0
         luminosity = luminosity / 100.0
@@ -439,16 +440,16 @@ class ColorRange:
     def __iter__(self):
         while True:
             offset = 0
-            for sat, lum in zip(self.s_list, self.l_list):
+            for sat, lumi in zip(self.s_list, self.l_list):
                 last = self.start + offset
                 offset += 10
-                yield self.hsl_to_rgb_code(0, sat, lum)
+                yield self.hsl_to_rgb_code(0, sat, lumi)
                 for i in range(0, self.calc_count()):
                     new_hue = last + self.step
                     if new_hue > 360:
                         new_hue -= 360
                     last = new_hue
-                    yield self.hsl_to_rgb_code(new_hue, sat, lum)
+                    yield self.hsl_to_rgb_code(new_hue, sat, lumi)
 
 
 class SingleCurve:
@@ -599,7 +600,7 @@ class SignalsData:
         Checks the correctness of input data_ndarray.
         Raises exception if data_ndarray check fails.
 
-        data_ndarray  -- ndarray with data to add to a SignlsData instance
+        data_ndarray  -- ndarray with data to add to a SignalsData instance
         new_labels    -- the list of labels for the new curves
         new_units     -- the list of units for the new curves
         """
@@ -660,13 +661,13 @@ class SignalsData:
         return self.curves[self.label_to_idx[label]]
 
     def get_label(self, idx):
-        # return label of the SingelCurve by index
+        # return label of the SingleCurve by index
         for key, value in self.label_to_idx.items():
             if value == idx:
                 return key
 
     def get_idx(self, label):
-        # returns index of the SingelCurve by label
+        # returns index of the SingleCurve by label
         if label in self.label_to_idx:
             return self.label_to_idx[label]
 
@@ -727,7 +728,7 @@ def check_header_label(s, count):
     Returns the list of labels or None.
 
     s -- the header line (string) to check
-    count -- the requered number of labels/units/etc.
+    count -- the required number of labels/units/etc.
     """
     labels = [word.strip() for word in s.split(",")]
     if len(labels) == count:
@@ -761,7 +762,7 @@ def global_check_idx_list(args, name, allow_all=False):
     error_text = ("Unsupported curve index ({val}) at {name} parameter."
                   "\nOnly positive integer values ")
     if allow_all:
-        error_text += "and string 'all' (without the qoutes) "
+        error_text += "and string 'all' (without the quotes) "
     error_text += "are allowed."
 
     if len(args) == 1 and args[0].upper() == 'ALL' and allow_all:
@@ -862,7 +863,7 @@ def global_check_front_params(params, window=101, polyorder=3):
     return idx, level, window, polyorder
 
 
-def check_file_list(dir, grouped_files):
+def check_file_list(folder, grouped_files):
     """Checks the list of file names, inputted by user.
     The file names must be grouped by shots.
     Raises an exception if any test fails.
@@ -880,7 +881,7 @@ def check_file_list(dir, grouped_files):
                        shot_idx + 1, len(shot_files), ", ".join(shot_files))
              )
         for file_idx, filename in enumerate(shot_files):
-            full_path = os.path.join(dir, filename.strip())
+            full_path = os.path.join(folder, filename.strip())
             grouped_files[shot_idx][file_idx] = full_path
             assert os.path.isfile(full_path), \
                 "Can not find file \"{}\"".format(full_path)
@@ -1003,10 +1004,10 @@ def compare_2_files(first_file_name, second_file_name, lines=30):
     second_file_name --  the full path to the second file
     lines            --  the number of lines to compare
     """
-    with open(first_file_name, 'r') as file:
+    with open(first_file_name, 'r') as file1:
         with open(second_file_name, 'r') as file2:
             for idx in range(lines):
-                if file.readline() != file2.readline():
+                if file1.readline() != file2.readline():
                     return False
             return True
 
@@ -1233,7 +1234,7 @@ def parse_filename(name):
     return match_list
 
 
-def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
+def get_grouped_file_list(folder, ext_list, group_size, sorted_by_ch=False):
     """Return the list of files grouped by shots.
 
     dir             -- the directory containing the target files
@@ -1246,9 +1247,9 @@ def get_grouped_file_list(dir, ext_list, group_size, sorted_by_ch=False):
                        files are sorted by the shot number (firstly)
                        and by the oscilloscope/channel (secondly).
     """
-    assert dir, ("Specify the directory (-d) containing the "
-                 "data files. See help for more details.")
-    file_list = get_file_list_by_ext(dir, ext_list, sort=True)
+    assert folder, ("Specify the directory (-d) containing the "
+                    "data files. See help for more details.")
+    file_list = get_file_list_by_ext(folder, ext_list, sort=True)
     assert len(file_list) % group_size == 0, \
         ("The number of data files ({}) in the specified folder "
          "is not a multiple of group size ({})."
@@ -1426,7 +1427,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
                                            start) / float(step)))
                 if points < available:
                     last_row = points * step + skip_header + start - 1
-            text_data = text_data[h_lines + start : last_row + 1 : step]
+            text_data = text_data[h_lines + start: last_row + 1: step]
             assert len(text_data) >= 2, \
                 "\nError! Not enough data lines in the file."
 
@@ -1437,9 +1438,9 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
                                  usecols=usecols)
 
     else:
-        data = wfm.read_wfm_group([filename], start_index=start,
-                                  number_of_points=points,
-                                  read_step=step)
+        data = WFMReader.read_wfm_group([filename], start_index=start,
+                                        number_of_points=points,
+                                        read_step=step)
         header = None
     if verbose:
         if data.shape[1] % 2 == 0:
@@ -1451,7 +1452,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
     return data, header
 
 
-def origin_to_csv(readed_lines):
+def origin_to_csv(read_lines):
     """
     Replaces ',' with '.' and then ';' with ',' in the
     given list of lines of a .csv file.
@@ -1462,7 +1463,7 @@ def origin_to_csv(readed_lines):
     read_lines -- array of a .csv file lines (array of string)
     """
     import re
-    converted = [re.sub(r',', '.', line) for line in readed_lines]
+    converted = [re.sub(r',', '.', line) for line in read_lines]
     converted = [re.sub(r';', ',', line) for line in converted]
     # if verbose:
     #     print("OriginPro ascii format detected.")
@@ -1855,7 +1856,8 @@ def align_and_append_ndarray(*args):
             raise ValueError("Input arrays must have 2 dimensions.")
 
     # ALIGN & APPEND
-    max_rows = max([arr.shape[0] for arr in args])
+    col_len_list = [arr.shape[0] for arr in args]
+    max_rows = max(col_len_list)
     data = np.empty(shape=(max_rows, 0), dtype=float, order='F')
     for arr in args:
         miss_rows = max_rows - arr.shape[0]
@@ -1984,7 +1986,7 @@ def raw_y_auto_zero(params, multiplier, delay):
 
 
 def update_by_y_auto_zero(data, y_auto_zero_params,
-                                 multiplier, delay, verbose=True):
+                          multiplier, delay, verbose=True):
     """The function analyzes the mean amplitude in
     the selected X range of the selected curves.
     The Y zero offset values obtained are added to
@@ -2311,7 +2313,7 @@ def do_reset_to_zero(signals_data, cl_args, verbose):
 # ========================================
 # -----    PLOT     ----------------------
 # ========================================
-def calc_ylim(time, y, time_bounds=None, reserve=0.1):
+def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
     """Returns (min_y, max_y) tuple with y axis bounds.
     The axis boundaries are calculated in such a way
     as to show all points of the curve with a indent
@@ -2342,7 +2344,7 @@ def calc_ylim(time, y, time_bounds=None, reserve=0.1):
     return y_min - reserve, y_max + reserve
 
 
-def do_multoplots(signals_data, cl_args, shot_name, verbose=False):
+def do_multiplots(signals_data, cl_args, shot_name, verbose=False):
     """Plots all the multiplot graphs specified by the user.
     Saves the graphs that the user specified to save.
     
@@ -2430,9 +2432,9 @@ def plot_multiplot(data, peak_data, curves_list,
         # set bounds
         if xlim is not None:
             axes[wf].set_xlim(xlim)
-            axes[wf].set_ylim(calc_ylim(data.time(curves_list[wf]),
-                                        data.value(curves_list[wf]),
-                                        xlim, reserve=0.1))
+            axes[wf].set_ylim(calc_y_lim(data.time(curves_list[wf]),
+                                         data.value(curves_list[wf]),
+                                         xlim, reserve=0.1))
         # y label (units only)
         if amp_unit is None:
             amp_unit = data.curves[curves_list[wf]].unit
@@ -2595,9 +2597,9 @@ def global_check(options):
             options.src_dir = os.path.dirname(gr_files[0][0])
     else:
         gr_files = get_grouped_file_list(options.src_dir,
-                                              options.ext_list,
-                                              options.group_size,
-                                              options.sorted_by_ch)
+                                         options.ext_list,
+                                         options.group_size,
+                                         options.sorted_by_ch)
     options.gr_files = gr_files
 
     # Now we have the list of files, grouped by shots:
@@ -2639,11 +2641,11 @@ def global_check(options):
     # check and convert plot and multiplot options
     if options.plot:
         options.plot = global_check_idx_list(options.plot, '--plot',
-                                          allow_all=True)
+                                             allow_all=True)
     if options.multiplot:
         for idx, m_param in enumerate(options.multiplot):
             options.multiplot[idx] = global_check_idx_list(m_param,
-                                                        '--multiplot')
+                                                           '--multiplot')
 
     # checks if postfix and prefix can be used in filename
     if options.prefix:
@@ -2670,7 +2672,7 @@ def global_check(options):
     # check and convert set-to-zero options
     if options.zero:
         options.zero = global_check_idx_list(options.zero, '--set-to-zero',
-                                          allow_all=True)
+                                             allow_all=True)
 
     # raw check multiplier and delay
     if options.multiplier is not None and options.delay is not None:
@@ -2749,7 +2751,7 @@ if __name__ == "__main__":
 
                 # plot and save multi-plots
                 if args.multiplot:
-                    do_multoplots(data, args, shot_name, verbose)
+                    do_multiplots(data, args, shot_name, verbose)
 
                 # save data
                 if args.save:
