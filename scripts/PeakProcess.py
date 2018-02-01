@@ -15,6 +15,8 @@ import SignalProcess as sp
 pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
 
+NOISEATTENUATION = 0.75
+
 
 def get_parser():
     """Returns final CL args parser.
@@ -124,7 +126,7 @@ def get_peak_args_parser():
     peak_args_parser.add_argument(
         '--diff', '--diff-time',
         action='store',
-        dest='diff',
+        dest='pk_diff',
         metavar='DIFF_TIME',
         type=float,
         help='description in development\n\n')
@@ -166,6 +168,7 @@ def get_peak_args_parser():
         action='store',
         dest='noise_att',
         type=float,
+        default=NOISEATTENUATION,
         help='description in development\n\n')
 
     peak_args_parser.add_argument(
@@ -847,6 +850,20 @@ def get_peaks(data, args, verbose):
     return unsorted_peaks
 
 
+def check_curves_list(curves, signals_data):
+    """Checks the indexes of the curves to process.
+    Raises the exception if the index is out of range.
+    
+    :param curves: the list of indexes of curves to find peaks for
+    :param signals_data: SIgnalsData instance
+    :return: None
+    """
+    for curve_idx in curves:
+        assert curve_idx < signals_data.count, \
+            ("The curve index {} is out of range. The total number "
+             "of curves: {}.".format(curve_idx, len(signals_data.count)))
+
+
 def global_check(options):
     """Input options global check.
     
@@ -919,6 +936,31 @@ def global_check(options):
             ("The number of multipliers ({}) is not equal"
              " to the number of delays ({})."
              "".format(len(options.multiplier), len(options.delay)))
+
+    # ==============================================================
+    # original PeakProcess args
+    if any({options.level, options.pk_diff, options.ge_diff, options.curves}):
+        assert all({options.level, options.pk_diff, options.ge_diff, options.curves}), \
+            "To start the process of finding peaks, '--level', " \
+            "'--diff-time', '--group-diff', '--curves' arguments are needed."
+        assert options.pk_diff >=0, \
+            "'--diff-time' value must be non negative real number."
+        assert options.gr_diff >=0, \
+            "'--group-diff' must be non negative real number."
+        assert all(idx >= 0 for idx in options.curves), \
+            "Curve index must be non negative integer"
+
+    if options.t_noise:
+        assert options.t_noise >= 0, \
+            "'--t-noise' must be non negative real number."
+    assert options.noise_att > 0, \
+        "'--noise-attenuation' must be real number > 0."
+
+    if options.t_bounds:
+        assert options.t_bounds[0] < options.t_bounds[1], \
+            "The left time bound must be less then the right one."
+    # TODO default value for time_bounds
+
     return options
 
 
@@ -931,13 +973,14 @@ if __name__ == '__main__':
 
     # try:
     args = global_check(args)
+
     '''
-            num_mask (tuple) - contains the first and last index
-            of substring of filename
-            That substring contains the shot number.
-            The last idx is excluded: [first, last).
-            Read numbering_parser docstring for more info.
-            '''
+    num_mask (tuple) - contains the first and last index
+    of substring of filename
+    That substring contains the shot number.
+    The last idx is excluded: [first, last).
+    Read numbering_parser docstring for more info.
+    '''
     num_mask = sp.numbering_parser([files[0] for
                                    files in args.gr_files])
 
@@ -966,6 +1009,7 @@ if __name__ == '__main__':
                                    args.multiplier, args.delay)
             sp.check_coeffs_number(data.count, ["label", "unit"],
                                    args.labels, args.units)
+            check_curves_list(args.curves, data)
 
             # check y_zero_offset parameters (if idx is out of range)
             if args.y_auto_zero:
