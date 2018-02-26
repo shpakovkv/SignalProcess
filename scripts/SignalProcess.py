@@ -934,9 +934,9 @@ def check_y_auto_zero_params(data, y_auto_zero_params):
                            argument's hep for more detail)
     """
     for params in y_auto_zero_params:
-        assert params[0] < data.count, ("Index ({}) is out of range in "
+        assert params[0] < data.count, ("Index ({}) is out of range ({} curves) in "
                                         "--y-auto-zero parameters."
-                                        "".format(params[0]))
+                                        "".format(params[0], data.count))
 
 
 def check_plot_param(args, curves_count, param_name):
@@ -2006,8 +2006,8 @@ def update_by_y_auto_zero(data, y_auto_zero_params,
     curves_list = [item[0] for item in y_auto_zero_params]
     start_stop_tuples = [(item[1], item[2]) for item in
                          raw_y_auto_zero(y_auto_zero_params,
-                                         args.multiplier,
-                                         args.delay)]
+                                         multiplier,
+                                         delay)]
     for idx, new_val in \
             enumerate(y_zero_offset_all(data,
                                         curves_list,
@@ -2344,7 +2344,7 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
     return y_min - reserve, y_max + reserve
 
 
-def do_multiplots(signals_data, cl_args, shot_name, verbose=False):
+def do_multiplots(signals_data, cl_args, shot_name, peak_data=None, verbose=False):
     """Plots all the multiplot graphs specified by the user.
     Saves the graphs that the user specified to save.
     
@@ -2365,7 +2365,7 @@ def do_multiplots(signals_data, cl_args, shot_name, verbose=False):
         check_plot_param(curve_list, signals_data.count,
                          '--multiplot')
     for curve_list in cl_args.multiplot:
-        plot_multiplot(signals_data, None, curve_list)
+        plot_multiplot(signals_data, peak_data, curve_list)
         if cl_args.multiplot_dir is not None:
             idx_list = "_".join(str(i) for
                                 i in sorted(curve_list))
@@ -2747,11 +2747,11 @@ if __name__ == "__main__":
 
                 # plot preview and save
                 if args.plot:
-                    do_plots(data, args, shot_name, verbose)
+                    do_plots(data, args, shot_name, verbose=verbose)
 
                 # plot and save multi-plots
                 if args.multiplot:
-                    do_multiplots(data, args, shot_name, verbose)
+                    do_multiplots(data, args, shot_name, verbose=verbose)
 
                 # save data
                 if args.save:

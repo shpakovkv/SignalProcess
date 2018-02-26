@@ -32,6 +32,7 @@ def get_parser():
         parents=[sp.get_input_files_args_parser(),
                  sp.get_mult_del_args_parser(),
                  sp.get_plot_args_parser(),
+                 sp.get_data_corr_args_parser(),
                  get_peak_args_parser(),
                  get_pk_save_args_parser()],
         prog='SignalProcess.py',
@@ -137,7 +138,7 @@ def get_peak_args_parser():
         dest='curves',
         metavar='CURVE',
         nargs='+',
-        type=float,
+        type=int,
         help='description in development\n\n')
 
     peak_args_parser.add_argument(
@@ -153,10 +154,11 @@ def get_peak_args_parser():
         metavar=('LEFT', 'RIGHT'),
         nargs=2,
         type=float,
+        default=(None, None),
         help='description in development\n\n')
 
     peak_args_parser.add_argument(
-        '--t-noise',
+        '--noise-half-period', '--t-noise',
         action='store',
         dest='t_noise',
         metavar='T',
@@ -469,6 +471,9 @@ def find_curve_front(curve,
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                 tnoise=None, is_negative=True, graph=False,
                 noise_attenuation=0.5, debug=False):
+    print("========================================================")
+    print("level = {};    is_negative={}".format(level, is_negative))
+    print("========================================================")
     """Peaks search (negative by default)
     
     :param x: array of time values
@@ -633,7 +638,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
     if is_negative:
         y = -y
-        level = -level
+        level = -abs(level)
         for i in range(len(peak_list)):
             peak_list[i].invert()
     if graph:
@@ -759,7 +764,7 @@ def group_peaks(data, window):
         gr = 0
         pk = 0
 
-        while pk < len(data[wf]) and len(data[wf]) > 0:
+        while data[wf] is not None and pk < len(data[wf]):  # and len(data[wf]) > 0:
             '''ADD PEAK TO GROUP
             when curve[i]'s peak[j] is in
             +/-dt interval from peaks of group[gr]
@@ -833,12 +838,11 @@ def get_peaks(data, args, verbose):
     for idx in args.curves:
         if verbose:
             print("Curve #" + str(idx))
-        is_negative = is_neg(check_polarity(data.curves[idx]))
         new_peaks, peak_log = peak_finder(
             data.time(idx), data.value(idx),
-            level=args.level, diff_time=args.diff,
+            level=args.level, diff_time=args.pk_diff,
             time_bounds=args.t_bounds, tnoise=args.t_noise,
-            is_negative=is_negative,
+            is_negative=args.level < 0,
             noise_attenuation=args.noise_att,
             graph=False
         )
@@ -930,6 +934,23 @@ def global_check(options):
     # if options.postfix:
     #     options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
 
+    # raw check offset_by_voltage parameters (types)
+    options.it_offset = False  # interactive offset process
+    if options.offset_by_front:
+        assert len(options.offset_by_front) in [2, 4], \
+            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
+             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
+             "".format(arg_name="--offset-by-curve_level"))
+        if len(options.offset_by_front) < 4:
+            options.it_offset = True
+        options.offset_by_front = \
+            sp.global_check_front_params(options.offset_by_front)
+
+    # raw check y_auto_zero parameters (types)
+    if options.y_auto_zero:
+        options.y_auto_zero = sp.global_check_y_auto_zero_params(options.y_auto_zero)
+
+
     # raw check multiplier and delay
     if options.multiplier is not None and options.delay is not None:
         assert len(options.multiplier) == len(options.delay), \
@@ -939,8 +960,8 @@ def global_check(options):
 
     # ==============================================================
     # original PeakProcess args
-    if any({options.level, options.pk_diff, options.ge_diff, options.curves}):
-        assert all({options.level, options.pk_diff, options.ge_diff, options.curves}), \
+    if any([options.level, options.pk_diff, options.gr_diff, options.curves]):
+        assert all([options.level, options.pk_diff, options.gr_diff, options.curves]), \
             "To start the process of finding peaks, '--level', " \
             "'--diff-time', '--group-diff', '--curves' arguments are needed."
         assert options.pk_diff >=0, \
@@ -952,11 +973,11 @@ def global_check(options):
 
     if options.t_noise:
         assert options.t_noise >= 0, \
-            "'--t-noise' must be non negative real number."
+            "'--noise-half-period' must be non negative real number."
     assert options.noise_att > 0, \
         "'--noise-attenuation' must be real number > 0."
 
-    if options.t_bounds:
+    if all(bound is not None for bound in options.t_bounds):
         assert options.t_bounds[0] < options.t_bounds[1], \
             "The left time bound must be less then the right one."
     # TODO default value for time_bounds
@@ -985,12 +1006,12 @@ if __name__ == '__main__':
                                    files in args.gr_files])
 
     # MAIN LOOP
-    print("Loop")  # debugging
+    print("Check Loop in")  # debugging
     if (args.save or
             args.plot or
             args.multiplot or
             args.offset_by_front):
-        print("in loop")  # debugging
+        print("==> In loop")  # debugging
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = sp.get_shot_number_str(file_list[0], num_mask,
                                                args.ext_list)
@@ -1031,8 +1052,8 @@ if __name__ == '__main__':
                 unsorted_peaks = get_peaks(data, args, verbose)
 
                 # step 7 - group peaks [and plot all curves with peaks]
-                peak_data = group_peaks(unsorted_peaks, args.gr_diff)
-                # TODO access to peak_data via curve id
+                peaks_data = group_peaks(unsorted_peaks, args.gr_diff)
+                # TODO access to peaks_data via curve id
 
                 # step 8 - save peaks data
                 if verbose:
@@ -1040,7 +1061,7 @@ if __name__ == '__main__':
                 # TODO peaks_filename (del data file ext)
                 pk_filename = os.path.join(args.save_to, peaks_dir,
                                            os.path.basename(file_list[0])[:-4])
-                save_peaks_csv(pk_filename, peak_data)
+                save_peaks_csv(pk_filename, peaks_data)
 
                 # step 9 - save multicurve plot
                 multiplot_name = pk_filename[:]
@@ -1049,12 +1070,12 @@ if __name__ == '__main__':
 
                 if verbose:
                     print("Saving all peaks as " + multiplot_name)
-                sp.plot_multiplot(data, peak_data, args.curves,
+                sp.plot_multiplot(data, peaks_data, args.curves,
                                   xlim=args.t_bounds)
-                # TODO save multiplot
+                # TODO save multiplot (by default)
                 pyplot.show()
 
-            # read peaks from file
+            # TODO read peaks from file
 
             # plot preview and save
             if args.plot:
