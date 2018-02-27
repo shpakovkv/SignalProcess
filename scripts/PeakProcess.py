@@ -471,9 +471,6 @@ def find_curve_front(curve,
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                 tnoise=None, is_negative=True, graph=False,
                 noise_attenuation=0.5, debug=False):
-    print("========================================================")
-    print("level = {};    is_negative={}".format(level, is_negative))
-    print("========================================================")
     """Peaks search (negative by default)
     
     :param x: array of time values
