@@ -2464,16 +2464,16 @@ def plot_multiplot(data, peak_data, curves_list,
 
         # plot peaks scatter
         if peak_data is not None:
+            color_iter = iter(ColorRange())
             for pk in peak_data[curves_list[wf]]:
-                color_iter = iter(ColorRange())
                 color = next(color_iter)
                 if pk is not None:
                     axes[wf].scatter([pk.time], [pk.val], s=20,
                                      edgecolors=color, facecolors='none',
                                      linewidths=1.5)
-                    axes[wf].scatter([pk.time], [pk.val], s=50,
-                                     edgecolors='none', facecolors=color,
-                                     linewidths=1.5, marker='x')
+                    # axes[wf].scatter([pk.time], [pk.val], s=50,
+                    #                  edgecolors='none', facecolors=color,
+                    #                  linewidths=1, marker='x')
     fig.subplots_adjust(hspace=0)
 
 

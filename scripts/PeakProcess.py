@@ -16,6 +16,7 @@ pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
 
 NOISEATTENUATION = 0.75
+DEFAULTSAVETODIR = "Peaks"
 
 
 def get_parser():
@@ -62,7 +63,6 @@ def get_pk_save_args_parser():
         action='store',
         metavar='DIR',
         dest='save_to',
-        default='',
         help='specify the output directory.\n\n')
 
     # parser.add_argument(
@@ -913,7 +913,9 @@ def global_check(options):
                                              '--mp-save')
     options.save_to = sp.check_param_path(options.save_to, '--save-to')
     if not options.save_to:
-        options.save_to = os.path.dirname(gr_files[0][0])
+        # save peaks data to dir
+        options.save_to = os.path.join(os.path.dirname(gr_files[0][0]),
+                                       DEFAULTSAVETODIR)
 
     # check and convert plot and multiplot options
     if options.plot:
@@ -987,7 +989,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     verbose = not args.silent
-    peaks_dir = "Peaks"
 
     # try:
     args = global_check(args)
@@ -1054,10 +1055,12 @@ if __name__ == '__main__':
                 # step 8 - save peaks data
                 if verbose:
                     print("Saving peak data...")
-                # TODO peaks_filename (del data file ext)
-                pk_filename = os.path.join(args.save_to, peaks_dir,
+                pk_filename = os.path.join(os.path.dirname(file_list[0]),
+                                           args.save_to,
                                            os.path.basename(file_list[0])[:-4])
                 save_peaks_csv(pk_filename, peaks_data)
+                print("DATA FROM: {}".format(os.path.dirname(file_list[0])))
+                print("SAVED PEAKS at {}".format(pk_filename))
 
                 # step 9 - save multicurve plot
                 multiplot_name = pk_filename[:]
@@ -1068,7 +1071,7 @@ if __name__ == '__main__':
                     print("Saving all peaks as " + multiplot_name)
                 sp.plot_multiplot(data, peaks_data, args.curves,
                                   xlim=args.t_bounds)
-                # TODO save multiplot (by default)
+                pyplot.savefig(multiplot_name, dpi=400)
                 pyplot.show()
 
             # TODO read peaks from file
