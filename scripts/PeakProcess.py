@@ -1,5 +1,4 @@
-#!/usr/bin/python
-# -*- coding: Windows-1251 -*-
+"""Peak handle functions."""
 from __future__ import print_function
 
 from matplotlib import pyplot
@@ -16,6 +15,8 @@ import SignalProcess as sp
 pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
 
+NOISEATTENUATION = 0.75
+
 
 def get_parser():
     """Returns final CL args parser.
@@ -31,6 +32,7 @@ def get_parser():
         parents=[sp.get_input_files_args_parser(),
                  sp.get_mult_del_args_parser(),
                  sp.get_plot_args_parser(),
+                 sp.get_data_corr_args_parser(),
                  get_peak_args_parser(),
                  get_pk_save_args_parser()],
         prog='SignalProcess.py',
@@ -103,8 +105,8 @@ def get_pk_save_args_parser():
 def get_peak_args_parser():
     """Returns peak search options parser.
     """
-    parser = argparse.ArgumentParser(add_help=False)
-    # parser.add_argument(
+    peak_args_parser = argparse.ArgumentParser(add_help=False)
+    # peak_args_parser.add_argument(
     #     '--peak',
     #     action='store',
     #     dest='peak',
@@ -113,7 +115,7 @@ def get_peak_args_parser():
     #     type=float,
     #     help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '--level',
         action='store',
         dest='level',
@@ -121,16 +123,16 @@ def get_peak_args_parser():
         type=float,
         help='description in development\n\n')
 
-    # TODO default value for diff_time
-    parser.add_argument(
+    # TODO default value for peak diff_time
+    peak_args_parser.add_argument(
         '--diff', '--diff-time',
         action='store',
-        dest='diff',
+        dest='pk_diff',
         metavar='DIFF_TIME',
         type=float,
         help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '--curves',
         action='store',
         dest='curves',
@@ -139,7 +141,13 @@ def get_peak_args_parser():
         type=int,
         help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
+        '-s', '--save',
+        action='store_true',
+        dest='save',
+        help='description in development\n\n')
+
+    peak_args_parser.add_argument(
         '--bounds', '--time-bounds',
         action='store',
         dest='t_bounds',
@@ -149,35 +157,43 @@ def get_peak_args_parser():
         default=(None, None),
         help='description in development\n\n')
 
-    parser.add_argument(
-        '--t-noise',
+    peak_args_parser.add_argument(
+        '--noise-half-period', '--t-noise',
         action='store',
         dest='t_noise',
         metavar='T',
         type=float,
         help='description in development\n\n')
 
-    parser.add_argument(
+    peak_args_parser.add_argument(
         '--noise-attenuation',
         action='store',
         dest='noise_att',
         type=float,
+        default=NOISEATTENUATION,
         help='description in development\n\n')
 
-    parser.add_argument(
-        '--gr-diff',
+    peak_args_parser.add_argument(
+        '--group-diff',
         action='store',
         dest='gr_diff',
         metavar='GR_DIFF',
         type=float,
         help='description in development\n\n')
 
-    return parser
+    return peak_args_parser
 
 
 class SinglePeak:
     """Peak object.
+    Contains fields:
+        time - time value
+        val - amplitude value
+        idx - index in the SignalsData
+        sqr_l - 
+        sqr_r - 
     """
+    # TODO sqr_l sqr_r description
     def __init__(self, time=None, value=None, index=None,
                  sqr_l=0, sqr_r=0):
         self.time = time
@@ -264,7 +280,7 @@ def save_peaks_csv(filename, peaks):
 
 def find_nearest_idx(sorted_arr, value, side='auto'):
     """
-    Returns the index of the value closest to 'value'
+    Returns the index of the 'sorted_arr' element closest to 'value'
     
     :param sorted_arr: sorted array/list of ints or floats
     :param value: the int/float number to which the 
@@ -279,38 +295,26 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
     :rtype: int
     
     .. note:: if two numbers are equally close and side='auto', 
-           returns the index of the smallest one.
+           returns the index of the smaller one.
     """
 
     idx = bisect.bisect_left(sorted_arr, value)
     if idx == 0:
-        if side == 'auto' or side == 'right':
-            return idx
-        else:
-            return None
+        return idx if side == 'auto' or side == 'right' else None
 
     if idx == len(sorted_arr):
-        if side == 'auto' or side == 'left':
-            return idx
-        else:
-            return None
+        return idx if side == 'auto' or side == 'left' else None
 
     after = sorted_arr[idx]
     before = sorted_arr[idx - 1]
     if side == 'auto':
-        if after - value < value - before:
-            return idx
-        else:
-            return idx - 1
-    elif side == 'left':
-        return idx - 1
-    elif side == 'right':
-        return idx
+        return idx if after - value < value - before else idx - 1
+    else:
+        return idx if side == 'right' else idx - 1
 
 
-
-def level_excess_check(x, y, level, start=0, step=1,
-                       window=0, is_positive=True):
+def level_excess(x, y, level, start=0, step=1,
+                 window=0, is_positive=True):
     """Checks if 'Y' values excess 'level' value 
     for 'X' in range from X(start) to X(start) + window
     OR for x in range from X(start) - window to X(start)
@@ -424,7 +428,7 @@ def find_curve_front(curve,
                        plot_name="voltage_front.png"):
     """Find x (time) of voltage front on specific level
     Default: Negative polarity, -0.2 MV level
-    PeakProcess.level_excess_check(x, y, level, start=0, step=1,
+    PeakProcess.level_excess(x, y, level, start=0, step=1,
     window=0, is_positive=True):
     
     :param curve: 
@@ -447,8 +451,8 @@ def find_curve_front(curve,
         else:
             level = -abs(level)
 
-    front_checked, idx = level_excess_check(curve.time, curve.val, level,
-                                            is_positive=is_pos(polarity))
+    front_checked, idx = level_excess(curve.time, curve.val, level,
+                                      is_positive=is_pos(polarity))
     if front_checked:
         if save_plot:
             pyplot.close('all')
@@ -467,60 +471,64 @@ def find_curve_front(curve,
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                 tnoise=None, is_negative=True, graph=False,
                 noise_attenuation=0.5, debug=False):
-    # Поиск пиков (положительных или отрицательных)
-    # Пример:
-    # Peaks = PeakFinder_v4( x, y, -1, 5E-9, 0.8, 5E-9, 1);
-    # Peaks = PeakFinder_v4( x, y, -1, 5, 0.8, 5, 1);
+    print("========================================================")
+    print("level = {};    is_negative={}".format(level, is_negative))
+    print("========================================================")
+    """Peaks search (negative by default)
+    
+    :param x: array of time values
+    :param y: array of amplitude values
+    :param level: peak threshold (all amplitude values 
+                  below this level will be ignored)
+    :param diff_time: the minimum difference between two neighboring peaks.
+                      If the next peak is at the front (fall or rise) 
+                      of the previous peak, and the "distance" from 
+                      its maximum to that front (at the same level) is less 
+                      than the diff_time, this second peak will be ignored.
+    :param time_bounds: tuple with the left and the right search boundaries
+    :param tnoise: maximum half-period of noise fluctuation.
+    :param is_negative: specify False for positive curve.
+                        for negative curve (by default) the 'y' array will be 
+                        inverted before process and inverted again at the end.
+    :param graph: specify True to display a graph with found peaks
+    :param noise_attenuation: Attenuation of the second half-wave 
+                              with a polarity reversal (noise). If too many 
+                              noise maxima are defined as real peaks, 
+                              reduce this value.
+    :param debug: debug mode (outputs additional information)
+     
+    :type x: numpy.ndarray
+    :type y: numpy.ndarray
+    :type level: float, int ''same as values of param y''
+    :type diff_time: float, int ''same as values of param x''
+    :type time_bounds: tuple, list ''(float, float)''
+    :type tnoise: float, int ''same as values of param x''
+    :type is_negative: bool
+    :type graph: bool
+    :type noise_attenuation: float
+    :type debug: bool
 
-    # x - время (массив непрерывно увеличивающихся значений)
-    # y - значения (массив)
+    :return: list 
+    """
 
-    # level - уровень при превышении которого (по модулю) сигнал
-    # считается пиком. При level > 0 идет поиск положительных пиков,
-    # при level < 0 идет поиск отрицательных пиков.
-
-    # tnoise - максимальный полупериод колебания наводки (время между максимумом и минимумом волны).
-
-    # fflevel - (FrontFallLevel) критерий конца текущего пика. Если модуль значения Y
-    # опустится ниже определенной доли от максимума (fflevel), то за пределами
-    # этого значения начинается поиск следующего максимума
-
-    # diff_time - окно различия. Если на фронте спада максимума растет
-    # следующий максимум, то он должен отстоять от фронта спада предыдущего
-    # пика на это значение. В единицах измерения "x".
-    # Предполагается diff_time >= tnoise (но не обязательно)
-
-    # graph = 0 если строить проверочный график не надо, напрмер, если функция
-    # выполняется внутри цикла
-
-    # noise_attenuation (default 0.5)
-    # Ослабление второй полуволны при переполюсовке (наводке). Если программа
-    # пропускает (не распознает) много сигналов-наводок, понизьте значение.
-
-
-    # Проверка введенных значений
+    # Checkout the inputs
     peak_log = ""
-    if level == 0:
-        raise ValueError('Invalid level value!')
+    assert level != 0, 'Invalid level value!'
 
     if is_negative:
         y = -y
-        level = -level
+        level = abs(level)
 
     if not tnoise:
         # print('tnoise parameter is empty. ')
-        tnoise = x(3) - x(1)
+        tnoise = x[3] - x[1]
         peak_log += 'Set "tnoise" to default 2 stops = ' + str(tnoise) + "\n"
 
-    if len(time_bounds) != 2:
-        raise ValueError("time_bounds has incorrect number of values. "
-                         "2 expected, " + str(len(time_bounds)) +
-                         " given.")
-    # проверка длины массивов
-    if len(x) > len(y):
-        raise IndexError('Length(X) > Length(Y) by ' + str(len(x) - len(y)))
-    elif len(x) < len(y):
-        raise IndexError('Warning! Length(X) < Length(Y) by ' + str(len(y) - len(x)))
+    assert len(time_bounds) == 2, ("time_bounds has incorrect number of "
+                                   "values. 2 expected, " +
+                                   str(len(time_bounds)) + " given.")
+    assert len(x) == len(y), ("The length of X ({}) is not equal to the "
+                              "length of Y ({}).".format(len(x), len(y)))
 
     if time_bounds[0] is None:
         time_bounds = (x[0], time_bounds[1])
@@ -528,98 +536,76 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         time_bounds = (time_bounds[0], x[-1])
     start_idx = find_nearest_idx(x, time_bounds[0], side='right')
     stop_idx = find_nearest_idx(x, time_bounds[1], side='left')
-    if start_idx is None or stop_idx is None:
-        peak_log += "Time bounds is out of range.\n"
-        return [], peak_log
     diff_idx = int(diff_time // (x[1] - x[0]))
     if debug:
         print("Diff_time = {}, Diff_idx = {}".format(diff_time, diff_idx))
 
     peak_list = []
-    # ==========================================================================
-    # print('Starting peaks search...')
+
+    if start_idx is None or stop_idx is None:
+        peak_log += "Time bounds is out of range.\n"
+        return peak_list, peak_log
 
     i = start_idx
     while i < stop_idx :
-        # Событие превышение уровня
         if y[i] > level:
-            # print('Overlevel occurance!')
-            # сохранение текущих максимальных значений
             max_y = y[i]
             max_idx = i
 
-            # перебираем все точки внутри diff_time или до конца данных
+            # search for a bigger peak within the diff_time from the found one
+            # y[i] == max_y condition is needed for flat-top peaks
             while (i <= stop_idx and
                    (x[i] - x[max_idx] <= diff_time or
                     y[i] == max_y)):
-                if x[i] > 82 and x[i] < 83:
-                    pass
-                temp01 = y[i]
-                temp02 = x[i]
                 if y[i] > max_y:
-                    # сохранение текущих максимальных значений
                     max_y = y[i]
                     max_idx = i
                 i += 1
             if debug:
-                print("local_max = [{:.3f}, {:.3f}] i={}".format(x[max_idx], max_y, max_idx))
+                print("local_max = [{:.3f}, {:.3f}] i={}"
+                      "".format(x[max_idx], max_y, max_idx))
 
-            # print('Found max element')
-            # перебираем точки слева от пика в пределах diff_time
-            # если находим точку повыше - то это "взбрык" на фронте спада
-            # а не настоящий пик
-            [is_noise, _] = level_excess_check(x,
-                                               y,
-                                               max_y,
-                                               start=max_idx,
-                                               step=-1,
-                                               window=diff_time,
-                                               is_positive=True)
-            # print('Right window check completed.')
+            # search for a bigger value within the diff_time
+            # to the left from the found local maximum
+            # if found: this is a little signal fluctuation on the fall front
+            # (not a real peak)
+            [is_noise, _] = level_excess(x, y, max_y, start=max_idx,
+                                         step=-1, window=diff_time,
+                                         is_positive=True)
             if debug and is_noise:
                 print('Left Excess at x({:.2f}, {:.2f}) '
                       '== Not a peak at front fall!'.format(x[i], y[i]))
 
-            # проверка пика (наводка или нет)
-            # перебираем от max_idx справа все точки в пределах tnoise
-            # или до конца данных
-
+            # search for a polarity reversal within tnose from this local max
+            # if found: this is a noise (not a real peak)
             if not is_noise:
-                # проверка на переполюсовку выход за level с учетом ослабления
-                # второй полуволны NoiseAttenuation
-                [is_noise, j] = level_excess_check(x,
-                                                   y,
-                                                   -max_y * noise_attenuation,
-                                                   start=max_idx,
-                                                   step=1,
-                                                   window=tnoise,
-                                                   is_positive=False)
+                # search to the right from this local max
+                [is_noise, j] = level_excess(x, y,
+                                             -max_y * noise_attenuation,
+                                             start=max_idx, step=1,
+                                             window=tnoise,
+                                             is_positive=False)
 
                 if debug and is_noise:
-                    print('Noise to the right x({:.2f}, {:.2f})'.format(x[j], y[j]))
+                    print('Noise to the right x({:.2f}, {:.2f})'
+                          ''.format(x[j], y[j]))
                 else:
-                    # проверка на наводку в другую сторону от max_idx
-                    [is_noise, j] = level_excess_check(x,
-                                                       y,
-                                                       -max_y * noise_attenuation,
-                                                       start=max_idx,
-                                                       step=-1,
-                                                       window=tnoise,
-                                                       is_positive=False)
+                    # search to the left from this local max
+                    [is_noise, j] = level_excess(x, y,
+                                                 -max_y * noise_attenuation,
+                                                 start=max_idx, step=-1,
+                                                 window=tnoise,
+                                                 is_positive=False)
                     if debug and is_noise:
-                        print('Noise to the left x({:.2f}, {:.2f})'.format(x[j], y[j]))
+                        print('Noise to the left x({:.2f}, {:.2f})'
+                              ''.format(x[j], y[j]))
 
-            # если не наводка, то записываем
             if not is_noise:
                 peak_list.append(SinglePeak(x[max_idx], max_y, max_idx))
-                # print('Found peak!')
                 continue
         i += 1
 
     peak_log += 'Number of peaks: ' + str(len(peak_list)) + "\n"
-    # for pk in peak_list:
-    #     print("[{:.3f}, {:.3f}]    ".format(pk.time, pk.val), end="")
-    # print()
 
     # LOCAL INTEGRAL CHECK
     dt = x[1] - x[0]
@@ -630,21 +616,21 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
             pk = peak_list[idx]
             # square = pk.val * dt * di
             square = pk.val * di
-            integral_left = 0
-            integral_right = 0
+            intgr_l = 0
+            intgr_r = 0
             peak_log += ("Peak[{:3d}] = [{:7.2f},   {:4.1f}]   "
                          "Square factor [".format(idx, pk.time, pk.val))
             if pk.idx - di >= 0:
-                integral_left = integrate.trapz(y[pk.idx-di : pk.idx+1])
-                peak_list[idx].sqr_l = integral_left / square
-                peak_log += "{:.3f}".format(integral_left / square)
+                intgr_l = integrate.trapz(y[pk.idx-di : pk.idx+1])
+                peak_list[idx].sqr_l = intgr_l / square
+                peak_log += "{:.3f}".format(intgr_l / square)
             peak_log += " | "
             if pk.idx + di < len(y):  # stop_idx
-                integral_right = integrate.trapz(y[pk.idx: pk.idx + di + 1])
-                peak_list[idx].sqr_r = integral_right / square
-                peak_log += "{:.3f}".format(integral_right / square)
+                intgr_r = integrate.trapz(y[pk.idx: pk.idx + di + 1])
+                peak_list[idx].sqr_r = intgr_r / square
+                peak_log += "{:.3f}".format(intgr_r / square)
             peak_log += "]"
-            peak_log += "  ({:.3f})".format((integral_right + integral_left) / square)
+            peak_log += "  ({:.3f})".format((intgr_r + intgr_l) / square)
             peak_log += "\n"
         if peak_list:
             peak_log += "\n"
@@ -652,112 +638,146 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
     if is_negative:
         y = -y
-        level = -level
+        level = -abs(level)
         for i in range(len(peak_list)):
             peak_list[i].invert()
-    # строим проверочные графики, если это необходимо
     if graph:
         # plotting curve
-        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-', color='#8888bb')
+        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-',
+                    color='#8888bb')
         pyplot.xlim(time_bounds)
         # plotting level line
-        pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':', color='#80ff80')
+        pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':',
+                    color='#80ff80')
         # marking overall peaks
         peaks_x = [p.time for p in peak_list]
         peaks_y = [p.val for p in peak_list]
-        pyplot.scatter(peaks_x, peaks_y, s=50, edgecolors='#ff7f0e', facecolors='none', linewidths=2)
-        pyplot.scatter(peaks_x, peaks_y, s=80, edgecolors='#dd3328', facecolors='none', linewidths=2)
-        # pyplot.plot(peaks_x, peaks_y, 'o', color='#ff550e', facecolors='none')
-        # pyplot.plot(peaks_x, peaks_y, 'xb', markersize=9)
+        pyplot.scatter(peaks_x, peaks_y, s=50, edgecolors='#ff7f0e',
+                       facecolors='none', linewidths=2)
+        pyplot.scatter(peaks_x, peaks_y, s=80, edgecolors='#dd3328',
+                       facecolors='none', linewidths=2)
         pyplot.show()
 
     return peak_list, peak_log
 
 
 def group_peaks(data, window):
-    # Groups the peaks from different X-Ray detectors
-    # each group corresponds to one single act of X-Ray emission
-    #
-    # data - list with N elements, each element represents one curve
-    # curve - list witn M elements, each element represents one peak
-    # peak - list with 2 float numbers: [time, value]
-    #
-    # data[curve_idx][peak_idx][0] = X-value of peak with peak_idx index of curve with curve_idx index
-    # data[curve_idx][peak_idx][1] = Y-value of peak with peak_idx index of curve with curve_idx index
-    # where curve_idx and peak_idx - zero-based index of curve and peak
-    #
-    # window - peaks coincide when their X values are within...
-    # ... +/-window interval from average X (time) position of peak ()
-    # "Average" because X (time) value of a peak may differ from curve to curve
+    """Groups the peaks from different curves.
+    Each group corresponds to one single event (for example: 
+    act of X-Ray emission, registered by several detectors).
+    
+    If 
+    
+    :param data: three-dimensional array containing data 
+                 on all the peaks of all curves
+                 The array structure:
+                 data[curve_idx][peak_idx] == SinglePeak instance
+    :param window: peaks coincide when their X values are within
+                   +/-window interval from average X (time) position 
+                   of peak (event). "Average" because X (time) value 
+                   of a peak (event) may differ from curve to curve.
+    :return: (peak_data, peak_map)
+             where peak_data is three-dimensional array containing data 
+             on all the peaks (grouped by time) of all curves
+             The array structure:
+             peak_data[curve_idx][group_idx] == SinglePeak instance if 
+             this curve has a peak related to this event (group), else None
+             
+             and peak_map is similar array:
+             peak_map[curve_idx][group_idx] == True if this curve has a 
+             peak related to this event (group), else False
+    """
 
+    def insert_group(peak, peak_data, peak_map, group_time,
+                     num_peak_in_gr, wf, gr):
+        group_time.insert(gr, peak.time)
+        num_peak_in_gr.insert(gr, 1)
+        for curve_i in range(len(peak_data)):
+            if curve_i == wf:
+                peak_map[curve_i].insert(gr, True)
+                peak_data[curve_i].insert(gr, SinglePeak(*peak.data_full))
+            else:
+                peak_map[curve_i].insert(gr, False)
+                peak_data[curve_i].insert(gr, None)
+
+
+    def add_pk_to_gr(peak, peak_data, peak_map, peak_time,
+                     num_peak_in_gr, wf, gr):
+        peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] +
+                          peak.time) /
+                         (num_peak_in_gr[gr] + 1))
+        num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1
+        peak_map[wf][gr] = True
+        peak_data[wf][gr] = SinglePeak(*peak.data_full)
+
+    # wf == waveform == curve
     start_wf = 0
+
+    # skip first curves if they have no peaks
     for wf in range(len(data)):
         if data[wf]:
             start_wf = wf
             break
 
-    peak_time = []                  # 1D array with average X (time) data of peak group
+    # 1D array with average X (time) data of peak group
+    peak_time = []
     for peak in data[start_wf]:
         peak_time.append(peak.time)
 
-    dt = abs(window)                            # changes variable name for shortness
-    curves_count = len(data)                    # number of waveforms
-    num_peak_in_gr = [1] * len(peak_time)       # 1D array with numbers of peaks in each group
+    # 1D array with numbers of peaks in each group
+    num_peak_in_gr = [1] * len(peak_time)
 
-    peak_map = [[True] * len(peak_time)]            # (peak_map[curve_idx][group_idx] == True) means "there IS a peak"
-    for curve in range(1, curves_count):          # False value means...
-        peak_map.append([False] * len(peak_time))   # ..."this curve have not peak at this time position"
+    dt = abs(window)
+    curves_count = len(data)
+
+    # at the beginning we have only start_wf's peaks
+    peak_map = [[True] * len(peak_time)]
+    for curve in range(1, curves_count):
+        peak_map.append([False] * len(peak_time))
 
     peak_data = [[]]
-    for peak in data[start_wf]:    # peaks of first curve
+    for peak in data[start_wf]:
         peak_data[0].append(SinglePeak(*peak.data_full))
-
     for curve_idx in range(0, start_wf):
         peak_data.insert(0, [None] * len(peak_time))
     for curve_idx in range(start_wf + 1, curves_count):
         peak_data.append([None] * len(peak_time))
 
-    if curves_count <= 1:  # if less than 2 elements = no comparison
+    if curves_count <= 1:
         return peak_data, peak_map
 
-    # ---------- making groups of peaks ------------------------------
-    # makes groups of peaks
-    # two peaks make group when they are close enought
-    # ('X' of a peak is within +/- dt interval from 'X' of the group)
-    # with adding new peak to a group,
-    # the 'X' parameter of the group changes to (X1 + X2 + ... + Xn)/n
-    # where n - number of peaks in group
-    #
-    # for all waveforms exept first
+    '''---------- making groups of peaks ------------------------------
+    two peaks make group when they are close enough
+    ('X' of a peak is within +/- dt interval from 'X' of the group)
+    with adding new peak to a group,
+    the 'X' parameter of the group changes to (X1 + X2 + ... + Xn)/n
+    where n - number of peaks in group
+    '''
+
     for wf in range(start_wf + 1, curves_count):
-                # wf == 'waveform index'
-        gr = 0  # gr == 'group index', zero-based index of current group
-        pk = 0  # pk == 'peak index', zero-based index of current peak
-                # (in peak list of current waveform)
+        '''
+        wf == waveform index = curve index
+        gr == group index (zero-based index of current group)
+        pk == peak index (zero-based index of current peak
+              in the peak list of current waveform)
+        '''
+        gr = 0
+        pk = 0
 
-        while pk < len(data[wf]) and len(data[wf]) > 0:
-            # ================================================================
-            # ADD PEAK TO GROUP
-            # check if curve[i]'s peak[j] is in
-            # +/-dt interval from peaks of group[gr]
-            # print "Checking Group[" + str(gr) + "]"
-
-            if gr < len(peak_time) and abs(peak_time[gr] - data[wf][pk].time) <= dt:
-                # check if X-position of current peak of curve[wf] matches group gr
+        while data[wf] is not None and pk < len(data[wf]):  # and len(data[wf]) > 0:
+            '''ADD PEAK TO GROUP
+            when curve[i]'s peak[j] is in
+            +/-dt interval from peaks of group[gr]
+            '''
+            if gr < len(peak_time) \
+                    and abs(peak_time[gr] - data[wf][pk].time) <= dt:
                 if (len(data[wf]) > pk + 1 and
                         (abs(peak_time[gr] - data[wf][pk].time) >
                          abs(peak_time[gr] - data[wf][pk + 1].time))):
                     # next peak of data[wf] matches better
-                    # insert new column for current data[wf]'s peak
-                    peak_time.insert(gr, data[wf][pk].time)
-                    num_peak_in_gr.insert(gr, 1)
-                    peak_map[wf].insert(gr, True)
-                    peak_data[wf].insert(gr, SinglePeak(
-                        *data[wf][pk].data_full))
-                    for curve_i in range(curves_count):
-                        if curve_i != wf:
-                            peak_map[curve_i].insert(gr, False)  # new row to other columns of peak map table
-                            peak_data[curve_i].insert(gr, None)  # new row to other columns of peak data table
+                    # insert new group for current data[wf]'s peak
+                    insert_group(data[wf][pk], peak_data, peak_map, peak_time,
+                                 num_peak_in_gr, wf, gr)
                     pk += 1
                 elif (len(peak_time) > gr + 1 and
                           (abs(peak_time[gr] - data[wf][pk].time) >
@@ -765,82 +785,98 @@ def group_peaks(data, window):
                     # current peak matches next group better
                     pass
                 else:
-                    # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "group match"
-                    peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] +
-                                     data[wf][pk].time) /
-                                     (num_peak_in_gr[gr] + 1))        # recalculate average X-position of group
-                    num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1         # update count of peaks in current group
-                    peak_map[wf][gr] = True                         # update peak_map
-                    peak_data[wf][gr] = SinglePeak(*data[wf][pk].data_full)          # add peak to output peak data array
-                    pk += 1                                         # go to the next peak
+                    add_pk_to_gr(data[wf][pk], peak_data, peak_map, peak_time,
+                                 num_peak_in_gr, wf, gr)
+                    pk += 1
                 if gr == len(peak_time) - 1 and pk < len(data[wf]):
-                    # Last peak_data column was filled but there are more peaks in the data[wf]
-                    # adds new group
+                    # Last peak_data column was filled but there are
+                    # more peaks in the data[wf], so adds new group
                     gr += 1
 
+            elif (gr < len(peak_time) and
+                          data[wf][pk].time < peak_time[gr] - dt):
+                '''INSERT NEW GROUP
+                when X-position of current peak of curve[wf] is 
+                to the left of current group by more than dt
+                '''
+                insert_group(data[wf][pk], peak_data, peak_map, peak_time,
+                             num_peak_in_gr, wf, gr)
+                pk += 1
 
-            # ===============================================================================================
-            # INSERT NEW GROUP
-            # check if X-position of current peak of curve[wf] is to the left of current group by more than dt
-            elif gr < len(peak_time) and data[wf][pk].time < peak_time[gr] - dt:
-                # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "left insert"
-                peak_time.insert(gr, data[wf][pk].time)       # insert new group of peaks into the groups table
-                num_peak_in_gr.insert(gr, 1)                # update the number of peaks in current group
-                peak_map[wf].insert(gr, True)               # insert row to current wf column of peak map table
-                peak_data[wf].insert(gr, SinglePeak(*data[wf][pk].data_full))   # insert row to current wf column of peak data table
-                for curve_i in range(curves_count):
-                    if curve_i != wf:
-                        peak_map[curve_i].insert(gr, False)  # new row to other columns of peak map table
-                        peak_data[curve_i].insert(gr, None)  # new row to other columns of peak data table
-                pk += 1                                      # go to the next peak of current curve
-
-            # ===============================================================================================
-            # APPEND NEW GROUP
-            # here X-position of current peak of curve[wf] is to the right of current group by more than dt
-            # checks if current group is the latest in the groups table
-
-            # elif (data[wf][pk].time > peak_time[gr] + dt) and (gr >= len(peak_time) - 1):
             elif gr >= len(peak_time) - 1:
-                # print "Waveform[" + str(wf) + "] Peak[" + str(pk) + "]   action:    " + "insert at the end"
-                peak_time.append(data[wf][pk].time)           # add new group at the end of the group table
-                num_peak_in_gr.append(1)                    # update count of peaks and groups
-                peak_map[wf].append(True)                   # add row to current wf column of peak map table
-                peak_data[wf].append(SinglePeak(*data[wf][pk].data_full))           # add row to current wf column of peak data table
-                for curve_i in range(curves_count):
-                    if curve_i != wf:
-                        peak_map[curve_i].append(False)  # add row to other columns of peak map table
-                        peak_data[curve_i].append(None)  # add row to other columns of peak data table
-                pk += 1                                  # go to the next peak...
-                gr += 1                                  # ... and the next group
+                '''APPEND NEW GROUP
+                when X-position of current peak of curve[wf] is to the right 
+                of the last group
+                '''
+                insert_group(data[wf][pk], peak_data, peak_map, peak_time,
+                             num_peak_in_gr, wf, len(peak_data))
+                pk += 1
+                gr += 1
 
-            # ===============================================================================================
-            # APPEND NEW GROUP
-            # if we are here then the X-position of current peak of curve[curve_i]
-            # is to the right of current group by more than dt
-            # so go to the next group
-            '''
-            print()
-            for cr_dat in peak_data:
-                tmp_list = ["[{} : {}]".format(*local_peak.xy) 
-                            if local_peak is not None else "[.....]" for local_peak in cr_dat]
-                print("  |\t".join(tmp_list))
-            '''
             if gr < len(peak_time) - 1:
                 gr += 1
-    # END OF GROUPING
-    # =======================================================================================================
-    # print peak_time
-    # print num_peak_in_gr
-    return peak_data, peak_map
-# ===============================================================================================================
+
+    # return peak_data, peak_map
+    return peak_data
+
+
+def get_peaks(data, args, verbose):
+    """Searches for peaks using parameters from args namespace.
+    
+    :param data:    SignalsData instance
+    :param args:    argparse.namespace with arguments
+    :param verbose: shows more info during the process
+    
+    :return:        three-dimensional array containing data 
+                    on all the peaks of curves with index in args.curves list
+                    The array structure:
+                    data[curve_idx][peak_idx] == SinglePeak instance
+                    For curves not in the args.curves list:
+                    data[curve_idx] == None
+    """
+    unsorted_peaks = [None] * data.count
+    for idx in args.curves:
+        if verbose:
+            print("Curve #" + str(idx))
+        new_peaks, peak_log = peak_finder(
+            data.time(idx), data.value(idx),
+            level=args.level, diff_time=args.pk_diff,
+            time_bounds=args.t_bounds, tnoise=args.t_noise,
+            is_negative=args.level < 0,
+            noise_attenuation=args.noise_att,
+            graph=False
+        )
+        # TODO single graph with peaks
+
+        unsorted_peaks[idx] = new_peaks
+        if verbose:
+            print(peak_log)
+    return unsorted_peaks
+
+
+def check_curves_list(curves, signals_data):
+    """Checks the indexes of the curves to process.
+    Raises the exception if the index is out of range.
+    
+    :param curves: the list of indexes of curves to find peaks for
+    :param signals_data: SIgnalsData instance
+    :return: None
+    """
+    for curve_idx in curves:
+        assert curve_idx < signals_data.count, \
+            ("The curve index {} is out of range. The total number "
+             "of curves: {}.".format(curve_idx, len(signals_data.count)))
 
 
 def global_check(options):
     """Input options global check.
+    
+    Checks the input arguments and converts them to the required format.
 
-    Returns changed options with converted values.
-
-    options -- namespace with options
+    :param options: namespace with options
+    :type options:   argparse.namespace
+    
+    :return: changed namespace with converted values
     """
     # input directory and files check
     if options.src_dir:
@@ -898,12 +934,54 @@ def global_check(options):
     # if options.postfix:
     #     options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
 
+    # raw check offset_by_voltage parameters (types)
+    options.it_offset = False  # interactive offset process
+    if options.offset_by_front:
+        assert len(options.offset_by_front) in [2, 4], \
+            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
+             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
+             "".format(arg_name="--offset-by-curve_level"))
+        if len(options.offset_by_front) < 4:
+            options.it_offset = True
+        options.offset_by_front = \
+            sp.global_check_front_params(options.offset_by_front)
+
+    # raw check y_auto_zero parameters (types)
+    if options.y_auto_zero:
+        options.y_auto_zero = sp.global_check_y_auto_zero_params(options.y_auto_zero)
+
+
     # raw check multiplier and delay
     if options.multiplier is not None and options.delay is not None:
         assert len(options.multiplier) == len(options.delay), \
             ("The number of multipliers ({}) is not equal"
              " to the number of delays ({})."
              "".format(len(options.multiplier), len(options.delay)))
+
+    # ==============================================================
+    # original PeakProcess args
+    if any([options.level, options.pk_diff, options.gr_diff, options.curves]):
+        assert all([options.level, options.pk_diff, options.gr_diff, options.curves]), \
+            "To start the process of finding peaks, '--level', " \
+            "'--diff-time', '--group-diff', '--curves' arguments are needed."
+        assert options.pk_diff >=0, \
+            "'--diff-time' value must be non negative real number."
+        assert options.gr_diff >=0, \
+            "'--group-diff' must be non negative real number."
+        assert all(idx >= 0 for idx in options.curves), \
+            "Curve index must be non negative integer"
+
+    if options.t_noise:
+        assert options.t_noise >= 0, \
+            "'--noise-half-period' must be non negative real number."
+    assert options.noise_att > 0, \
+        "'--noise-attenuation' must be real number > 0."
+
+    if all(bound is not None for bound in options.t_bounds):
+        assert options.t_bounds[0] < options.t_bounds[1], \
+            "The left time bound must be less then the right one."
+    # TODO default value for time_bounds
+
     return options
 
 
@@ -916,131 +994,113 @@ if __name__ == '__main__':
 
     # try:
     args = global_check(args)
+
     '''
-            num_mask (tuple) - contains the first and last index
-            of substring of filename
-            That substring contains the shot number.
-            The last idx is excluded: [first, last).
-            Read numbering_parser docstring for more info.
-            '''
-    # num_mask = sp.numbering_parser([files[0] for
-    #                                files in args.gr_files])
-    num_mask = (0, 4)
+    num_mask (tuple) - contains the first and last index
+    of substring of filename
+    That substring contains the shot number.
+    The last idx is excluded: [first, last).
+    Read numbering_parser docstring for more info.
+    '''
 
+    num_mask = sp.numbering_parser([files[0] for
+                                   files in args.gr_files])
     # MAIN LOOP
-    # if (args.save or
-    #         args.plot or
-    #         args.multiplot or
-    #         args.offset_by_front):
-    print(len(args.gr_files))
-    print("\n".join(args.gr_files[0]))
-    print("---------------------------------------------------")
-    for shot_idx, file_list in enumerate(args.gr_files):
-        shot_name = sp.get_shot_number_str(file_list[0], num_mask,
-                                           args.ext_list)
+    print("Check Loop in")  # debugging
+    if (args.save or
+            args.plot or
+            args.multiplot or
+            args.offset_by_front):
+        print("==> In loop")  # debugging
+        for shot_idx, file_list in enumerate(args.gr_files):
+            shot_name = sp.get_shot_number_str(file_list[0], num_mask,
+                                               args.ext_list)
 
-        # get SignalsData
-        data = sp.read_signals(file_list, start=args.partial[0],
-                               step=args.partial[1], points=args.partial[2])
-        # data = sp.read_signals(file_list, start=args.partial[0],
-        #                        step=args.partial[1], points=args.partial[2],
-        #                        labels=args.labels, units=args.units,
-        #                        time_unit=args.time_unit)
-        print(data.count)
-        if verbose:
-            print("The number of curves = {}".format(data.count))
-
-        # checks the number of columns with data,
-        # as well as the number of multipliers, delays, labels
-        sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
-                               args.multiplier, args.delay)
-        sp.check_coeffs_number(data.count, ["label", "unit"],
-                               args.labels, args.units)
-
-        # multiplier and delay
-        data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
-
-        # find peaks
-        # TODO enter peak finder condition
-        if True:
-            unsorted_peaks = []
-            for idx in args.curves:
-                if verbose:
-                    print("Curve #" + str(idx))
-                is_negative = is_neg(check_polarity(data.curves[idx]))
-                new_peaks, peak_log = peak_finder(
-                    data.time(idx), data.value(idx),
-                    level=args.level, diff_time=args.diff,
-                    time_bounds=args.t_bounds, tnoise=args.t_noise,
-                    is_negative=is_negative, noise_attenuation=args.noise_att,
-                    graph=False
-                )
-                # TODO single graph with peaks
-
-                unsorted_peaks.append(new_peaks)
-                if verbose:
-                    print(peak_log)
-
-            # step 7 - group peaks [and plot all curves with peaks]
-            peak_data, peak_map = group_peaks(unsorted_peaks, args.gr_diff)
-
-            # step 8 - save peaks data
+            # get SignalsData
+            data = sp.read_signals(file_list, start=args.partial[0],
+                                   step=args.partial[1], points=args.partial[2],
+                                   labels=args.labels, units=args.units,
+                                   time_unit=args.time_unit)
             if verbose:
-                print("Saving peak data...")
-            # TODO peaks_filename (del data file ext)
-            pk_filename = os.path.join(args.save_to, peaks_dir,
-                                       os.path.basename(file_list[0])[:-4])
-            save_peaks_csv(pk_filename, peak_data)
+                print("The number of curves = {}".format(data.count))
 
-            # step 9 - save multicurve plot
-            multiplot_name = pk_filename[:]
-            multiplot_name = multiplot_name + ".plot.png"
-            multiplot_name = os.path.join(args.save_to, multiplot_name)
+            # checks the number of columns with data,
+            # and the number of multipliers, delays, labels
+            sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+                                   args.multiplier, args.delay)
+            sp.check_coeffs_number(data.count, ["label", "unit"],
+                                   args.labels, args.units)
+            check_curves_list(args.curves, data)
 
-            if verbose:
-                print("Saving all peaks as " + multiplot_name)
-            sp.plot_multiplot(
-                data, peak_data, args.curves,
-                xlim=args.t_bounds)
-            # TODO save multiplot
-            pyplot.show()
+            # check y_zero_offset parameters (if idx is out of range)
+            if args.y_auto_zero:
+                args = sp.do_y_zero_offset(data, args)
 
-            # plot_peaks_all(data, peak_data, args.curves,
-            #                xlim=params.get("time_bounds", None),
-            #                show=True, save=True, save_as=multiplot_name)
+            # check offset_by_voltage parameters (if idx is out of range)
+            if args.offset_by_front:
+                args = sp.do_offset_by_front(data, args, shot_name)
 
-        # group peaks
+            # reset to zero
+            if args.zero:
+                data = sp.do_reset_to_zero(data, args, verbose)
 
-        # save peaks
+            # multiplier and delay
+            data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
 
-        # or read peaks from file
+            # find peaks
+            if args.level:
+                unsorted_peaks = get_peaks(data, args, verbose)
 
-        # plot preview and save
-        if args.plot:
-            sp.do_plots(data, args, shot_name, verbose)
+                # step 7 - group peaks [and plot all curves with peaks]
+                peaks_data = group_peaks(unsorted_peaks, args.gr_diff)
+                # TODO access to peaks_data via curve id
 
-        # plot and save multi-plots
-        if args.multiplot:
-            sp.do_multoplots(data, args, shot_name, verbose)
+                # step 8 - save peaks data
+                if verbose:
+                    print("Saving peak data...")
+                # TODO peaks_filename (del data file ext)
+                pk_filename = os.path.join(args.save_to, peaks_dir,
+                                           os.path.basename(file_list[0])[:-4])
+                save_peaks_csv(pk_filename, peaks_data)
 
-        # save data
-        if args.save:
-            saved_as = sp.do_save(data, args, shot_name, verbose)
-            labels = [data.label(cr) for cr in data.idx_to_label.keys()]
-            sp.save_m_log(file_list, saved_as, labels, args.multiplier,
-                          args.delay, args.offset_by_front,
-                          args.y_auto_zero, args.partial)
+                if verbose:
+                    print("Saving all peaks as " + multiplot_name)
+                sp.plot_multiplot(data, peaks_data, args.curves,
+                                  xlim=args.t_bounds)
+                # TODO save multiplot (by default)
+                pyplot.show()
+
+            # TODO read peaks from file
+
+            # plot preview and save
+            if args.plot:
+                sp.do_plots(data, args, shot_name, verbose)
+
+            # plot and save multi-plots
+            if args.multiplot:
+                sp.do_multiplots(data, args, shot_name, verbose)
+
+            # save data
+            if args.save:
+                saved_as = sp.do_save(data, args, shot_name, verbose)
+                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+                sp.save_m_log(file_list, saved_as, labels, args.multiplier,
+                              args.delay, args.offset_by_front,
+                              args.y_auto_zero, args.partial)
 
     sp.print_duplicates(args.gr_files, 30)
     # except Exception as e:
     #     print()
     #     sys.exit(e)
 
-    # TODO: reformat lines PEP8
-    # TODO: English comments
+    # TODO check group_peak for error with curves not in args.curves list
     # TODO: cl args original
     # TODO: cl read/save/plot (copy from SP)
     # TODO: cl peak finder
     # TODO: cl peak reader
     # TODO: cl replot peak multiplots
-    print('Done!!!')
+    # TODO: cl description
+    # TODO: cl args description
+    # TODO exception handle (via sys.exit(e))
+
+    print('Done!!!')  # debugging
