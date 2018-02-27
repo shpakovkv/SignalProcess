@@ -2446,8 +2446,8 @@ def plot_multiplot(data, peak_data, curves_list,
 
         # subplot title
         amp_label = data.curves[curves_list[wf]].label
-        if data.curves[curves_list[wf]].unit:
-            amp_label += ", " + data.curves[curves_list[wf]].unit
+        # if data.curves[curves_list[wf]].unit:
+        #     amp_label += ", " + data.curves[curves_list[wf]].unit
         axes[wf].text(0.99, 0.01, amp_label, verticalalignment='bottom',
                       horizontalalignment='right',
                       transform=axes[wf].transAxes, size=8)
