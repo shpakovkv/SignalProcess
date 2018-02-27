@@ -2464,7 +2464,7 @@ def plot_multiplot(data, peak_data, curves_list,
 
         # plot peaks scatter
         if peak_data is not None:
-            for pk in peak_data[wf]:
+            for pk in peak_data[curves_list[wf]]:
                 color_iter = iter(ColorRange())
                 color = next(color_iter)
                 if pk is not None:

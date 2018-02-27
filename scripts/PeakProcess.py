@@ -1053,7 +1053,6 @@ if __name__ == '__main__':
 
                 # step 7 - group peaks [and plot all curves with peaks]
                 peaks_data = group_peaks(unsorted_peaks, args.gr_diff)
-                # TODO access to peaks_data via curve id
 
                 # step 8 - save peaks data
                 if verbose:
