@@ -1063,6 +1063,11 @@ if __name__ == '__main__':
                                            os.path.basename(file_list[0])[:-4])
                 save_peaks_csv(pk_filename, peaks_data)
 
+                # step 9 - save multicurve plot
+                multiplot_name = pk_filename[:]
+                multiplot_name = multiplot_name + ".plot.png"
+                multiplot_name = os.path.join(args.save_to, multiplot_name)
+
                 if verbose:
                     print("Saving all peaks as " + multiplot_name)
                 sp.plot_multiplot(data, peaks_data, args.curves,
