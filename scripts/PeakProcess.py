@@ -38,7 +38,7 @@ def get_parser():
                  sp.get_data_corr_args_parser(),
                  get_peak_args_parser(),
                  get_pk_save_args_parser()],
-        prog='SignalProcess.py',
+        prog='PeakProcess.py',
         description=p_desc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
         formatter_class=argparse.RawTextHelpFormatter)
@@ -59,7 +59,6 @@ def get_pk_save_args_parser():
     #          '      the output directory is not specified, the input\n'
     #          '      files will be overwritten.\n\n')
 
-    # TODO default directory to save peaks
     parser.add_argument(
         '-t', '--save-to', '--target-dir',
         action='store',
@@ -125,7 +124,6 @@ def get_peak_args_parser():
         type=float,
         help='description in development\n\n')
 
-    # TODO default value for peak diff_time
     peak_args_parser.add_argument(
         '--diff', '--diff-time',
         action='store',
@@ -188,6 +186,8 @@ def get_peak_args_parser():
         action='store_true',
         dest='peak_hide',
         help='description in development\n\n')
+
+    # TODO add --hide-all option
 
     return peak_args_parser
 
