@@ -2348,7 +2348,7 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
     return y_min - reserve, y_max + reserve
 
 
-def do_multiplots(signals_data, cl_args, shot_name, peak_data=None, verbose=False):
+def do_multiplots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
     """Plots all the multiplot graphs specified by the user.
     Saves the graphs that the user specified to save.
     
@@ -2369,7 +2369,7 @@ def do_multiplots(signals_data, cl_args, shot_name, peak_data=None, verbose=Fals
         check_plot_param(curve_list, signals_data.count,
                          '--multiplot')
     for curve_list in cl_args.multiplot:
-        plot_multiplot(signals_data, peak_data, curve_list)
+        plot_multiplot(signals_data, peaks, curve_list)
         if cl_args.multiplot_dir is not None:
             idx_list = "_".join(str(i) for
                                 i in sorted(curve_list))
@@ -2477,7 +2477,7 @@ def plot_multiplot(data, peak_data, curves_list,
     fig.subplots_adjust(hspace=0)
 
 
-def do_plots(signals_data, cl_args, shot_name, verbose=False):
+def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
     """Plots all the single curve graphs specified by the user.
     Saves the graphs that the user specified to save.
     
@@ -2498,7 +2498,8 @@ def do_plots(signals_data, cl_args, shot_name, verbose=False):
     else:
         check_plot_param(cl_args.plot, signals_data.count, '--plot')
     for curve_idx in cl_args.plot:
-        plot_multiple_curve(signals_data.curves[curve_idx])
+        curve_peaks = peaks[curve_idx] if peaks is not None else None
+        plot_multiple_curve(signals_data.curves[curve_idx], curve_peaks)
         if cl_args.plot_dir is not None:
             plot_name = (
                 "{shot}_curve_{idx}_{label}.plot.png"
@@ -2579,8 +2580,8 @@ def plot_multiple_curve(curve_list, peaks=None,
                     facecolors='none', linewidths=2)
         plt.scatter(peak_x, peak_y, s=90, edgecolors='#dd3328',
                     facecolors='none', linewidths=2)
-        plt.scatter(peak_x, peak_y, s=150, edgecolors='none',
-                    facecolors='#133cac', linewidths=1.5, marker='x')
+        # plt.scatter(peak_x, peak_y, s=150, edgecolors='none',
+        #             facecolors='#133cac', linewidths=1.5, marker='x')
 
 
 def global_check(options):
