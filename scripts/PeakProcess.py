@@ -16,7 +16,9 @@ pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
 
 NOISEATTENUATION = 0.75
-DEFAULTSAVETODIR = "Peaks"
+SAVETODIR = 'Peaks'
+SINGLEPLOTDIR = 'SinglePlot'
+MULTIPLOTDIR = 'MultiPlot'
 
 
 def get_parser():
@@ -179,6 +181,12 @@ def get_peak_args_parser():
         dest='gr_diff',
         metavar='GR_DIFF',
         type=float,
+        help='description in development\n\n')
+
+    peak_args_parser.add_argument(
+        '--hide-found-peaks',
+        action='store_true',
+        dest='peak_hide',
         help='description in development\n\n')
 
     return peak_args_parser
@@ -908,14 +916,31 @@ def global_check(options):
     #         "Label value error! Only latin letters, " \
     #         "numbers and underscore are allowed."
 
-    options.plot_dir = sp.check_param_path(options.plot_dir, '--p_save')
-    options.multiplot_dir = sp.check_param_path(options.multiplot_dir,
-                                             '--mp-save')
-    options.save_to = sp.check_param_path(options.save_to, '--save-to')
-    if not options.save_to:
-        # save peaks data to dir
-        options.save_to = os.path.join(os.path.dirname(gr_files[0][0]),
-                                       DEFAULTSAVETODIR)
+    def path_constructor(path, arg_name, default_path, default_dir):
+        """Checks path, makes dir if not exists.
+        
+        :param path: user entered path
+        :param arg_name: the name of the command line argument 
+                         through which the path was entered
+        :param default_path: the default output path 
+        :param default_dir: the destination folder inside the default path
+        :return: path
+        """
+        if not path:
+            path = os.path.join(default_path, default_dir)
+        path = sp.check_param_path(path, arg_name)
+        return path
+
+    options.save_to = path_constructor(options.save_to, '--save-to',
+                                       os.path.dirname(gr_files[0][0]),
+                                       SAVETODIR)
+
+    options.plot_dir = path_constructor(options.plot_dir, '--p-save',
+                                        options.save_to, SINGLEPLOTDIR)
+
+    options.multiplot_dir = path_constructor(options.multiplot_dir,
+                                             '--mp-save', options.save_to,
+                                             MULTIPLOTDIR)
 
     # check and convert plot and multiplot options
     if options.plot:
@@ -1046,6 +1071,7 @@ if __name__ == '__main__':
             data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
 
             # find peaks
+            peaks_data = None
             if args.level:
                 unsorted_peaks = get_peaks(data, args, verbose)
 
@@ -1059,8 +1085,6 @@ if __name__ == '__main__':
                                            args.save_to,
                                            os.path.basename(file_list[0])[:-4])
                 save_peaks_csv(pk_filename, peaks_data)
-                print("DATA FROM: {}".format(os.path.dirname(file_list[0])))
-                print("SAVED PEAKS at {}".format(pk_filename))
 
                 # step 9 - save multicurve plot
                 multiplot_name = pk_filename[:]
@@ -1072,17 +1096,22 @@ if __name__ == '__main__':
                 sp.plot_multiplot(data, peaks_data, args.curves,
                                   xlim=args.t_bounds)
                 pyplot.savefig(multiplot_name, dpi=400)
-                pyplot.show()
+                if args.peak_hide:
+                    pyplot.show(block=False)
+                else:
+                    pyplot.show()
 
             # TODO read peaks from file
 
             # plot preview and save
             if args.plot:
-                sp.do_plots(data, args, shot_name, verbose)
+                sp.do_plots(data, args, shot_name,
+                            peaks=peaks_data, verbose=verbose)
 
             # plot and save multi-plots
             if args.multiplot:
-                sp.do_multiplots(data, args, shot_name, verbose)
+                sp.do_multiplots(data, args, shot_name,
+                                 peaks=peaks_data, verbose=verbose)
 
             # save data
             if args.save:
