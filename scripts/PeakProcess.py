@@ -187,7 +187,11 @@ def get_peak_args_parser():
         dest='peak_hide',
         help='description in development\n\n')
 
-    # TODO add --hide-all option
+    peak_args_parser.add_argument(
+        '--hide-all',
+        action='store_true',
+        dest='hide_all',
+        help='description in development\n\n')\
 
     return peak_args_parser
 
@@ -851,7 +855,6 @@ def get_peaks(data, args, verbose):
             noise_attenuation=args.noise_att,
             graph=False
         )
-        # TODO single graph with peaks
 
         unsorted_peaks[idx] = new_peaks
         if verbose:
@@ -870,7 +873,7 @@ def check_curves_list(curves, signals_data):
     for curve_idx in curves:
         assert curve_idx < signals_data.count, \
             ("The curve index {} is out of range. The total number "
-             "of curves: {}.".format(curve_idx, len(signals_data.count)))
+             "of curves: {}.".format(curve_idx, signals_data.count))
 
 
 def global_check(options):
@@ -950,14 +953,6 @@ def global_check(options):
         for idx, m_param in enumerate(options.multiplot):
             options.multiplot[idx] = sp.global_check_idx_list(m_param,
                                                            '--multiplot')
-
-    # # checks if postfix and prefix can be used in filename
-    # TODO include OR exclude file prefix and postfix
-    # if options.prefix:
-    #     options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
-    # if options.postfix:
-    #     options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
-
     # raw check offset_by_voltage parameters (types)
     options.it_offset = False  # interactive offset process
     if options.offset_by_front:
@@ -1004,7 +999,9 @@ def global_check(options):
     if all(bound is not None for bound in options.t_bounds):
         assert options.t_bounds[0] < options.t_bounds[1], \
             "The left time bound must be less then the right one."
-    # TODO default value for time_bounds
+
+    if options.hide_all:
+        options.p_hide = options.mp_hide = options.peak_hide = True
 
     return options
 
@@ -1126,10 +1123,6 @@ if __name__ == '__main__':
     #     print()
     #     sys.exit(e)
 
-    # TODO check group_peak for error with curves not in args.curves list
-    # TODO: cl args original
-    # TODO: cl read/save/plot (copy from SP)
-    # TODO: cl peak finder
     # TODO: cl peak reader
     # TODO: cl replot peak multiplots
     # TODO: cl description
