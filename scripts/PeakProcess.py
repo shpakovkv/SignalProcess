@@ -1133,8 +1133,7 @@ if __name__ == '__main__':
                 pk_filename = get_pk_filename(file_list,
                                               args.save_to,
                                               shot_name)
-                peak_files = get_peak_files(pk_filename)
-                peaks_data = read_peaks(peak_files)
+                peaks_data = read_peaks(get_peak_files(pk_filename))
 
             # plot preview and save
             if args.plot:
@@ -1159,8 +1158,6 @@ if __name__ == '__main__':
     #     print()
     #     sys.exit(e)
 
-    # TODO: cl peak reader
-    # TODO: cl replot peak multiplots
     # TODO: cl description
     # TODO: cl args description
     # TODO exception handle (via sys.exit(e))
