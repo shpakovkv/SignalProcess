@@ -36,70 +36,11 @@ def get_parser():
                  sp.get_mult_del_args_parser(),
                  sp.get_plot_args_parser(),
                  sp.get_data_corr_args_parser(),
-                 get_peak_args_parser(),
-                 get_pk_save_args_parser()],
+                 get_peak_args_parser()],
         prog='PeakProcess.py',
         description=p_desc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
         formatter_class=argparse.RawTextHelpFormatter)
-    return parser
-
-
-def get_pk_save_args_parser():
-    """Returns peak save options parser.
-    """
-    parser = argparse.ArgumentParser(add_help=False)
-    # parser.add_argument(
-    #     '-s', '--save',
-    #     action='store_true',
-    #     dest='save',
-    #     help='saves the shot data to a CSV file after all the changes\n'
-    #          'have been applied.\n'
-    #          'NOTE: if one shot corresponds to one CSV file, and\n'
-    #          '      the output directory is not specified, the input\n'
-    #          '      files will be overwritten.\n\n')
-
-    parser.add_argument(
-        '-t', '--save-to', '--target-dir',
-        action='store',
-        metavar='DIR',
-        dest='save_to',
-        help='specify the output directory.\n\n')
-
-    # parser.add_argument(
-    #     '--prefix',
-    #     action='store',
-    #     metavar='PREFIX',
-    #     dest='prefix',
-    #     default='',
-    #     help='specify the file name prefix. This prefix will be added\n'
-    #          'to the output file names during the automatic\n'
-    #          'generation of file names.\n'
-    #          'Default=\'\'.\n\n')
-    #
-    # parser.add_argument(
-    #     '--postfix',
-    #     action='store',
-    #     metavar='POSTFIX',
-    #     dest='postfix',
-    #     default='',
-    #     help='specify the file name postfix. This postfix will be\n'
-    #          'added to the output file names during the automatic\n'
-    #          'generation of file names.\n'
-    #          'Default=\'\'.\n\n')
-
-    # parser.add_argument(
-    #     '-o', '--output',
-    #     action='store',
-    #     nargs='+',
-    #     metavar='FILE',
-    #     dest='out_names',
-    #     help='specify the list of file names after the flag.\n'
-    #          'The output files with data will be save with the names\n'
-    #          'from this list. This will override the automatic\n'
-    #          'generation of file names.\n'
-    #          'NOTE: you must enter file names for \n'
-    #          '      all the input shots.\n\n')
     return parser
 
 
@@ -191,7 +132,13 @@ def get_peak_args_parser():
         '--hide-all',
         action='store_true',
         dest='hide_all',
-        help='description in development\n\n')\
+        help='description in development\n\n')
+
+    peak_args_parser.add_argument(
+        '--read',
+        action='store_true',
+        dest='read',
+        help='description in development\n\n')
 
     return peak_args_parser
 
@@ -934,7 +881,7 @@ def global_check(options):
         path = sp.check_param_path(path, arg_name)
         return path
 
-    options.save_to = path_constructor(options.save_to, '--save-to',
+    options.save_to = path_constructor(None, '--save-to',
                                        os.path.dirname(gr_files[0][0]),
                                        SAVETODIR)
 
@@ -1027,10 +974,10 @@ if __name__ == '__main__':
                                    files in args.gr_files])
     # MAIN LOOP
     print("Check Loop in")  # debugging
-    if (args.save or
+    if (args.level or
             args.plot or
             args.multiplot or
-            args.offset_by_front):
+            args.read):
         print("==> In loop")  # debugging
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = sp.get_shot_number_str(file_list[0], num_mask,
@@ -1070,6 +1017,9 @@ if __name__ == '__main__':
             # find peaks
             peaks_data = None
             if args.level:
+                if verbose:
+                    print("Searching for peaks...")
+
                 unsorted_peaks = get_peaks(data, args, verbose)
 
                 # step 7 - group peaks [and plot all curves with peaks]
@@ -1080,7 +1030,7 @@ if __name__ == '__main__':
                     print("Saving peak data...")
                 pk_filename = os.path.join(os.path.dirname(file_list[0]),
                                            args.save_to,
-                                           os.path.basename(file_list[0])[:-4])
+                                           shot_name)
                 save_peaks_csv(pk_filename, peaks_data)
 
                 # step 9 - save multicurve plot
@@ -1099,6 +1049,11 @@ if __name__ == '__main__':
                     pyplot.show()
 
             # TODO read peaks from file
+            if args.read:
+                if verbose:
+                    print("Reading peak data...")
+                # search for a folder with peaks related to the current shot
+                # read peaks data
 
             # plot preview and save
             if args.plot:
