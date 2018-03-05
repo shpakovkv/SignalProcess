@@ -223,6 +223,7 @@ def save_peaks_csv(filename, peaks):
             pk = peaks[wf][gr]
             if pk is None:
                 pk = SinglePeak(0, 0, 0)
+            # TODO add curves labels to the peaks files
             content = (content +
                        "{:3d},{:0.18e},{:0.18e},"
                        "{:0.3f},{:0.3f},{:0.3f}\n".format(
@@ -632,16 +633,11 @@ def group_peaks(data, window):
                    +/-window interval from average X (time) position 
                    of peak (event). "Average" because X (time) value 
                    of a peak (event) may differ from curve to curve.
-    :return: (peak_data, peak_map)
-             where peak_data is three-dimensional array containing data 
+    :return: peak_data - the three-dimensional array containing data 
              on all the peaks (grouped by time) of all curves
              The array structure:
              peak_data[curve_idx][group_idx] == SinglePeak instance if 
              this curve has a peak related to this event (group), else None
-             
-             and peak_map is similar array:
-             peak_map[curve_idx][group_idx] == True if this curve has a 
-             peak related to this event (group), else False
     """
 
     def insert_group(peak, peak_data, peak_map, group_time,
@@ -953,6 +949,38 @@ def global_check(options):
     return options
 
 
+def get_pk_filename(data_files, save_to, shot_name):
+    """Compiles the full path to the files with peaks data.
+    
+    :param data_files:  the list of files with signals data
+    :param save_to:     the folder to save peaks data to
+    :param shot_name:   the name of current shot
+    :return:            full path + prefix for file name with peak data
+    """
+    return os.path.join(os.path.dirname(data_files[0]),
+                                        save_to,
+                                        shot_name)
+
+
+def get_peak_files(pk_filename):
+    """Returns the list of the peak files.
+    If peak files are not found or the folder containing 
+    peak data is not found, returns [].
+
+    :param pk_filename: full path + prefix of file names with peak data
+    :return: list of full paths
+    """
+    peak_folder = os.path.dirname(pk_filename)
+    file_prefix = os.path.basename(pk_filename)
+    if os.path.isdir(peak_folder):
+        peak_file_list = []
+        for name in sp.get_file_list_by_ext(peak_folder, '.csv', sort=True):
+            if os.path.basename(name).startswith(file_prefix):
+                peak_file_list.append(name)
+        return peak_file_list
+    return []
+
+
 if __name__ == '__main__':
     parser = get_parser()
 
@@ -984,9 +1012,12 @@ if __name__ == '__main__':
                                                args.ext_list)
 
             # get SignalsData
-            data = sp.read_signals(file_list, start=args.partial[0],
-                                   step=args.partial[1], points=args.partial[2],
-                                   labels=args.labels, units=args.units,
+            data = sp.read_signals(file_list,
+                                   start=args.partial[0],
+                                   step=args.partial[1],
+                                   points=args.partial[2],
+                                   labels=args.labels,
+                                   units=args.units,
                                    time_unit=args.time_unit)
             if verbose:
                 print("The number of curves = {}".format(data.count))
@@ -1012,7 +1043,9 @@ if __name__ == '__main__':
                 data = sp.do_reset_to_zero(data, args, verbose)
 
             # multiplier and delay
-            data = sp.multiplier_and_delay(data, args.multiplier, args.delay)
+            data = sp.multiplier_and_delay(data,
+                                           args.multiplier,
+                                           args.delay)
 
             # find peaks
             peaks_data = None
@@ -1024,19 +1057,21 @@ if __name__ == '__main__':
 
                 # step 7 - group peaks [and plot all curves with peaks]
                 peaks_data = group_peaks(unsorted_peaks, args.gr_diff)
+                # print("PEAK DATA:\n{}".format(peaks_data)) # debugging
 
                 # step 8 - save peaks data
                 if verbose:
                     print("Saving peak data...")
-                pk_filename = os.path.join(os.path.dirname(file_list[0]),
-                                           args.save_to,
-                                           shot_name)
+
+                # full path without peak number and extension:
+                pk_filename = get_pk_filename(file_list,
+                                              args.save_to,
+                                              shot_name)
+
                 save_peaks_csv(pk_filename, peaks_data)
 
                 # step 9 - save multicurve plot
-                multiplot_name = pk_filename[:]
-                multiplot_name = multiplot_name + ".plot.png"
-                multiplot_name = os.path.join(args.save_to, multiplot_name)
+                multiplot_name = pk_filename + ".plot.png"
 
                 if verbose:
                     print("Saving all peaks as " + multiplot_name)
@@ -1053,6 +1088,10 @@ if __name__ == '__main__':
                 if verbose:
                     print("Reading peak data...")
                 # search for a folder with peaks related to the current shot
+                pk_filename = get_pk_filename(file_list,
+                                              args.save_to,
+                                              shot_name)
+                peak_files = get_peak_files(pk_filename)
                 # read peaks data
 
             # plot preview and save
