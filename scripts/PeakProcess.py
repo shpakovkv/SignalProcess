@@ -3,8 +3,7 @@ from __future__ import print_function
 
 from matplotlib import pyplot
 import os
-import re
-import sys
+import numpy
 import bisect
 import argparse
 import scipy.integrate as integrate
@@ -798,7 +797,7 @@ def get_peaks(data, args, verbose):
             noise_attenuation=args.noise_att,
             graph=False
         )
-
+        # TODO: autosave single curve peaks preview
         unsorted_peaks[idx] = new_peaks
         if verbose:
             print(peak_log)
@@ -981,6 +980,51 @@ def get_peak_files(pk_filename):
     return []
 
 
+def read_single_peak(filename):
+    """Reads one file containing the data of the peaks.
+
+    :param   filename:  file with peak (one group of peaks) data
+    :return:            grouped peaks data with one peak (group)
+                        peaks[curve_idx][0] == SinglePeak instance if 
+                        this curve has a peak related to this event (group), 
+                        else peaks[curve_idx][0] == None.
+    """
+    data = numpy.genfromtxt(filename, delimiter=',')
+    peaks = []
+    curves_count = data.shape[0]
+    for idx in range(curves_count):
+        new_peak = SinglePeak(time=data[idx, 1], value=data[idx, 2])
+        if new_peak.time != 0 and new_peak.val != 0:
+            peaks.append([new_peak])
+            # peaks[idx].append(new_peak)
+        else:
+            peaks.append([None])
+            # peaks[idx].append(None)
+    print("Read peak:\n{}".format(peaks))  # debugging
+    return peaks
+
+
+def read_peaks(file_list):
+    """Reads all the files containing the data of the peaks.
+
+    :param file_list:   file with peak (one group of peaks) data
+    :return:            grouped peaks data
+                        peaks[curve_idx][group_idx] == SinglePeak instance if
+                        this curve has a peak related to this event (group), 
+                        else peaks[curve_idx][group_idx] == None.
+    """
+    if file_list is None or len(file_list) == 0:
+        return None
+    else:
+        groups = read_single_peak(file_list[0])
+        curves_count = len(groups)
+        for file_idx in range(1, len(file_list)):
+            new_group = read_single_peak(file_list[file_idx])
+            for wf in range(curves_count):  # wavefrorm number
+                groups[wf].append(new_group[wf][0])
+        return groups
+
+
 if __name__ == '__main__':
     parser = get_parser()
 
@@ -1057,7 +1101,6 @@ if __name__ == '__main__':
 
                 # step 7 - group peaks [and plot all curves with peaks]
                 peaks_data = group_peaks(unsorted_peaks, args.gr_diff)
-                # print("PEAK DATA:\n{}".format(peaks_data)) # debugging
 
                 # step 8 - save peaks data
                 if verbose:
@@ -1083,16 +1126,15 @@ if __name__ == '__main__':
                 else:
                     pyplot.show()
 
-            # TODO read peaks from file
             if args.read:
                 if verbose:
                     print("Reading peak data...")
-                # search for a folder with peaks related to the current shot
+
                 pk_filename = get_pk_filename(file_list,
                                               args.save_to,
                                               shot_name)
                 peak_files = get_peak_files(pk_filename)
-                # read peaks data
+                peaks_data = read_peaks(peak_files)
 
             # plot preview and save
             if args.plot:
