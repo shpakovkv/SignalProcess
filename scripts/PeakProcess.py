@@ -18,6 +18,7 @@ NOISEATTENUATION = 0.75
 SAVETODIR = 'Peaks'
 SINGLEPLOTDIR = 'SinglePlot'
 MULTIPLOTDIR = 'MultiPlot'
+PEAKDATADIR = 'PeakData'
 
 
 def get_parser():
@@ -958,6 +959,7 @@ def get_pk_filename(data_files, save_to, shot_name):
     """
     return os.path.join(os.path.dirname(data_files[0]),
                                         save_to,
+                                        PEAKDATADIR,
                                         shot_name)
 
 
@@ -1068,8 +1070,10 @@ if __name__ == '__main__':
 
             # checks the number of columns with data,
             # and the number of multipliers, delays, labels
-            sp.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
-                                   args.multiplier, args.delay)
+            args.multiplier = sp.check_multiplier(args.multiplier,
+                                                  count=data.count)
+            args.delay = sp.check_delay(args.delay,
+                                        count=data.count)
             sp.check_coeffs_number(data.count, ["label", "unit"],
                                    args.labels, args.units)
             check_curves_list(args.curves, data)
@@ -1157,9 +1161,12 @@ if __name__ == '__main__':
     # except Exception as e:
     #     print()
     #     sys.exit(e)
-
+    # TODO: final peak table
     # TODO: cl description
     # TODO: cl args description
     # TODO exception handle (via sys.exit(e))
+
+    # TODO: offset_by_front says 'No front found' if the front point at (0, 0)
+    # TODO: rename the peak_NNN.csv files when --read (change numbers)
 
     print('Done!!!')  # debugging

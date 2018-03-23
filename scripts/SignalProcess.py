@@ -2584,6 +2584,36 @@ def plot_multiple_curve(curve_list, peaks=None,
         #             facecolors='#133cac', linewidths=1.5, marker='x')
 
 
+def check_multiplier(m, count=1):
+    """Checks 'multiplier' argument, return it's copy 
+     or generates a list of ones.
+
+    :param m:     the list of multipliers
+    :param count: the number of data curves
+    :return:      the list of multipliers (copy)
+    """
+    if m is None:
+        # need two multipliers for each curve (for X and Y columns)
+        return [1 for _ in range(count * 2)]
+    check_coeffs_number(count * 2, ["multiplier"], m)
+    return m.copy()
+
+
+def check_delay(d, count=1):
+    """Checks 'delay' argument, return it's copy 
+     or generates a list of zeros.
+
+    :param d:     the list of delays
+    :param count: the number of data curves
+    :return:      the list of delays (copy)
+    """
+    if d is None:
+        # need two delays for each curve (for X and Y columns)
+        return [0 for _ in range(count * 2)]
+    check_coeffs_number(count * 2, ["delay"], d)
+    return d.copy()
+
+
 def global_check(options):
     """Input options global check.
     
