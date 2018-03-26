@@ -1411,11 +1411,14 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
             datafile.seek(0)
             if dialect.delimiter not in valid_delimiters:
                 dialect.delimiter = ','
+            # read
+            text_data = datafile.readlines()
+            if ';' in text_data[-1]:
+                dialect.delimiter = ';'
+
             if verbose:
                 print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
                       end="")
-            # read
-            text_data = datafile.readlines()
             header = text_data[0: h_lines]
             if dialect.delimiter == ";":
                 text_data = origin_to_csv(text_data)
@@ -2369,7 +2372,8 @@ def do_multiplots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
         check_plot_param(curve_list, signals_data.count,
                          '--multiplot')
     for curve_list in cl_args.multiplot:
-        plot_multiplot(signals_data, peaks, curve_list)
+        plot_multiplot(signals_data, peaks, curve_list,
+                       xlim=cl_args.t_bounds)
         if cl_args.multiplot_dir is not None:
             idx_list = "_".join(str(i) for
                                 i in sorted(curve_list))
