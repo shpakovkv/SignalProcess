@@ -1076,7 +1076,6 @@ if __name__ == '__main__':
                                         count=data.count)
             sp.check_coeffs_number(data.count, ["label", "unit"],
                                    args.labels, args.units)
-            check_curves_list(args.curves, data)
 
             # check y_zero_offset parameters (if idx is out of range)
             if args.y_auto_zero:
@@ -1098,6 +1097,7 @@ if __name__ == '__main__':
             # find peaks
             peaks_data = None
             if args.level:
+                check_curves_list(args.curves, data)
                 if verbose:
                     print("Searching for peaks...")
 
