@@ -1002,7 +1002,6 @@ def read_single_peak(filename):
         else:
             peaks.append([None])
             # peaks[idx].append(None)
-    print("Read peak:\n{}".format(peaks))  # debugging
     return peaks
 
 
@@ -1025,6 +1024,33 @@ def read_peaks(file_list):
             for wf in range(curves_count):  # wavefrorm number
                 groups[wf].append(new_group[wf][0])
         return groups
+
+
+def renumber_peak_files(file_list, start=1):
+    """Checks the file numbering, if the numbering is not continuous 
+    or does not start from the specified value, 
+    then renames the files and changes the file_list.
+    
+    :param file_list: the list of files names
+    :param start: the numbering must begin with this value
+    :return: None
+    """
+    n1, n2 = sp.numbering_parser(file_list)
+    digits = n2 - n1
+    short_names = [os.path.basename(name) for name in file_list]
+    file_nums = [int(name[n1: n2]) for name in short_names]
+    dir = os.path.dirname(file_list[0])
+    name_format = '{prefix}{num:0' + str(digits) + 'd}{postfix}'
+    for i in range(len(file_nums)):
+        if file_nums[i] != i + start:
+            new_name = (name_format.format(prefix=short_names[i][0: n1],
+                                           num=i + start,
+                                           postfix=short_names[i][n2:]))
+            new_name = os.path.join(dir, new_name)
+            os.rename(file_list[i], new_name)
+            file_list[i] = new_name
+
+
 
 
 if __name__ == '__main__':
@@ -1137,7 +1163,9 @@ if __name__ == '__main__':
                 pk_filename = get_pk_filename(file_list,
                                               args.save_to,
                                               shot_name)
-                peaks_data = read_peaks(get_peak_files(pk_filename))
+                peak_files = get_peak_files(pk_filename)
+                peaks_data = read_peaks(peak_files)
+                renumber_peak_files(peak_files)
 
             # plot preview and save
             if args.plot:
@@ -1167,6 +1195,5 @@ if __name__ == '__main__':
     # TODO exception handle (via sys.exit(e))
 
     # TODO: offset_by_front says 'No front found' if the front point at (0, 0)
-    # TODO: rename the peak_NNN.csv files when --read (change numbers)
 
     print('Done!!!')  # debugging
