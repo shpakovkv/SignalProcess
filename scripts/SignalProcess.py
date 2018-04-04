@@ -2164,7 +2164,7 @@ def get_front_point(signals_data, args, multiplier, delay,
                                                         level, polarity)
         plot_title = ("Curve[{idx}] \"{label}\"\n"
                       "".format(idx=curve_idx, label=curve.label))
-        if front_x:
+        if front_x is not None:
             front_point = PeakProcess.SinglePeak(front_x, front_y, 0)
             plot_title += "Found front at [{},  {}]".format(front_x, front_y)
         else:
