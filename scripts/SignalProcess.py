@@ -2600,7 +2600,7 @@ def check_multiplier(m, count=1):
         # need two multipliers for each curve (for X and Y columns)
         return [1 for _ in range(count * 2)]
     check_coeffs_number(count * 2, ["multiplier"], m)
-    return m.copy()
+    return list(m)
 
 
 def check_delay(d, count=1):
@@ -2615,7 +2615,7 @@ def check_delay(d, count=1):
         # need two delays for each curve (for X and Y columns)
         return [0 for _ in range(count * 2)]
     check_coeffs_number(count * 2, ["delay"], d)
-    return d.copy()
+    return list(d)
 
 
 def global_check(options):
