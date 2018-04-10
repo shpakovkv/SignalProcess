@@ -48,14 +48,6 @@ def get_peak_args_parser():
     """Returns peak search options parser.
     """
     peak_args_parser = argparse.ArgumentParser(add_help=False)
-    # peak_args_parser.add_argument(
-    #     '--peak',
-    #     action='store',
-    #     dest='peak',
-    #     metavar=('LEVEL', 'DIFF_TIME'),
-    #     nargs=2,
-    #     type=float,
-    #     help='description in development\n\n')
 
     peak_args_parser.add_argument(
         '--level',
@@ -144,17 +136,21 @@ def get_peak_args_parser():
 
 
 class SinglePeak:
-    """Peak object.
-    Contains fields:
-        time - time value
-        val - amplitude value
-        idx - index in the SignalsData
-        sqr_l - 
-        sqr_r - 
+    """Peak object. Contains information on one peak point.
     """
     # TODO sqr_l sqr_r description
     def __init__(self, time=None, value=None, index=None,
                  sqr_l=0, sqr_r=0):
+        """        
+        :param time: time (X) value of peak point
+        :param value: amplitude (Y) value of peak point
+        :param index: index of peak point (in SingleCurve data)
+        :param sqr_l: 'square factor' of the left edge of the peak:
+                      the closer the both sqr_l and sqr_r values 
+                      to '1', the higher the probability 
+                      that this is an erroneous peak
+        :param sqr_r: same as sqr_r
+        """
         self.time = time
         self.val = value
         self.idx = index
@@ -347,14 +343,7 @@ def is_neg(polarity):
                         otherwise returns False
     :rtype:             bool
     """
-    global pos_polarity_labels
-    global neg_polarity_labels
-    if polarity.lower() in pos_polarity_labels:
-        return False
-    if polarity.lower() in neg_polarity_labels:
-        return True
-    else:
-        raise ValueError("Wrong polarity value ({})".format(polarity))
+    return not is_pos(polarity)
 
 
 def check_polarity(curve, time_bounds=(None, None)):
@@ -386,22 +375,25 @@ def find_curve_front(curve,
                        polarity='auto',
                        save_plot=False,
                        plot_name="voltage_front.png"):
-    """Find x (time) of voltage front on specific level
+    """Find time point (x) of voltage curve edge at specific level
     Default: Negative polarity, -0.2 MV level
     PeakProcess.level_excess(x, y, level, start=0, step=1,
     window=0, is_positive=True):
     
-    :param curve: 
-    :param level: 
-    :param polarity: 
-    :param save_plot: 
-    :param plot_name: 
-    :type curve: 
-    :type level: 
-    :type polarity: 
-    :type save_plot: 
-    :type plot_name: 
-    :return: 
+    :param curve: curve data
+    :param level: amplitude value to find
+    :param polarity: the polarity of the curve
+    :param save_plot: bool flag
+    :param plot_name: plot full file name to save as
+    
+    :type curve: SingleCurve
+    :type level: float
+    :type polarity: str '+'/'pos'/'-'/'neg'/'auto'
+    :type save_plot: bool
+    :type plot_name: str
+    
+    :return:  (time, amplitude) or (None, None)
+    :rtupe: tuple(float, float)
     """
 
     if polarity=='auto':
@@ -477,7 +469,6 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         level = abs(level)
 
     if not tnoise:
-        # print('tnoise parameter is empty. ')
         tnoise = x[3] - x[1]
         peak_log += 'Set "tnoise" to default 2 stops = ' + str(tnoise) + "\n"
 
@@ -573,6 +564,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
             pk = peak_list[idx]
             # square = pk.val * dt * di
             square = pk.val * di
+            
             intgr_l = 0
             intgr_r = 0
             peak_log += ("Peak[{:3d}] = [{:7.2f},   {:4.1f}]   "
@@ -1056,7 +1048,10 @@ def renumber_peak_files(file_list, start=1):
 if __name__ == '__main__':
     parser = get_parser()
 
-    args = parser.parse_args()
+    file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
+    with open(file_name) as fid:
+        file_lines = [line.strip() for line in fid.readlines()]
+    args = parser.parse_args(file_lines)
     verbose = not args.silent
 
     # try:
@@ -1193,7 +1188,5 @@ if __name__ == '__main__':
     # TODO: cl description
     # TODO: cl args description
     # TODO exception handle (via sys.exit(e))
-
-    # TODO: offset_by_front says 'No front found' if the front point at (0, 0)
 
     print('Done!!!')  # debugging
