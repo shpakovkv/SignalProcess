@@ -753,7 +753,7 @@ def group_peaks(data, window):
                 of the last group
                 '''
                 insert_group(data[wf][pk], peak_data, peak_map, peak_time,
-                             num_peak_in_gr, wf, len(peak_data))
+                             num_peak_in_gr, wf, len(peak_time))
                 pk += 1
                 gr += 1
 
