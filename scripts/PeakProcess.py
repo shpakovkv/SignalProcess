@@ -19,6 +19,8 @@ SAVETODIR = 'Peaks'
 SINGLEPLOTDIR = 'SinglePlot'
 MULTIPLOTDIR = 'MultiPlot'
 PEAKDATADIR = 'PeakData'
+DEBUG = True
+PEAKFINDERDEBUG = False
 
 
 def get_parser():
@@ -429,7 +431,7 @@ def find_curve_front(curve,
 
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                 tnoise=None, is_negative=True, graph=False,
-                noise_attenuation=0.5, debug=False):
+                noise_attenuation=0.5):
     """Finds peaks on the curve (x, y). 
     Searchs for negative peaks by default.
     
@@ -452,7 +454,6 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                               with a polarity reversal (noise). If too many 
                               noise maxima are defined as real peaks, 
                               reduce this value.
-    :param debug: debug mode (outputs additional information)
      
     :type x: numpy.ndarray
     :type y: numpy.ndarray
@@ -463,7 +464,6 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     :type is_negative: bool
     :type graph: bool
     :type noise_attenuation: float
-    :type debug: bool
 
     :return: (peaks_list, log) - the list of peaks (SinglePeak instances) 
              and the process log
@@ -494,7 +494,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     start_idx = find_nearest_idx(x, time_bounds[0], side='right')
     stop_idx = find_nearest_idx(x, time_bounds[1], side='left')
     diff_idx = int(diff_time // (x[1] - x[0]))
-    if debug:
+    if PEAKFINDERDEBUG:
         print("Diff_time = {}, Diff_idx = {}".format(diff_time, diff_idx))
 
     peak_list = []
@@ -520,7 +520,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                     max_y = y[i]
                     max_idx = i
                 i += 1
-            if debug:
+            if PEAKFINDERDEBUG:
                 print("local_max = [{:.3f}, {:.3f}] i={}"
                       "".format(x[max_idx], max_y, max_idx))
 
@@ -531,7 +531,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
             [is_noise, _] = level_excess(x, y, max_y, start=max_idx,
                                          step=-1, window=diff_time,
                                          is_positive=True)
-            if debug and is_noise:
+            if PEAKFINDERDEBUG and is_noise:
                 print('Left Excess at x({:.2f}, {:.2f}) '
                       '== Not a peak at fall edge!'.format(x[i], y[i]))
 
@@ -545,7 +545,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                                              window=tnoise,
                                              is_positive=False)
 
-                if debug and is_noise:
+                if PEAKFINDERDEBUG and is_noise:
                     print('Noise to the right x({:.2f}, {:.2f})'
                           ''.format(x[j], y[j]))
                 else:
@@ -555,7 +555,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                                                  start=max_idx, step=-1,
                                                  window=tnoise,
                                                  is_positive=False)
-                    if debug and is_noise:
+                    if PEAKFINDERDEBUG and is_noise:
                         print('Noise to the left x({:.2f}, {:.2f})'
                               ''.format(x[j], y[j]))
 
@@ -1072,10 +1072,13 @@ def renumber_peak_files(file_list, start=1):
 if __name__ == '__main__':
     parser = get_parser()
 
-    file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
-    with open(file_name) as fid:
-        file_lines = [line.strip() for line in fid.readlines()]
-    args = parser.parse_args(file_lines)
+    # # for debugging
+    # file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
+    # with open(file_name) as fid:
+    #     file_lines = [line.strip() for line in fid.readlines()]
+    # args = parser.parse_args(file_lines)
+
+    args = parser.parse_args()
     verbose = not args.silent
 
     # try:
@@ -1092,12 +1095,14 @@ if __name__ == '__main__':
     num_mask = sp.numbering_parser([files[0] for
                                    files in args.gr_files])
     # MAIN LOOP
-    print("Check Loop in")  # debugging
+    if DEBUG:
+        print("Check Loop in")
     if (args.level or
             args.plot or
             args.multiplot or
             args.read):
-        print("==> In loop")  # debugging
+        if DEBUG:
+            print("==> In loop")
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = sp.get_shot_number_str(file_list[0], num_mask,
                                                args.ext_list)
@@ -1213,4 +1218,5 @@ if __name__ == '__main__':
     # TODO: cl args description
     # TODO exception handle (via sys.exit(e))
 
-    print('Done!!!')  # debugging
+    if DEBUG:
+        print('Done!!!')
