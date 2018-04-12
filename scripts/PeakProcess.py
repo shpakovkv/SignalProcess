@@ -200,10 +200,18 @@ class SinglePeak:
 
 
 def save_peaks_csv(filename, peaks):
-    """Saves peaks data.
+    """Saves peaks data. 
+    Writes one line for each peak.
+    Each line contains (comma separated): 
+        zero-based curve index, 
+        time value,
+        amplitude value,
+        sqr_l,
+        sqr_r,
+        the sum of sqr_l and sqr_r.
 
     :param filename: the peak data file name prefix
-    :param peaks: the list of list of peaks [curve_idx][peak_idx]
+    :param peaks: the list of lists of peaks [curve_idx][peak_idx]
     :return: None
     """
     folder_path = os.path.dirname(filename)
@@ -228,7 +236,6 @@ def save_peaks_csv(filename, peaks):
                        )
                        )
         postfix = "_peak{:03d}.csv".format(gr + 1)
-        # print("Saving " + filename + postfix)
         with open(filename + postfix, 'w') as fid:
             fid.writelines(content)
             # print("Done!")
@@ -315,8 +322,9 @@ def level_excess(x, y, level, start=0, step=1,
         idx += step
     return False, idx
 
+
 def is_pos(polarity):
-    """Checks if the (str) 'polarity' is positive.
+    """Checks if the polarity (str flag) is positive.
     
     :param polarity:    word denoting polarity
     :type polarity:     str
@@ -335,7 +343,7 @@ def is_pos(polarity):
 
 
 def is_neg(polarity):
-    """Checks if the (str) 'polarity' is negative.
+    """Checks if the polarity (str flag) is negative.
 
     :param polarity:    word denoting polarity
     :type polarity:     str
@@ -355,6 +363,7 @@ def check_polarity(curve, time_bounds=(None, None)):
                         the specified interval
     :type curve:        SignalProcess.SingleCurve
     :type time_bounds:  tuple, list ''(float, float)''
+    
     :return:            the word denoting polarity
     :rtype:             str 
     """
@@ -371,14 +380,12 @@ def check_polarity(curve, time_bounds=(None, None)):
 
 
 def find_curve_front(curve,
-                       level=-0.2,
-                       polarity='auto',
-                       save_plot=False,
-                       plot_name="voltage_front.png"):
+                     level=-0.2,
+                     polarity='auto',
+                     save_plot=False,
+                     plot_name="voltage_front.png"):
     """Find time point (x) of voltage curve edge at specific level
     Default: Negative polarity, -0.2 MV level
-    PeakProcess.level_excess(x, y, level, start=0, step=1,
-    window=0, is_positive=True):
     
     :param curve: curve data
     :param level: amplitude value to find
@@ -393,7 +400,7 @@ def find_curve_front(curve,
     :type plot_name: str
     
     :return:  (time, amplitude) or (None, None)
-    :rtupe: tuple(float, float)
+    :rtype: tuple(float, float)
     """
 
     if polarity=='auto':
@@ -423,7 +430,8 @@ def find_curve_front(curve,
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                 tnoise=None, is_negative=True, graph=False,
                 noise_attenuation=0.5, debug=False):
-    """Peaks search (negative by default)
+    """Finds peaks on the curve (x, y). 
+    Searchs for negative peaks by default.
     
     :param x: array of time values
     :param y: array of amplitude values
@@ -457,7 +465,9 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     :type noise_attenuation: float
     :type debug: bool
 
-    :return: list 
+    :return: (peaks_list, log) - the list of peaks (SinglePeak instances) 
+             and the process log
+    :rtype: (list, str)
     """
 
     # Checkout the inputs
@@ -466,7 +476,6 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
     if is_negative:
         y = -y
-        level = abs(level)
 
     if not tnoise:
         tnoise = x[3] - x[1]
@@ -497,11 +506,13 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     i = start_idx
     while i < stop_idx :
         if y[i] > level:
-            max_y = y[i]
+            max_y = y[i]  # local max (may be real peak or not)
             max_idx = i
 
-            # search for a bigger peak within the diff_time from the found one
-            # y[i] == max_y condition is needed for flat-top peaks
+            # search for a bigger local max within the diff_time from
+            # the found one
+            # y[i] == max_y condition is needed
+            # for flat-top peaks (wider than diff_time)
             while (i <= stop_idx and
                    (x[i] - x[max_idx] <= diff_time or
                     y[i] == max_y)):
@@ -515,19 +526,19 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
             # search for a bigger value within the diff_time
             # to the left from the found local maximum
-            # if found: this is a little signal fluctuation on the fall front
+            # if found: this is a little signal fluctuation on the fall edge
             # (not a real peak)
             [is_noise, _] = level_excess(x, y, max_y, start=max_idx,
                                          step=-1, window=diff_time,
                                          is_positive=True)
             if debug and is_noise:
                 print('Left Excess at x({:.2f}, {:.2f}) '
-                      '== Not a peak at front fall!'.format(x[i], y[i]))
+                      '== Not a peak at fall edge!'.format(x[i], y[i]))
 
             # search for a polarity reversal within tnose from this local max
             # if found: this is a noise (not a real peak)
             if not is_noise:
-                # search to the right from this local max
+                # search to the right from the local max
                 [is_noise, j] = level_excess(x, y,
                                              -max_y * noise_attenuation,
                                              start=max_idx, step=1,
@@ -538,7 +549,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                     print('Noise to the right x({:.2f}, {:.2f})'
                           ''.format(x[j], y[j]))
                 else:
-                    # search to the left from this local max
+                    # search to the left from the local max
                     [is_noise, j] = level_excess(x, y,
                                                  -max_y * noise_attenuation,
                                                  start=max_idx, step=-1,
@@ -549,6 +560,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                               ''.format(x[j], y[j]))
 
             if not is_noise:
+                # all checks passed, the local max is the real peak
                 peak_list.append(SinglePeak(x[max_idx], max_y, max_idx))
                 continue
         i += 1
@@ -556,6 +568,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     peak_log += 'Number of peaks: ' + str(len(peak_list)) + "\n"
 
     # LOCAL INTEGRAL CHECK
+    # needed for error probability estimation
     dt = x[1] - x[0]
     di = int(diff_time * 2 // dt)    # diff window in index units
 
@@ -583,11 +596,11 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
             peak_log += "\n"
         if peak_list:
             peak_log += "\n"
-
+    # integr_l, integr_r: The closer the value to unity,
+    # the greater the probability that the peak is imaginary (erroneous)
 
     if is_negative:
         y = -y
-        level = -abs(level)
         for i in range(len(peak_list)):
             peak_list[i].invert()
     if graph:
@@ -613,14 +626,14 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 def group_peaks(data, window):
     """Groups the peaks from different curves.
     Each group corresponds to one single event (for example: 
-    act of X-Ray emission, registered by several detectors).
-    
-    If 
+    one act of X-Ray emission, registered by several detectors).
     
     :param data: three-dimensional array containing data 
                  on all the peaks of all curves
                  The array structure:
                  data[curve_idx][peak_idx] == SinglePeak instance
+                 If a curve with curve_idx index has no peaks 
+                 the data[curve_idx] contains an empty list. 
     :param window: peaks coincide when their X values are within
                    +/-window interval from average X (time) position 
                    of peak (event). "Average" because X (time) value 
@@ -632,63 +645,77 @@ def group_peaks(data, window):
              this curve has a peak related to this event (group), else None
     """
 
-    def insert_group(peak, peak_data, peak_map, group_time,
+    def insert_group(peak, peak_data, groups_time,
                      num_peak_in_gr, wf, gr):
-        group_time.insert(gr, peak.time)
+        """Inserts new group of peaks to the peak_data array 
+        at a specific index.
+        
+        :param peak: new peak to add
+        :param peak_data: the 3-dimensional array with peaks data
+        :param groups_time: the list with groups average time
+        :param num_peak_in_gr: the list contains 
+                               the number of peaks in each group
+        :param wf: waveform (curve) index
+        :param gr: new group index (insert on this index)
+        :return: None
+        """
+        groups_time.insert(gr, peak.time)
         num_peak_in_gr.insert(gr, 1)
         for curve_i in range(len(peak_data)):
             if curve_i == wf:
-                peak_map[curve_i].insert(gr, True)
                 peak_data[curve_i].insert(gr, SinglePeak(*peak.data_full))
             else:
-                peak_map[curve_i].insert(gr, False)
                 peak_data[curve_i].insert(gr, None)
 
 
-    def add_pk_to_gr(peak, peak_data, peak_map, peak_time,
+    def add_pk_to_gr(peak, peak_data, groups_time,
                      num_peak_in_gr, wf, gr):
-        peak_time[gr] = ((peak_time[gr] * num_peak_in_gr[gr] +
-                          peak.time) /
-                         (num_peak_in_gr[gr] + 1))
-        num_peak_in_gr[gr] = num_peak_in_gr[gr] + 1
-        peak_map[wf][gr] = True
+        """Adds new peak (from another curve) to existing group.
+        It is assumed that the group contains None value
+        on the place of this peak.
+        
+        :param peak: new peak to add
+        :param peak_data: the 3-dimensional array with peaks data
+        :param groups_time: the list with groups average time
+        :param num_peak_in_gr: the list contains 
+                               the number of peaks in each group
+        :param wf: waveform (curve) index
+        :param gr: new group index (insert on this index)
+        :return: None
+        """
+        groups_time[gr] = ((groups_time[gr] * num_peak_in_gr[gr] +
+                            peak.time) /
+                           (num_peak_in_gr[gr] + 1))
+        num_peak_in_gr[gr] += 1
         peak_data[wf][gr] = SinglePeak(*peak.data_full)
 
     # wf == waveform == curve
     start_wf = 0
-
     # skip first curves if they have no peaks
-    for wf in range(len(data)):
-        if data[wf]:
-            start_wf = wf
-            break
+    while not data[start_wf] and start_wf < len(data):
+        start_wf += 1
 
-    # 1D array with average X (time) data of peak group
-    peak_time = []
-    for peak in data[start_wf]:
-        peak_time.append(peak.time)
+    # 1D array with average time value of peak group
+    groups_time = [peak.time for peak in data[start_wf]]
 
     # 1D array with numbers of peaks in each group
-    num_peak_in_gr = [1] * len(peak_time)
+    num_peak_in_gr = [1] * len(groups_time)
 
     dt = abs(window)
     curves_count = len(data)
 
-    # at the beginning we have only start_wf's peaks
-    peak_map = [[True] * len(peak_time)]
-    for curve in range(1, curves_count):
-        peak_map.append([False] * len(peak_time))
-
+    # the 3-dimensional array will contain data
+    # on all the peaks (grouped by time)
     peak_data = [[]]
     for peak in data[start_wf]:
         peak_data[0].append(SinglePeak(*peak.data_full))
     for curve_idx in range(0, start_wf):
-        peak_data.insert(0, [None] * len(peak_time))
+        peak_data.insert(0, [None] * len(groups_time))
     for curve_idx in range(start_wf + 1, curves_count):
-        peak_data.append([None] * len(peak_time))
+        peak_data.append([None] * len(groups_time))
 
     if curves_count <= 1:
-        return peak_data, peak_map
+        return peak_data
 
     '''---------- making groups of peaks ------------------------------
     two peaks make group when they are close enough
@@ -713,54 +740,53 @@ def group_peaks(data, window):
             when curve[i]'s peak[j] is in
             +/-dt interval from peaks of group[gr]
             '''
-            if gr < len(peak_time) \
-                    and abs(peak_time[gr] - data[wf][pk].time) <= dt:
+            if gr < len(groups_time) \
+                    and abs(groups_time[gr] - data[wf][pk].time) <= dt:
                 if (len(data[wf]) > pk + 1 and
-                        (abs(peak_time[gr] - data[wf][pk].time) >
-                         abs(peak_time[gr] - data[wf][pk + 1].time))):
+                        (abs(groups_time[gr] - data[wf][pk].time) >
+                         abs(groups_time[gr] - data[wf][pk + 1].time))):
                     # next peak of data[wf] matches better
                     # insert new group for current data[wf]'s peak
-                    insert_group(data[wf][pk], peak_data, peak_map, peak_time,
+                    insert_group(data[wf][pk], peak_data, groups_time,
                                  num_peak_in_gr, wf, gr)
                     pk += 1
-                elif (len(peak_time) > gr + 1 and
-                          (abs(peak_time[gr] - data[wf][pk].time) >
-                               abs(peak_time[gr + 1] - data[wf][pk].time))):
+                elif (len(groups_time) > gr + 1 and
+                          (abs(groups_time[gr] - data[wf][pk].time) >
+                               abs(groups_time[gr + 1] - data[wf][pk].time))):
                     # current peak matches next group better
                     pass
                 else:
-                    add_pk_to_gr(data[wf][pk], peak_data, peak_map, peak_time,
+                    add_pk_to_gr(data[wf][pk], peak_data, groups_time,
                                  num_peak_in_gr, wf, gr)
                     pk += 1
-                if gr == len(peak_time) - 1 and pk < len(data[wf]):
+                if gr == len(groups_time) - 1 and pk < len(data[wf]):
                     # Last peak_data column was filled but there are
                     # more peaks in the data[wf], so adds new group
                     gr += 1
 
-            elif (gr < len(peak_time) and
-                          data[wf][pk].time < peak_time[gr] - dt):
+            elif (gr < len(groups_time) and
+                          data[wf][pk].time < groups_time[gr] - dt):
                 '''INSERT NEW GROUP
                 when X-position of current peak of curve[wf] is 
                 to the left of current group by more than dt
                 '''
-                insert_group(data[wf][pk], peak_data, peak_map, peak_time,
+                insert_group(data[wf][pk], peak_data, groups_time,
                              num_peak_in_gr, wf, gr)
                 pk += 1
 
-            elif gr >= len(peak_time) - 1:
+            elif gr >= len(groups_time) - 1:
                 '''APPEND NEW GROUP
                 when X-position of current peak of curve[wf] is to the right 
                 of the last group
                 '''
-                insert_group(data[wf][pk], peak_data, peak_map, peak_time,
-                             num_peak_in_gr, wf, len(peak_time))
+                insert_group(data[wf][pk], peak_data, groups_time,
+                             num_peak_in_gr, wf, len(groups_time))
                 pk += 1
                 gr += 1
 
-            if gr < len(peak_time) - 1:
+            if gr < len(groups_time) - 1:
                 gr += 1
 
-    # return peak_data, peak_map
     return peak_data
 
 
@@ -775,7 +801,7 @@ def get_peaks(data, args, verbose):
                     on all the peaks of curves with index in args.curves list
                     The array structure:
                     data[curve_idx][peak_idx] == SinglePeak instance
-                    For curves not in the args.curves list:
+                    For the curves not in the args.curves list:
                     data[curve_idx] == None
     """
     unsorted_peaks = [None] * data.count
@@ -790,7 +816,6 @@ def get_peaks(data, args, verbose):
             noise_attenuation=args.noise_att,
             graph=False
         )
-        # TODO: autosave single curve peaks preview
         unsorted_peaks[idx] = new_peaks
         if verbose:
             print(peak_log)
@@ -802,7 +827,7 @@ def check_curves_list(curves, signals_data):
     Raises the exception if the index is out of range.
     
     :param curves: the list of indexes of curves to find peaks for
-    :param signals_data: SIgnalsData instance
+    :param signals_data: SignalsData instance
     :return: None
     """
     for curve_idx in curves:
@@ -817,11 +842,11 @@ def global_check(options):
     Checks the input arguments and converts them to the required format.
 
     :param options: namespace with options
-    :type options:   argparse.namespace
+    :type options:  argparse.namespace
     
     :return: changed namespace with converted values
     """
-    # input directory and files check
+
     if options.src_dir:
         options.src_dir = options.src_dir.strip()
         assert os.path.isdir(options.src_dir), \
@@ -844,10 +869,9 @@ def global_check(options):
     #               ...etc.
     #             ]
 
-    # check partial import options
     options.partial = sp.check_partial_args(options.partial)
 
-    # # raw check labels not used
+    # # Raw check labels. Not used.
     # # instead: the forbidden symbols are replaced during CSV saving
     # if options.labels:
     #     assert global_check_labels(options.labels), \
@@ -1184,7 +1208,7 @@ if __name__ == '__main__':
     # except Exception as e:
     #     print()
     #     sys.exit(e)
-    # TODO: final peak table
+    # TODO: add curve labels to peak files
     # TODO: cl description
     # TODO: cl args description
     # TODO exception handle (via sys.exit(e))
