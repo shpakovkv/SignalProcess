@@ -201,7 +201,7 @@ class SinglePeak:
                              "sqr_l, sqr_r] of peak.")
 
 
-def save_peaks_csv(filename, peaks):
+def save_peaks_csv(filename, peaks, labels=None):
     """Saves peaks data. 
     Writes one line for each peak.
     Each line contains (comma separated): 
@@ -223,6 +223,9 @@ def save_peaks_csv(filename, peaks):
     if len(filename) > 4 and filename[-4:].upper() == ".CSV":
         filename = filename[0:-4]
 
+    if labels is None:
+        labels = ['' for _ in range(len(peaks))]
+
     for gr in range(len(peaks[0])):
         content = ""
         for wf in range(len(peaks)):
@@ -231,10 +234,11 @@ def save_peaks_csv(filename, peaks):
                 pk = SinglePeak(0, 0, 0)
             # TODO add curves labels to the peaks files
             content = (content +
-                       "{:3d},{:0.18e},{:0.18e},"
-                       "{:0.3f},{:0.3f},{:0.3f}\n".format(
-                           wf, pk.time, pk.val,
-                           pk.sqr_l, pk.sqr_r, pk.sqr_l + pk.sqr_r
+                       "{idx:3d},{time:0.18e},{amp:0.18e},"
+                       "{sqr_l:0.3f},{sqr_r:0.3f},{label}\n".format(
+                           idx=wf, time=pk.time, amp=pk.val,
+                           sqr_l=pk.sqr_l, sqr_r=pk.sqr_r,
+                           label=labels[wf]
                        )
                        )
         postfix = "_peak{:03d}.csv".format(gr + 1)
@@ -1011,7 +1015,8 @@ def read_single_peak(filename):
     peaks = []
     curves_count = data.shape[0]
     for idx in range(curves_count):
-        new_peak = SinglePeak(time=data[idx, 1], value=data[idx, 2])
+        new_peak = SinglePeak(time=data[idx, 1], value=data[idx, 2],
+                              sqr_l=data[idx, 3], sqr_r=data[idx, 4])
         if new_peak.time != 0 and new_peak.val != 0:
             peaks.append([new_peak])
             # peaks[idx].append(new_peak)
@@ -1072,13 +1077,13 @@ def renumber_peak_files(file_list, start=1):
 if __name__ == '__main__':
     parser = get_parser()
 
-    # # for debugging
-    # file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
-    # with open(file_name) as fid:
-    #     file_lines = [line.strip() for line in fid.readlines()]
-    # args = parser.parse_args(file_lines)
+    # for debugging
+    file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
+    with open(file_name) as fid:
+        file_lines = [line.strip() for line in fid.readlines()]
+    args = parser.parse_args(file_lines)
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
     verbose = not args.silent
 
     # try:
@@ -1147,6 +1152,7 @@ if __name__ == '__main__':
             # find peaks
             peaks_data = None
             if args.level:
+                print('LEVEL = {}'.format(args.level))
                 check_curves_list(args.curves, data)
                 if verbose:
                     print("Searching for peaks...")
@@ -1165,7 +1171,7 @@ if __name__ == '__main__':
                                               args.save_to,
                                               shot_name)
 
-                save_peaks_csv(pk_filename, peaks_data)
+                save_peaks_csv(pk_filename, peaks_data, args.labels)
 
                 # step 9 - save multicurve plot
                 multiplot_name = pk_filename + ".plot.png"
@@ -1213,7 +1219,7 @@ if __name__ == '__main__':
     # except Exception as e:
     #     print()
     #     sys.exit(e)
-    # TODO: add curve labels to peak files
+
     # TODO: cl description
     # TODO: cl args description
     # TODO exception handle (via sys.exit(e))
