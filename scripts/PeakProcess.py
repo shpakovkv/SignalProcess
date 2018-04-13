@@ -480,6 +480,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
     if is_negative:
         y = -y
+        level = -level
 
     if not tnoise:
         tnoise = x[3] - x[1]
@@ -605,6 +606,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
     if is_negative:
         y = -y
+        level = -level
         for i in range(len(peak_list)):
             peak_list[i].invert()
     if graph:
