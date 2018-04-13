@@ -191,7 +191,7 @@ def get_input_files_args_parser():
              '      the specified directory will be processed.\n\n')
 
     input_params_parser.add_argument(
-        '-c', '--ch', '--sorted-by-channel',
+        '--sorted-by-channel',
         action='store_true',
         dest='sorted_by_ch',
         help='this options tells the program that the files are \n'

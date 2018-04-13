@@ -57,7 +57,8 @@ def get_peak_args_parser():
         dest='level',
         metavar='LEVEL',
         type=float,
-        help='description in development\n\n')
+        help='The threshold of peak (all amplitude values \n'
+             'below this level will be ignored).\n\n')
 
     peak_args_parser.add_argument(
         '--diff', '--diff-time',
@@ -65,7 +66,13 @@ def get_peak_args_parser():
         dest='pk_diff',
         metavar='DIFF_TIME',
         type=float,
-        help='description in development\n\n')
+        help='The minimum difference between two neighboring peaks. \n'
+             'If two peaks are spaced apart from each other by less than \n'
+             'diff_time, then the lower one will be ignored. \n'
+             'Or if the next peak is at the edge (fall or rise) \n' 
+             'of the previous peak, and the "distance" (time) from \n' 
+             'its maximum to that edge (at the same level) is less \n' 
+             'than the diff_time, this second peak will be ignored.\n\n')
 
     peak_args_parser.add_argument(
         '--curves',
@@ -74,13 +81,17 @@ def get_peak_args_parser():
         metavar='CURVE',
         nargs='+',
         type=int,
-        help='description in development\n\n')
+        help='The list of zero-based indexes of curves for which \n'
+             'it is necessary to find peaks.\n'
+             'The order of the curves corresponds to the order of \n'
+             'the columns with data in the files \n'
+             'and the order of reading the files\n\n')
 
     peak_args_parser.add_argument(
         '-s', '--save',
         action='store_true',
         dest='save',
-        help='description in development\n\n')
+        help='Unnecessary flag. Will be DELETED.\n\n')
 
     peak_args_parser.add_argument(
         '--bounds', '--time-bounds',
@@ -90,7 +101,9 @@ def get_peak_args_parser():
         nargs=2,
         type=float,
         default=(None, None),
-        help='description in development\n\n')
+        help='The list with the left and the right search boundaries.\n'
+             'The program will search for peaks only within this \n'
+             'interval.\n\n')
 
     peak_args_parser.add_argument(
         '--noise-half-period', '--t-noise',
@@ -98,7 +111,9 @@ def get_peak_args_parser():
         dest='t_noise',
         metavar='T',
         type=float,
-        help='description in development\n\n')
+        help='Maximum half-period of noise fluctuation.\n'
+             'It is necessary for automatic detection of noise and \n'
+             'exclusion of parasitic peaks from the final result\n\n')
 
     peak_args_parser.add_argument(
         '--noise-attenuation',
@@ -106,33 +121,49 @@ def get_peak_args_parser():
         dest='noise_att',
         type=float,
         default=NOISEATTENUATION,
-        help='description in development\n\n')
+        help='Attenuation of the second half-wave of noise with a polarity\n'
+             'reversal. If too many parasitic (noise) peaks are defined \n'
+             'as real peaks, reduce this value.\n\n')
 
     peak_args_parser.add_argument(
-        '--group-diff',
+        '--group-width',
         action='store',
-        dest='gr_diff',
+        dest='gr_width',
         metavar='GR_DIFF',
         type=float,
-        help='description in development\n\n')
+        help='The maximum time difference between peaks that '
+             'will be grouped.\n\n')
 
     peak_args_parser.add_argument(
         '--hide-found-peaks',
         action='store_true',
         dest='peak_hide',
-        help='description in development\n\n')
+        help='Hides the multiplot with overall found peaks.\n'
+             'It still will be saved at the default folder.\n'
+             'Needed for automation.\n\n')
 
     peak_args_parser.add_argument(
         '--hide-all',
         action='store_true',
         dest='hide_all',
-        help='description in development\n\n')
+        help='Hides all plots. The plots will be saved at their \n'
+             'default folders but not shown.\n'
+             'Needed for automation.\n\n')
 
     peak_args_parser.add_argument(
         '--read',
         action='store_true',
         dest='read',
-        help='description in development\n\n')
+        help='Read the peak from files at the default folder\n'
+             '({folder}).\n'
+             'If the arguments needed for the searching of peaks \n'
+             'were specified, the program will find peaks, save them\n'
+             'and show the multiplot with all found peaks.\n'
+             'You may delete some peak files or edit them.\n'
+             'When the multiplot window is closed, the program \n'
+             'will read the edited peak data and the other plots\n'
+             'will be plotted.\n\n'
+             ''.format(folder=os.path.join(SAVETODIR, PEAKDATADIR)))
 
     return peak_args_parser
 
@@ -483,8 +514,9 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         level = -level
 
     if not tnoise:
+        # TODO change to (x[1] - x[0]) * 4
         tnoise = x[3] - x[1]
-        peak_log += 'Set "tnoise" to default 2 stops = ' + str(tnoise) + "\n"
+        peak_log += 'Set "tnoise" to default 4 stops = ' + str(tnoise) + "\n"
 
     assert len(time_bounds) == 2, ("time_bounds has incorrect number of "
                                    "values. 2 expected, " +
@@ -944,13 +976,13 @@ def global_check(options):
 
     # ==============================================================
     # original PeakProcess args
-    if any([options.level, options.pk_diff, options.gr_diff, options.curves]):
-        assert all([options.level, options.pk_diff, options.gr_diff, options.curves]), \
+    if any([options.level, options.pk_diff, options.gr_width, options.curves]):
+        assert all([options.level, options.pk_diff, options.gr_width, options.curves]), \
             "To start the process of finding peaks, '--level', " \
             "'--diff-time', '--group-diff', '--curves' arguments are needed."
         assert options.pk_diff >=0, \
             "'--diff-time' value must be non negative real number."
-        assert options.gr_diff >=0, \
+        assert options.gr_width >=0, \
             "'--group-diff' must be non negative real number."
         assert all(idx >= 0 for idx in options.curves), \
             "Curve index must be non negative integer"
@@ -1079,13 +1111,13 @@ def renumber_peak_files(file_list, start=1):
 if __name__ == '__main__':
     parser = get_parser()
 
-    # for debugging
-    file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
-    with open(file_name) as fid:
-        file_lines = [line.strip() for line in fid.readlines()]
-    args = parser.parse_args(file_lines)
+    # # for debugging
+    # file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
+    # with open(file_name) as fid:
+    #     file_lines = [line.strip() for line in fid.readlines()]
+    # args = parser.parse_args(file_lines)
 
-    # args = parser.parse_args()
+    args = parser.parse_args()
     verbose = not args.silent
 
     # try:
@@ -1162,7 +1194,7 @@ if __name__ == '__main__':
                 unsorted_peaks = get_peaks(data, args, verbose)
 
                 # step 7 - group peaks [and plot all curves with peaks]
-                peaks_data = group_peaks(unsorted_peaks, args.gr_diff)
+                peaks_data = group_peaks(unsorted_peaks, args.gr_width)
 
                 # step 8 - save peaks data
                 if verbose:
@@ -1223,8 +1255,8 @@ if __name__ == '__main__':
     #     sys.exit(e)
 
     # TODO: cl description
-    # TODO: cl args description
     # TODO exception handle (via sys.exit(e))
+    # TODO delete save curves data section
 
     if DEBUG:
         print('Done!!!')
