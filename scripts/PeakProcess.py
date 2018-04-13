@@ -37,7 +37,6 @@ def get_parser():
         parents=[sp.get_input_files_args_parser(),
                  sp.get_mult_del_args_parser(),
                  sp.get_plot_args_parser(),
-                 sp.get_data_corr_args_parser(),
                  get_peak_args_parser()],
         prog='PeakProcess.py',
         description=p_desc, epilog=p_ep, usage=p_use,
@@ -86,12 +85,6 @@ def get_peak_args_parser():
              'The order of the curves corresponds to the order of \n'
              'the columns with data in the files \n'
              'and the order of reading the files\n\n')
-
-    peak_args_parser.add_argument(
-        '-s', '--save',
-        action='store_true',
-        dest='save',
-        help='Unnecessary flag. Will be DELETED.\n\n')
 
     peak_args_parser.add_argument(
         '--bounds', '--time-bounds',
@@ -171,7 +164,6 @@ def get_peak_args_parser():
 class SinglePeak:
     """Peak object. Contains information on one peak point.
     """
-    # TODO sqr_l sqr_r description
     def __init__(self, time=None, value=None, index=None,
                  sqr_l=0, sqr_r=0):
         """        
@@ -263,7 +255,6 @@ def save_peaks_csv(filename, peaks, labels=None):
             pk = peaks[wf][gr]
             if pk is None:
                 pk = SinglePeak(0, 0, 0)
-            # TODO add curves labels to the peaks files
             content = (content +
                        "{idx:3d},{time:0.18e},{amp:0.18e},"
                        "{sqr_l:0.3f},{sqr_r:0.3f},{label}\n".format(
@@ -1165,18 +1156,6 @@ if __name__ == '__main__':
             sp.check_coeffs_number(data.count, ["label", "unit"],
                                    args.labels, args.units)
 
-            # check y_zero_offset parameters (if idx is out of range)
-            if args.y_auto_zero:
-                args = sp.do_y_zero_offset(data, args)
-
-            # check offset_by_voltage parameters (if idx is out of range)
-            if args.offset_by_front:
-                args = sp.do_offset_by_front(data, args, shot_name)
-
-            # reset to zero
-            if args.zero:
-                data = sp.do_reset_to_zero(data, args, verbose)
-
             # multiplier and delay
             data = sp.multiplier_and_delay(data,
                                            args.multiplier,
@@ -1240,14 +1219,6 @@ if __name__ == '__main__':
                 sp.do_multiplots(data, args, shot_name,
                                  peaks=peaks_data, verbose=verbose)
 
-            # save data
-            if args.save:
-                saved_as = sp.do_save(data, args, shot_name, verbose)
-                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
-                sp.save_m_log(file_list, saved_as, labels, args.multiplier,
-                              args.delay, args.offset_by_front,
-                              args.y_auto_zero, args.partial)
-
     sp.print_duplicates(args.gr_files, 30)
     # except Exception as e:
     #     print()
@@ -1255,7 +1226,6 @@ if __name__ == '__main__':
 
     # TODO: cl description
     # TODO exception handle (via sys.exit(e))
-    # TODO delete save curves data section
 
     if DEBUG:
         print('Done!!!')
