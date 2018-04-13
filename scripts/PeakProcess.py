@@ -514,8 +514,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         level = -level
 
     if not tnoise:
-        # TODO change to (x[1] - x[0]) * 4
-        tnoise = x[3] - x[1]
+        tnoise = (x[1] - x[0]) * 4
         peak_log += 'Set "tnoise" to default 4 stops = ' + str(tnoise) + "\n"
 
     assert len(time_bounds) == 2, ("time_bounds has incorrect number of "
