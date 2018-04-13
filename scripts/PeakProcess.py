@@ -940,22 +940,6 @@ def global_check(options):
         for idx, m_param in enumerate(options.multiplot):
             options.multiplot[idx] = sp.global_check_idx_list(m_param,
                                                            '--multiplot')
-    # raw check offset_by_voltage parameters (types)
-    options.it_offset = False  # interactive offset process
-    if options.offset_by_front:
-        assert len(options.offset_by_front) in [2, 4], \
-            ("error: argument {arg_name}: expected 2 or 4 arguments.\n"
-             "[IDX LEVEL] or [IDX LEVEL WINDOW POLYORDER]."
-             "".format(arg_name="--offset-by-curve_level"))
-        if len(options.offset_by_front) < 4:
-            options.it_offset = True
-        options.offset_by_front = \
-            sp.global_check_front_params(options.offset_by_front)
-
-    # raw check y_auto_zero parameters (types)
-    if options.y_auto_zero:
-        options.y_auto_zero = sp.global_check_y_auto_zero_params(options.y_auto_zero)
-
 
     # raw check multiplier and delay
     if options.multiplier is not None and options.delay is not None:
