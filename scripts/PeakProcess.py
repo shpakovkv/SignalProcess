@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 from matplotlib import pyplot
-import os
+import os, sys
 import numpy
 import bisect
 import argparse
@@ -1094,122 +1094,118 @@ if __name__ == '__main__':
     args = parser.parse_args()
     verbose = not args.silent
 
-    # try:
-    args = global_check(args)
+    try:
+        args = global_check(args)
 
-    '''
-    num_mask (tuple) - contains the first and last index
-    of substring of filename
-    That substring contains the shot number.
-    The last idx is excluded: [first, last).
-    Read numbering_parser docstring for more info.
-    '''
+        '''
+        num_mask (tuple) - contains the first and last index
+        of substring of filename
+        That substring contains the shot number.
+        The last idx is excluded: [first, last).
+        Read numbering_parser docstring for more info.
+        '''
 
-    num_mask = sp.numbering_parser([files[0] for
-                                   files in args.gr_files])
-    # MAIN LOOP
-    if DEBUG:
-        print("Check Loop in")
-    if (args.level or
-            args.plot or
-            args.multiplot or
-            args.read):
+        num_mask = sp.numbering_parser([files[0] for
+                                       files in args.gr_files])
+        # MAIN LOOP
         if DEBUG:
-            print("==> In loop")
-        for shot_idx, file_list in enumerate(args.gr_files):
-            shot_name = sp.get_shot_number_str(file_list[0], num_mask,
-                                               args.ext_list)
+            print("Check Loop in")
+        if (args.level or
+                args.plot or
+                args.multiplot or
+                args.read):
+            if DEBUG:
+                print("==> In loop")
+            for shot_idx, file_list in enumerate(args.gr_files):
+                shot_name = sp.get_shot_number_str(file_list[0], num_mask,
+                                                   args.ext_list)
 
-            # get SignalsData
-            data = sp.read_signals(file_list,
-                                   start=args.partial[0],
-                                   step=args.partial[1],
-                                   points=args.partial[2],
-                                   labels=args.labels,
-                                   units=args.units,
-                                   time_unit=args.time_unit)
-            if verbose:
-                print("The number of curves = {}".format(data.count))
-
-            # checks the number of columns with data,
-            # and the number of multipliers, delays, labels
-            args.multiplier = sp.check_multiplier(args.multiplier,
-                                                  count=data.count)
-            args.delay = sp.check_delay(args.delay,
-                                        count=data.count)
-            sp.check_coeffs_number(data.count, ["label", "unit"],
-                                   args.labels, args.units)
-
-            # multiplier and delay
-            data = sp.multiplier_and_delay(data,
-                                           args.multiplier,
-                                           args.delay)
-
-            # find peaks
-            peaks_data = None
-            if args.level:
-                print('LEVEL = {}'.format(args.level))
-                check_curves_list(args.curves, data)
+                # get SignalsData
+                data = sp.read_signals(file_list,
+                                       start=args.partial[0],
+                                       step=args.partial[1],
+                                       points=args.partial[2],
+                                       labels=args.labels,
+                                       units=args.units,
+                                       time_unit=args.time_unit)
                 if verbose:
-                    print("Searching for peaks...")
+                    print("The number of curves = {}".format(data.count))
 
-                unsorted_peaks = get_peaks(data, args, verbose)
+                # checks the number of columns with data,
+                # and the number of multipliers, delays, labels
+                args.multiplier = sp.check_multiplier(args.multiplier,
+                                                      count=data.count)
+                args.delay = sp.check_delay(args.delay,
+                                            count=data.count)
+                sp.check_coeffs_number(data.count, ["label", "unit"],
+                                       args.labels, args.units)
 
-                # step 7 - group peaks [and plot all curves with peaks]
-                peaks_data = group_peaks(unsorted_peaks, args.gr_width)
+                # multiplier and delay
+                data = sp.multiplier_and_delay(data,
+                                               args.multiplier,
+                                               args.delay)
 
-                # step 8 - save peaks data
-                if verbose:
-                    print("Saving peak data...")
+                # find peaks
+                peaks_data = None
+                if args.level:
+                    print('LEVEL = {}'.format(args.level))
+                    check_curves_list(args.curves, data)
+                    if verbose:
+                        print("Searching for peaks...")
 
-                # full path without peak number and extension:
-                pk_filename = get_pk_filename(file_list,
-                                              args.save_to,
-                                              shot_name)
+                    unsorted_peaks = get_peaks(data, args, verbose)
 
-                save_peaks_csv(pk_filename, peaks_data, args.labels)
+                    # step 7 - group peaks [and plot all curves with peaks]
+                    peaks_data = group_peaks(unsorted_peaks, args.gr_width)
 
-                # step 9 - save multicurve plot
-                multiplot_name = pk_filename + ".plot.png"
+                    # step 8 - save peaks data
+                    if verbose:
+                        print("Saving peak data...")
 
-                if verbose:
-                    print("Saving all peaks as " + multiplot_name)
-                sp.plot_multiplot(data, peaks_data, args.curves,
-                                  xlim=args.t_bounds)
-                pyplot.savefig(multiplot_name, dpi=400)
-                if args.peak_hide:
-                    pyplot.show(block=False)
-                else:
-                    pyplot.show()
+                    # full path without peak number and extension:
+                    pk_filename = get_pk_filename(file_list,
+                                                  args.save_to,
+                                                  shot_name)
 
-            if args.read:
-                if verbose:
-                    print("Reading peak data...")
+                    save_peaks_csv(pk_filename, peaks_data, args.labels)
 
-                pk_filename = get_pk_filename(file_list,
-                                              args.save_to,
-                                              shot_name)
-                peak_files = get_peak_files(pk_filename)
-                peaks_data = read_peaks(peak_files)
-                renumber_peak_files(peak_files)
+                    # step 9 - save multicurve plot
+                    multiplot_name = pk_filename + ".plot.png"
 
-            # plot preview and save
-            if args.plot:
-                sp.do_plots(data, args, shot_name,
-                            peaks=peaks_data, verbose=verbose)
+                    if verbose:
+                        print("Saving all peaks as " + multiplot_name)
+                    sp.plot_multiplot(data, peaks_data, args.curves,
+                                      xlim=args.t_bounds)
+                    pyplot.savefig(multiplot_name, dpi=400)
+                    if args.peak_hide:
+                        pyplot.show(block=False)
+                    else:
+                        pyplot.show()
 
-            # plot and save multi-plots
-            if args.multiplot:
-                sp.do_multiplots(data, args, shot_name,
-                                 peaks=peaks_data, verbose=verbose)
+                if args.read:
+                    if verbose:
+                        print("Reading peak data...")
 
-    sp.print_duplicates(args.gr_files, 30)
-    # except Exception as e:
-    #     print()
-    #     sys.exit(e)
+                    pk_filename = get_pk_filename(file_list,
+                                                  args.save_to,
+                                                  shot_name)
+                    peak_files = get_peak_files(pk_filename)
+                    peaks_data = read_peaks(peak_files)
+                    renumber_peak_files(peak_files)
+
+                # plot preview and save
+                if args.plot:
+                    sp.do_plots(data, args, shot_name,
+                                peaks=peaks_data, verbose=verbose)
+
+                # plot and save multi-plots
+                if args.multiplot:
+                    sp.do_multiplots(data, args, shot_name,
+                                     peaks=peaks_data, verbose=verbose)
+
+        sp.print_duplicates(args.gr_files, 30)
+    except Exception as e:
+        print()
+        sys.exit(e)
 
     # TODO: cl description
-    # TODO exception handle (via sys.exit(e))
-
-    if DEBUG:
-        print('Done!!!')
