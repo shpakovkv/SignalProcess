@@ -22,6 +22,7 @@ import PeakProcess
 
 verbose = True
 global_log = ""
+DEBUG = False
 
 
 # ========================================
@@ -40,7 +41,7 @@ def get_parser():
     final_parser = argparse.ArgumentParser(
         parents=[get_input_files_args_parser(), get_mult_del_args_parser(),
                  get_data_corr_args_parser(), get_plot_args_parser(),
-                 get_output_args_parser()],
+                 get_output_args_parser(), get_specific_args_parser()],
         prog='SignalProcess.py',
         description=p_disc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
@@ -98,6 +99,7 @@ def get_output_args_parser():
         nargs='+',
         metavar='FILE',
         dest='out_names',
+        default=None,
         help='specify the list of file names after the flag.\n'
              'The output files with data will be save with the names\n'
              'from this list. This will override the automatic\n'
@@ -386,6 +388,26 @@ def get_plot_args_parser():
     return plot_args_parser
 
 
+def get_specific_args_parser():
+    """Returns plot options parser.
+        """
+    spec_args_parser= argparse.ArgumentParser(add_help=False)
+
+    spec_args_parser.add_argument(
+        '--bounds', '--time-bounds',
+        action='store',
+        dest='t_bounds',
+        metavar=('LEFT', 'RIGHT'),
+        nargs=2,
+        type=float,
+        default=(None, None),
+        help='The list with the left and the right time boundaries.\n'
+             'The plot and multiplot will only display data within \n'
+             'these boundaries.\n\n')
+
+    return spec_args_parser
+
+
 # ========================================
 # -----     CLASSES     ------------------
 # ========================================
@@ -394,8 +416,8 @@ class ColorRange:
     Returns the hexadecimal RGB color code (for example '#ffaa00')
     """
     def __init__(self, start_hue=0, hue_step=140, min_hue_diff=20,
-                 saturation=(90, 90, 60),
-                 luminosity=(55, 30, 50)):
+                 saturation=(90, 50, 90),
+                 luminosity=(40, 75, 45)):
         self.start = start_hue
         self.step = hue_step
         self.window = min_hue_diff
@@ -442,8 +464,8 @@ class ColorRange:
             offset = 0
             for sat, lumi in zip(self.s_list, self.l_list):
                 last = self.start + offset
-                offset += 10
-                yield self.hsl_to_rgb_code(0, sat, lumi)
+                offset += 20
+                yield self.hsl_to_rgb_code(last, sat, lumi)
                 for i in range(0, self.calc_count()):
                     new_hue = last + self.step
                     if new_hue > 360:
@@ -653,7 +675,8 @@ class SignalsData:
         """
         list_of_2d_arr = [self.curves[idx].data for
                           idx in sorted(self.idx_to_label.keys())]
-        print("len(lest of 2D arr) = {}".format(len(list_of_2d_arr)))
+        if DEBUG:
+            print("len(lest of 2D arr) = {}".format(len(list_of_2d_arr)))
         return align_and_append_ndarray(*list_of_2d_arr)
 
     def by_label(self, label):
@@ -1179,8 +1202,8 @@ def numbering_parser(group_of_files):
     names = []
     for raw in group_of_files:
         names.append(os.path.basename(raw))
-    assert all(len(name) for name in names), \
-        "Error! All file names must have the same length"
+    assert all(len(name)==len(names[0]) for name in names), \
+        "Error! All input file names must have the same length"
     if len(group_of_files) == 1:
         return 0, len(names[0])
 
@@ -1340,7 +1363,7 @@ def read_signals(file_list, start=0, step=1, points=-1,
     current_count = 0
     for filename in file_list:
         if verbose:
-            print("Loading \"{}\"".format(filename))
+            print("Loading {}".format(filename))
         new_data, new_header = load_from_file(filename, start,
                                               step, points, h_lines=3)
         if new_data.shape[1] % 2 != 0:
@@ -1454,8 +1477,9 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
             curves_count = data.shape[1] // 2
         else:
             curves_count = data.shape[1] - 1
-        print("Curves count = {}".format(curves_count))
-        print("Points count = {}".format(data.shape[0]))
+        if verbose:
+            print("Curves loaded: {}".format(curves_count))
+            print("Maximum points: {}".format(data.shape[0]))
     return data, header
 
 
@@ -1537,7 +1561,7 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
     return headers
 
 
-def do_save(signals_data, cl_args, shot_name, verbose=False):
+def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False):
     """Makes filename, saves changed data, 
     prints info about saving process.
     
@@ -1554,18 +1578,22 @@ def do_save(signals_data, cl_args, shot_name, verbose=False):
     :return: filename (full path)
     :rtype: str
     """
-    save_name = ("{pref}{number}{postf}.csv"
-                 "".format(pref=cl_args.prefix, number=shot_name,
-                           postf=cl_args.postfix))
-    save_path = os.path.join(cl_args.save_to, save_name)
-    save_signals_csv(save_path, signals_data)
+    if verbose:
+        print('Saving data...')
+    if save_as is None:
+        save_name = ("{pref}{number}{postf}.csv"
+                     "".format(pref=cl_args.prefix, number=shot_name,
+                               postf=cl_args.postfix))
+        save_as = os.path.join(cl_args.save_to, save_name)
+    save_signals_csv(save_as, signals_data)
     if verbose:
         max_rows = max(curve.data.shape[0] for curve in
                        signals_data.curves.values())
-        print("Curves count = {}\n"
-              "Rows count = {} ".format(signals_data.count, max_rows))
-        print("Saved as {}".format(save_path))
-    return save_path
+        if verbose:
+            print("Curves count = {};    "
+                  "Rows count = {} ".format(signals_data.count, max_rows))
+        print("Saved as {}".format(save_as))
+    return save_as
 
 
 def save_signals_csv(filename, signals, delimiter=",", precision=18):
@@ -1582,7 +1610,8 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
     """
     # check precision value
     table = signals.get_array()
-    print("Save columns count = {}".format(table.shape[1]))
+    if DEBUG:
+        print("Save columns count = {}".format(table.shape[1]))
     if not isinstance(precision, int):
         raise ValueError("Precision must be integer")
     if precision > 18:
@@ -1875,7 +1904,8 @@ def align_and_append_ndarray(*args):
 
         aligned_arr = np.append(arr, nan_arr, axis=0)
         data = np.append(data, aligned_arr, axis=1)
-    print("aligned array shape = {}".format(data.shape))
+    if DEBUG:
+        print("aligned array shape = {}".format(data.shape))
     return data
 
 
@@ -2719,6 +2749,10 @@ def global_check(options):
             ("The number of multipliers ({}) is not equal"
              " to the number of delays ({})."
              "".format(len(options.multiplier), len(options.delay)))
+
+    if options.out_names is None:
+        options.out_names = [None for _ in range(len(options.gr_files))]
+
     return options
 
 
@@ -2759,8 +2793,6 @@ if __name__ == "__main__":
                                     step=args.partial[1], points=args.partial[2],
                                     labels=args.labels, units=args.units,
                                     time_unit=args.time_unit)
-                if verbose:
-                    print("The number of curves = {}".format(data.count))
 
                 # checks the number of columns with data,
                 # as well as the number of multipliers, delays, labels
@@ -2794,7 +2826,8 @@ if __name__ == "__main__":
 
                 # save data
                 if args.save:
-                    saved_as = do_save(data, args, shot_name, verbose)
+                    saved_as = do_save(data, args, shot_name,
+                                       args.out_names[shot_idx], verbose)
                     labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                     save_m_log(file_list, saved_as, labels, args.multiplier,
                                args.delay, args.offset_by_front,
