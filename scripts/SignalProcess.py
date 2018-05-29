@@ -2827,7 +2827,8 @@ if __name__ == "__main__":
                 # save data
                 if args.save:
                     saved_as = do_save(data, args, shot_name,
-                                       args.out_names[shot_idx], verbose)
+                                       save_as=args.out_names[shot_idx],
+                                       verbose=verbose)
                     labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                     save_m_log(file_list, saved_as, labels, args.multiplier,
                                args.delay, args.offset_by_front,
