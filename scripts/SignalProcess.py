@@ -769,8 +769,9 @@ def check_labels(labels):
     """
     import re
     for label in labels:
-        if re.search(r'[^\w]+', label):
-            raise ValueError("{}\nLatin letters, numbers and underscore"
+        if re.search(r'[^\w-]+', label):
+            raise ValueError("{}\nWrong labels values!\n"
+                             "Latin letters, numbers, underscore and dash"
                              " are allowed only.".format(label))
 
 
