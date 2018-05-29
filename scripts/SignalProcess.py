@@ -22,6 +22,7 @@ import PeakProcess
 
 verbose = True
 global_log = ""
+LOGDIRECTORY = "LOG_SignalProcess"
 DEBUG = False
 
 
@@ -1650,30 +1651,32 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
         fid.writelines(lines)
 
 
-def save_m_log(src, save_as, labels, multiplier=None, delays=None,
+def create_log(src, saved_as, labels, multiplier=None, delays=None,
                offset_by_front=None, y_auto_offset=None, partial_params=None):
-    """Saves the log of data modifications. 
-    Saves log file describing the changes made to the data.
-
-    If the log file exists and any new changes were made to the data and
-    saved at the same data file, appends new lines to the log file.
-
-    src             -- the list of source files the data was read from
-    save_as         -- the full path to the file the data was saved to
-    labels          -- the list of curves labels
-    multiplier      -- the list of multipliers that were applied to the data
-    delays          -- the list of delays that were applied to the data
-    offset_by_front -- the --offset-by-curve-front args
-    y_auto_offset   -- the list of --y-auto-zero args (list of lists)
+    """Creates data changes log. 
+    Returns a list of log file lines.
+    
+    :param src:             the list of source files the data was read from
+    :param saved_as:        the full path to the file the signals data was saved to
+    :param labels:          the list of curves labels
+    :param multiplier:      the list of multipliers that were applied to the data
+    :param delays:          the list of delays that were applied to the data
+    :param offset_by_front: the --offset-by-curve-front args
+    :param y_auto_offset:   the list of --y-auto-zero args (list of lists)
+    :param partial_params:  the list of input parameters (start, stop, points)
+    :return:                the list of log file lines
     """
     now = datetime.datetime.now().strftime("%Y.%m.%d %H:%M:%S")
     lines = list()
     lines.append("Modified on {}\n".format(now))
-    src_line = "Source files = {}\n".format(str(src))
-    src_line = re.sub(r"\\\\", "\*", src_line)
-    src_line = re.sub(r"\*", "", src_line)
+    lines.append("Input files = {}\n".format(str(src)))
+    lines.append("Output file = {}\n".format(saved_as))
 
-    lines.append(src_line)
+    # # removes escape backslashes
+    # for idx, src_line in enumerate(lines):
+    #     lines[idx] = re.sub(r"\\\\", "\*", src_line)
+    #     lines[idx] = re.sub(r"\*", "", src_line)
+
     if not partial_params:
         partial_str = "start = 0, step = 1, points = all"
     else:
@@ -1688,30 +1691,39 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
 
     if multiplier:
         lines.append("Applied multipliers:\n")
-        lines.append("    Time         Amplitude\n")
-        for pair in zip(multiplier[0:-1:2], multiplier[1:-1:2]):
-            lines.append("{: <15.5e} {:.5e}\n".format(*pair))
+        lines.append("Time            Amplitude     Labels\n")
+        for idx, pair in enumerate(zip(multiplier[0:len(multiplier):2],
+                                       multiplier[1:len(multiplier):2])):
+            lines.append("{: <15.5e} {:.5e}   {}\n".format(pair[0], pair[1],
+                                                           labels[idx]))
         lines.append("\n")
     else:
         lines.append("No multipliers were applied.\n")
+
     if delays:
         lines.append("Applied delays:\n")
-        lines.append("Time            Amplitude\n")
-        for pair in zip(delays[0:-1:2], delays[1:-1:2]):
-            lines.append("{: <15.5e} {:.5e}\n".format(*pair))
+        lines.append("Time            Amplitude     Labels\n")
+        for idx, pair in enumerate(zip(delays[0:len(delays):2],
+                                       delays[1:len(delays):2])):
+            lines.append("{: <15.5e} {:.5e}   {}\n".format(pair[0], pair[1],
+                                                           labels[idx]))
         lines.append("\n")
     else:
         lines.append("No delays were applied.\n")
+
     if offset_by_front:
         lines.append("Delays was modified by --offset-by-curve-front "
                      "option with values:\n")
-        lines.append("Curve idx = {}\n".format(offset_by_front[0]))
+        lines.append("Curve idx = {}   ({})\n"
+                     "".format(offset_by_front[0],
+                               labels[offset_by_front[0]]))
         lines.append("Level     = {}\n".format(offset_by_front[1]))
         lines.append("Smooth filter window = {}\n"
                      "".format(offset_by_front[2]))
         lines.append("Smooth filter polyorder = {}\n"
                      "".format(offset_by_front[3]))
         lines.append("\n")
+
     if y_auto_offset:
         lines.append("Delays was modified by --y-auto-zero "
                      "option with values:\n")
@@ -1721,15 +1733,52 @@ def save_m_log(src, save_as, labels, multiplier=None, delays=None,
             lines.append("Background start time = {}\n".format(args[1]))
             lines.append("Background stop time  = {}\n".format(args[2]))
             lines.append("\n")
+
     lines.append("----------------------------------------------------\n")
-    if src == save_as and os.path.isfile(save_as + ".log"):
+    return lines
+
+
+def save_m_log(src, saved_as, labels, multiplier=None, delays=None,
+               offset_by_front=None, y_auto_offset=None, partial_params=None):
+    """Saves the log of data modifications. 
+    Saves log file describing the changes made to the data.
+
+    If the log file exists and any new changes were made to the data and
+    saved at the same data file, appends new lines to the log file.
+
+    :param src:             the list of source files the data was read from
+    :param saved_as:        the full path to the file the signals data was saved to
+    :param labels:          the list of curves labels
+    :param multiplier:      the list of multipliers that were applied to the data
+    :param delays:          the list of delays that were applied to the data
+    :param offset_by_front: the --offset-by-curve-front args
+    :param y_auto_offset:   the list of --y-auto-zero args (list of lists)
+    :param partial_params:  the list of input parameters (start, stop, points)
+    :return:                None
+    """
+
+
+    # log folder path
+    save_log_as = os.path.join(os.path.dirname(saved_as),
+                               LOGDIRECTORY)
+    if not os.path.isdir(save_log_as):
+        os.makedirs(save_log_as)
+
+    # log file path
+    save_log_as = os.path.join(save_log_as,
+                               os.path.basename(saved_as) + ".log")
+
+    log_lines = create_log(src, saved_as, labels, multiplier, delays,
+                           offset_by_front, y_auto_offset, partial_params)
+
+    if src == saved_as and os.path.isfile(save_log_as):
         mode = "a"
     else:
         mode = "w"
     # save log file if changes were made or data was saved as a new file
-    if len(lines) > 7 or src != save_as:
-        with open(save_as + ".log", mode) as f:
-            f.writelines(lines)
+    if len(log_lines) > 8 or src != saved_as:
+        with open(save_log_as, mode) as f:
+            f.writelines(log_lines)
 
 
 # ========================================
@@ -2765,78 +2814,80 @@ if __name__ == "__main__":
     args = parser.parse_args()
     verbose = not args.silent
 
-    try:
-        args = global_check(args)
+    # try:
+    args = global_check(args)
 
-        '''
-        num_mask (tuple) - contains the first and last index
-        of substring of filename
-        That substring contains the shot number.
-        The last idx is excluded: [first, last).
-        Read numbering_parser docstring for more info.
-        '''
-        num_mask = numbering_parser([files[0] for
-                                    files in args.gr_files])
+    '''
+    num_mask (tuple) - contains the first and last index
+    of substring of filename
+    That substring contains the shot number.
+    The last idx is excluded: [first, last).
+    Read numbering_parser docstring for more info.
+    '''
+    num_mask = numbering_parser([files[0] for
+                                files in args.gr_files])
 
-        # MAIN LOOP
-        if (args.save or
-                args.plot or
-                args.multiplot or
-                args.offset_by_front):
+    # MAIN LOOP
+    if (args.save or
+            args.plot or
+            args.multiplot or
+            args.offset_by_front):
 
-            for shot_idx, file_list in enumerate(args.gr_files):
-                shot_name = get_shot_number_str(file_list[0], num_mask,
-                                                args.ext_list)
+        for shot_idx, file_list in enumerate(args.gr_files):
+            shot_name = get_shot_number_str(file_list[0], num_mask,
+                                            args.ext_list)
 
-                # get SignalsData
-                data = read_signals(file_list, start=args.partial[0],
-                                    step=args.partial[1], points=args.partial[2],
-                                    labels=args.labels, units=args.units,
-                                    time_unit=args.time_unit)
+            # get SignalsData
+            data = read_signals(file_list, start=args.partial[0],
+                                step=args.partial[1], points=args.partial[2],
+                                labels=args.labels, units=args.units,
+                                time_unit=args.time_unit)
 
-                # checks the number of columns with data,
-                # as well as the number of multipliers, delays, labels
-                check_coeffs_number(data.count * 2, ["multiplier", "delay"],
-                                    args.multiplier, args.delay)
-                check_coeffs_number(data.count, ["label", "unit"],
-                                    args.labels, args.units)
+            # checks the number of columns with data,
+            # as well as the number of multipliers, delays, labels
+            check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+                                args.multiplier, args.delay)
+            check_coeffs_number(data.count, ["label", "unit"],
+                                args.labels, args.units)
 
-                # check y_zero_offset parameters (if idx is out of range)
-                if args.y_auto_zero:
-                    args = do_y_zero_offset(data, args)
+            # check y_zero_offset parameters (if idx is out of range)
+            if args.y_auto_zero:
+                args = do_y_zero_offset(data, args)
 
-                # check offset_by_voltage parameters (if idx is out of range)
-                if args.offset_by_front:
-                    args = do_offset_by_front(data, args, shot_name)
+            # check offset_by_voltage parameters (if idx is out of range)
+            if args.offset_by_front:
+                args = do_offset_by_front(data, args, shot_name)
 
-                # reset to zero
-                if args.zero:
-                    data = do_reset_to_zero(data, args, verbose)
+            # reset to zero
+            if args.zero:
+                data = do_reset_to_zero(data, args, verbose)
 
-                # multiplier and delay
-                data = multiplier_and_delay(data, args.multiplier, args.delay)
+            # multiplier and delay
+            data = multiplier_and_delay(data, args.multiplier, args.delay)
 
-                # plot preview and save
-                if args.plot:
-                    do_plots(data, args, shot_name, verbose=verbose)
+            # plot preview and save
+            if args.plot:
+                do_plots(data, args, shot_name, verbose=verbose)
 
-                # plot and save multi-plots
-                if args.multiplot:
-                    do_multiplots(data, args, shot_name, verbose=verbose)
+            # plot and save multi-plots
+            if args.multiplot:
+                do_multiplots(data, args, shot_name, verbose=verbose)
 
-                # save data
-                if args.save:
-                    saved_as = do_save(data, args, shot_name,
-                                       save_as=args.out_names[shot_idx],
-                                       verbose=verbose)
-                    labels = [data.label(cr) for cr in data.idx_to_label.keys()]
-                    save_m_log(file_list, saved_as, labels, args.multiplier,
-                               args.delay, args.offset_by_front,
-                               args.y_auto_zero, args.partial)
+            # save data
+            if args.save:
+                saved_as = do_save(data, args, shot_name,
+                                   save_as=args.out_names[shot_idx],
+                                   verbose=verbose)
+                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+                save_m_log(file_list, saved_as, labels, args.multiplier,
+                           args.delay, args.offset_by_front,
+                           args.y_auto_zero, args.partial)
 
+    if verbose:
         print_duplicates(args.gr_files, 30)
-    except Exception as e:
-        print()
-        sys.exit(e)
+
+    # except Exception as e:
+    #     print()
+    #     sys.exit(e)
     # ========================================================================
     # TODO: description
