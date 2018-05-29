@@ -775,6 +775,18 @@ def check_labels(labels):
                              " are allowed only.".format(label))
 
 
+def filename_is_valid(name):
+    """Checks the validity of a file name.
+    
+    :param name: file name (can be full name)
+    :return: True if the file name is valid, else False.
+    """
+    import re
+    if re.search(r'[^\w\s-]+', os.path.basename(name)):
+        return False
+    return True
+
+
 def global_check_idx_list(args, name, allow_all=False):
     """Checks the values of a parameter,
     converts it to integers and returns it.
@@ -2892,3 +2904,5 @@ if __name__ == "__main__":
     #     sys.exit(e)
     # ========================================================================
     # TODO: description
+    # TODO: file names validity check
+    # TODO: test plot and multiplot save
