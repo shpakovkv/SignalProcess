@@ -1439,17 +1439,23 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
 
     if filename[-3:].upper() != 'WFM':
         with open(filename, "r") as datafile:
-            # analyze structure
+            text_data = datafile.readlines()
             try:
-                dialect = csv.Sniffer().sniff(datafile.read(2096))
+                dialect = csv.Sniffer().sniff(text_data[-1])
             except csv.Error:
                 datafile.seek(0)
-                dialect = csv.Sniffer().sniff(datafile.readline())
-            datafile.seek(0)
+                dialect = csv.Sniffer().sniff(datafile.read(4096))
+
+            # # old version
+            # try:
+            #     dialect = csv.Sniffer().sniff(datafile.read(4096))
+            # except csv.Error:
+            #     datafile.seek(0)
+            #     dialect = csv.Sniffer().sniff(datafile.readline())
+            # datafile.seek(0)
+
             if dialect.delimiter not in valid_delimiters:
                 dialect.delimiter = ','
-            # read
-            text_data = datafile.readlines()
             if ';' in text_data[-1]:
                 dialect.delimiter = ';'
 
@@ -1471,7 +1477,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
                                            start) / float(step)))
                 if points < available:
                     last_row = points * step + skip_header + start - 1
-            text_data = text_data[h_lines + start: last_row + 1: step]
+            text_data = text_data[skip_header + start: last_row + 1: step]
             assert len(text_data) >= 2, \
                 "\nError! Not enough data lines in the file."
 
