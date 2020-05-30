@@ -2,13 +2,20 @@
 from __future__ import print_function
 
 from matplotlib import pyplot
-import os, sys
+import os
+import sys
 import numpy
 import bisect
 import argparse
 import scipy.integrate as integrate
 
-import SignalProcess as sp
+# import SignalProcess as sp
+import arg_parser
+import arg_checker
+import file_handler
+import plotter
+from SignalProcess import multiplier_and_delay
+from data_types import SinglePeak
 
 
 pos_polarity_labels = {'pos', 'positive', '+'}
@@ -34,239 +41,16 @@ def get_parser():
     p_ep = ('')
 
     parser = argparse.ArgumentParser(
-        parents=[sp.get_input_files_args_parser(),
-                 sp.get_mult_del_args_parser(),
-                 sp.get_plot_args_parser(),
-                 get_peak_args_parser()],
+        parents=[arg_parser.get_input_files_args_parser(),
+                 arg_parser.get_mult_del_args_parser(),
+                 arg_parser.get_plot_args_parser(),
+                 arg_parser.get_peak_args_parser()],
         prog='PeakProcess.py',
         description=p_desc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     return parser
-
-
-def get_peak_args_parser():
-    """Returns peak search options parser.
-    """
-    peak_args_parser = argparse.ArgumentParser(add_help=False)
-
-    peak_args_parser.add_argument(
-        '--level',
-        action='store',
-        dest='level',
-        metavar='LEVEL',
-        type=float,
-        help='The threshold of peak (all amplitude values \n'
-             'below this level will be ignored).\n\n')
-
-    peak_args_parser.add_argument(
-        '--diff', '--diff-time',
-        action='store',
-        dest='pk_diff',
-        metavar='DIFF_TIME',
-        type=float,
-        help='The minimum difference between two neighboring peaks. \n'
-             'If two peaks are spaced apart from each other by less than \n'
-             'diff_time, then the lower one will be ignored. \n'
-             'Or if the next peak is at the edge (fall or rise) \n' 
-             'of the previous peak, and the "distance" (time) from \n' 
-             'its maximum to that edge (at the same level) is less \n' 
-             'than the diff_time, this second peak will be ignored.\n\n')
-
-    peak_args_parser.add_argument(
-        '--curves',
-        action='store',
-        dest='curves',
-        metavar='CURVE',
-        nargs='+',
-        type=int,
-        help='The list of zero-based indexes of curves for which \n'
-             'it is necessary to find peaks.\n'
-             'The order of the curves corresponds to the order of \n'
-             'the columns with data in the files \n'
-             'and the order of reading the files\n\n')
-
-    peak_args_parser.add_argument(
-        '--bounds', '--time-bounds',
-        action='store',
-        dest='t_bounds',
-        metavar=('LEFT', 'RIGHT'),
-        nargs=2,
-        type=float,
-        default=(None, None),
-        help='The list with the left and the right search boundaries.\n'
-             'The program will search for peaks only within this \n'
-             'interval.\n\n')
-
-    peak_args_parser.add_argument(
-        '--noise-half-period', '--t-noise',
-        action='store',
-        dest='t_noise',
-        metavar='T',
-        type=float,
-        help='Maximum half-period of noise fluctuation.\n'
-             'It is necessary for automatic detection of noise and \n'
-             'exclusion of parasitic peaks from the final result\n\n')
-
-    peak_args_parser.add_argument(
-        '--noise-attenuation',
-        action='store',
-        dest='noise_att',
-        type=float,
-        default=NOISEATTENUATION,
-        help='Attenuation of the second half-wave of noise with a polarity\n'
-             'reversal. If too many parasitic (noise) peaks are defined \n'
-             'as real peaks, reduce this value.\n\n')
-
-    peak_args_parser.add_argument(
-        '--group-width',
-        action='store',
-        dest='gr_width',
-        metavar='GR_DIFF',
-        type=float,
-        help='The maximum time difference between peaks that '
-             'will be grouped.\n\n')
-
-    peak_args_parser.add_argument(
-        '--hide-found-peaks',
-        action='store_true',
-        dest='peak_hide',
-        help='Hides the multiplot with overall found peaks.\n'
-             'It still will be saved at the default folder.\n'
-             'Needed for automation.\n\n')
-
-    peak_args_parser.add_argument(
-        '--hide-all',
-        action='store_true',
-        dest='hide_all',
-        help='Hides all plots. The plots will be saved at their \n'
-             'default folders but not shown.\n'
-             'Needed for automation.\n\n')
-
-    peak_args_parser.add_argument(
-        '--read',
-        action='store_true',
-        dest='read',
-        help='Read the peak from files at the default folder\n'
-             '({folder}).\n'
-             'If the arguments needed for the searching of peaks \n'
-             'were specified, the program will find peaks, save them\n'
-             'and show the multiplot with all found peaks.\n'
-             'You may delete some peak files or edit them.\n'
-             'When the multiplot window is closed, the program \n'
-             'will read the edited peak data and the other plots\n'
-             'will be plotted.\n\n'
-             ''.format(folder=os.path.join(SAVETODIR, PEAKDATADIR)))
-
-    return peak_args_parser
-
-
-class SinglePeak:
-    """Peak object. Contains information on one peak point.
-    """
-    def __init__(self, time=None, value=None, index=None,
-                 sqr_l=0, sqr_r=0):
-        """        
-        :param time: time (X) value of peak point
-        :param value: amplitude (Y) value of peak point
-        :param index: index of peak point (in SingleCurve data)
-        :param sqr_l: 'square factor' of the left edge of the peak:
-                      the closer the both sqr_l and sqr_r values 
-                      to '1', the higher the probability 
-                      that this is an erroneous peak
-        :param sqr_r: same as sqr_r
-        """
-        self.time = time
-        self.val = value
-        self.idx = index
-        self.sqr_l = sqr_l
-        self.sqr_r = sqr_r
-
-    def invert(self):
-        if self.val is not None:
-            self.val = -self.val
-
-    def get_time_val(self):
-        return [self.time, self.val]
-
-    def set_time_val_idx(self, data):
-        if len(data) != 3:
-            raise ValueError("Wrong number of values to unpack. "
-                             "3 expected, " + str(len(data)) +
-                             " given.")
-        self.time = data[0]
-        self.val = data[1]
-        self.idx = data[2]
-
-    def set_data_full(self, data):
-        count = 5
-        if len(data) != count:
-            raise ValueError("Wrong number of values to unpack. "
-                             "{} expected, {} given."
-                             "".format(count, len(data)))
-        self.time = data[0]
-        self.val = data[1]
-        self.idx = data[2]
-        self.sqr_l = data[3]
-        self.sqr_r = data[4]
-
-    def get_time_val_idx(self):
-        return [self.time, self.val, self.idx]
-
-    def get_data_full(self):
-        return [self.time, self.val, self.idx, self.sqr_l, self.sqr_r]
-
-    xy = property(get_time_val, doc="Get [time, value] of peak.")
-    data = property(get_time_val_idx, set_time_val_idx,
-                    doc="Get/set [time, value, index] of peak.")
-    data_full = property(get_data_full, set_data_full,
-                         doc="Get/set [time, value, index, "
-                             "sqr_l, sqr_r] of peak.")
-
-
-def save_peaks_csv(filename, peaks, labels=None):
-    """Saves peaks data. 
-    Writes one line for each peak.
-    Each line contains (comma separated): 
-        zero-based curve index, 
-        time value,
-        amplitude value,
-        sqr_l,
-        sqr_r,
-        the sum of sqr_l and sqr_r.
-
-    :param filename: the peak data file name prefix
-    :param peaks: the list of lists of peaks [curve_idx][peak_idx]
-    :return: None
-    """
-    folder_path = os.path.dirname(filename)
-    if folder_path and not os.path.isdir(folder_path):
-        os.makedirs(folder_path)
-
-    if len(filename) > 4 and filename[-4:].upper() == ".CSV":
-        filename = filename[0:-4]
-
-    if labels is None:
-        labels = ['' for _ in range(len(peaks))]
-
-    for gr in range(len(peaks[0])):
-        content = ""
-        for wf in range(len(peaks)):
-            pk = peaks[wf][gr]
-            if pk is None:
-                pk = SinglePeak(0, 0, 0)
-            content = (content +
-                       "{idx:3d},{time:0.18e},{amp:0.18e},"
-                       "{sqr_l:0.3f},{sqr_r:0.3f},{label}\n".format(
-                           idx=wf, time=pk.time, amp=pk.val,
-                           sqr_l=pk.sqr_l, sqr_r=pk.sqr_r,
-                           label=labels[wf]
-                       )
-                       )
-        postfix = "_peak{:03d}.csv".format(gr + 1)
-        with open(filename + postfix, 'w') as fid:
-            fid.writelines(content)
-            # print("Done!")
 
 
 def find_nearest_idx(sorted_arr, value, side='auto'):
@@ -880,14 +664,14 @@ def global_check(options):
         assert os.path.isdir(options.src_dir), \
             "Can not find directory {}".format(options.src_dir)
     if options.files:
-        gr_files = sp.check_file_list(options.src_dir, options.files)
+        gr_files = arg_checker.check_file_list(options.src_dir, options.files)
         if not options.src_dir:
             options.src_dir = os.path.dirname(gr_files[0][0])
     else:
-        gr_files = sp.get_grouped_file_list(options.src_dir,
-                                         options.ext_list,
-                                         options.group_size,
-                                         options.sorted_by_ch)
+        gr_files = arg_checker.get_grouped_file_list(options.src_dir,
+                                                     options.ext_list,
+                                                     options.group_size,
+                                                     options.sorted_by_ch)
     options.gr_files = gr_files
 
     # Now we have the list of files, grouped by shots:
@@ -897,7 +681,7 @@ def global_check(options):
     #               ...etc.
     #             ]
 
-    options.partial = sp.check_partial_args(options.partial)
+    options.partial = arg_checker.check_partial_args(options.partial)
 
     # # Raw check labels. Not used.
     # # instead: the forbidden symbols are replaced during CSV saving
@@ -918,7 +702,7 @@ def global_check(options):
         """
         if not path:
             path = os.path.join(default_path, default_dir)
-        path = sp.check_param_path(path, arg_name)
+        path = arg_checker.check_param_path(path, arg_name)
         return path
 
     options.save_to = path_constructor(None, '--save-to',
@@ -934,12 +718,12 @@ def global_check(options):
 
     # check and convert plot and multiplot options
     if options.plot:
-        options.plot = sp.global_check_idx_list(options.plot, '--plot',
-                                             allow_all=True)
+        options.plot = arg_checker.global_check_idx_list(options.plot, '--plot',
+                                                         allow_all=True)
     if options.multiplot:
         for idx, m_param in enumerate(options.multiplot):
-            options.multiplot[idx] = sp.global_check_idx_list(m_param,
-                                                           '--multiplot')
+            options.multiplot[idx] = arg_checker.global_check_idx_list(m_param,
+                                                                       '--multiplot')
 
     # raw check multiplier and delay
     if options.multiplier is not None and options.delay is not None:
@@ -1003,7 +787,7 @@ def get_peak_files(pk_filename):
     file_prefix = os.path.basename(pk_filename)
     if os.path.isdir(peak_folder):
         peak_file_list = []
-        for name in sp.get_file_list_by_ext(peak_folder, '.csv', sort=True):
+        for name in file_handler.get_file_list_by_ext(peak_folder, '.csv', sort=True):
             if os.path.basename(name).startswith(file_prefix):
                 peak_file_list.append(name)
         return peak_file_list
@@ -1064,7 +848,7 @@ def renumber_peak_files(file_list, start=1):
     :param start: the numbering must begin with this value
     :return: None
     """
-    n1, n2 = sp.numbering_parser(file_list)
+    n1, n2 = file_handler.numbering_parser(file_list)
     digits = n2 - n1
     short_names = [os.path.basename(name) for name in file_list]
     file_nums = [int(name[n1: n2]) for name in short_names]
@@ -1078,8 +862,6 @@ def renumber_peak_files(file_list, start=1):
             new_name = os.path.join(dir, new_name)
             os.rename(file_list[i], new_name)
             file_list[i] = new_name
-
-
 
 
 if __name__ == '__main__':
@@ -1105,8 +887,8 @@ if __name__ == '__main__':
         Read numbering_parser docstring for more info.
         '''
 
-        num_mask = sp.numbering_parser([files[0] for
-                                       files in args.gr_files])
+        num_mask = file_handler.numbering_parser([files[0] for
+                                                 files in args.gr_files])
         # MAIN LOOP
         if DEBUG:
             print("Check Loop in")
@@ -1117,33 +899,33 @@ if __name__ == '__main__':
             if DEBUG:
                 print("==> In loop")
             for shot_idx, file_list in enumerate(args.gr_files):
-                shot_name = sp.get_shot_number_str(file_list[0], num_mask,
-                                                   args.ext_list)
+                shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
+                                                             args.ext_list)
 
                 # get SignalsData
-                data = sp.read_signals(file_list,
-                                       start=args.partial[0],
-                                       step=args.partial[1],
-                                       points=args.partial[2],
-                                       labels=args.labels,
-                                       units=args.units,
-                                       time_unit=args.time_unit)
+                data = file_handler.read_signals(file_list,
+                                                 start=args.partial[0],
+                                                 step=args.partial[1],
+                                                 points=args.partial[2],
+                                                 labels=args.labels,
+                                                 units=args.units,
+                                                 time_unit=args.time_unit)
                 if verbose:
                     print("The number of curves = {}".format(data.count))
 
                 # checks the number of columns with data,
                 # and the number of multipliers, delays, labels
-                args.multiplier = sp.check_multiplier(args.multiplier,
-                                                      count=data.count)
-                args.delay = sp.check_delay(args.delay,
-                                            count=data.count)
-                sp.check_coeffs_number(data.count, ["label", "unit"],
-                                       args.labels, args.units)
+                args.multiplier = arg_checker.check_multiplier(args.multiplier,
+                                                               count=data.count)
+                args.delay = arg_checker.check_delay(args.delay,
+                                                     count=data.count)
+                arg_checker.check_coeffs_number(data.count, ["label", "unit"],
+                                                args.labels, args.units)
 
                 # multiplier and delay
-                data = sp.multiplier_and_delay(data,
-                                               args.multiplier,
-                                               args.delay)
+                data = multiplier_and_delay(data,
+                                            args.multiplier,
+                                            args.delay)
 
                 # find peaks
                 peaks_data = None
@@ -1167,15 +949,15 @@ if __name__ == '__main__':
                                                   args.save_to,
                                                   shot_name)
 
-                    save_peaks_csv(pk_filename, peaks_data, args.labels)
+                    file_handler.save_peaks_csv(pk_filename, peaks_data, args.labels)
 
                     # step 9 - save multicurve plot
                     multiplot_name = pk_filename + ".plot.png"
 
                     if verbose:
                         print("Saving all peaks as " + multiplot_name)
-                    sp.plot_multiplot(data, peaks_data, args.curves,
-                                      xlim=args.t_bounds)
+                    plotter.plot_multiplot(data, peaks_data, args.curves,
+                                           xlim=args.t_bounds)
                     pyplot.savefig(multiplot_name, dpi=400)
                     if args.peak_hide:
                         pyplot.show(block=False)
@@ -1195,17 +977,18 @@ if __name__ == '__main__':
 
                 # plot preview and save
                 if args.plot:
-                    sp.do_plots(data, args, shot_name,
-                                peaks=peaks_data, verbose=verbose)
+                    plotter.do_plots(data, args, shot_name,
+                                     peaks=peaks_data, verbose=verbose)
 
                 # plot and save multi-plots
                 if args.multiplot:
-                    sp.do_multiplots(data, args, shot_name,
-                                     peaks=peaks_data, verbose=verbose)
+                    plotter.do_multiplots(data, args, shot_name,
+                                          peaks=peaks_data, verbose=verbose)
 
-        sp.print_duplicates(args.gr_files, 30)
+        file_handler.print_duplicates(args.gr_files, 30)
     except Exception as e:
         print()
         sys.exit(e)
 
     # TODO: cl description
+    # TODO: test refactored PeakProcess
