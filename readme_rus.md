@@ -120,6 +120,21 @@ python SignalProcess.py --src 'C:\Experiment Data\Source' --grouped-by 4 --sorte
 *описание в разработке*
 
 
+Построение графиков логгера
+---------------------------
+
+Чтобы построить 4 графика (по отдельности и в виде multiplot) с сохранением в файл, записанные с помощью логгера в нескольких файлах, со столбцом времени в формате unixtime:
+```bash
+python3 scripts/PlotFile.py -f untracked/EnvLog/20200612.LOG untracked/EnvLog/20200613.LOG --multiplot 0 1 2 3 --plot 0 1 2 3 --labels Temperature Humidity Pressure CO2 --save-plot-to ./untracked/EnvLogPlot --save-multiplot-to ./untracked/EnvLogPlot --units °C % mm ppa --time-unit s --unixtime --as-log-sequence
+
+```
+
+Чтобы не показывать графики (только сохранить), можно добавить флаги:
+```bash
+--p-hide --mp-hide
+```
+
+
 Термины 
 -------
 
