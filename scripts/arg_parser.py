@@ -36,7 +36,7 @@ def get_output_args_parser():
         '-s', '--save',
         action='store_true',
         dest='save',
-        help='saves the shot data to a CSV file after all the changes\n'
+        help='saves the shot data to one CSV file after all the changes\n'
              'have been applied.\n'
              'NOTE: if one shot corresponds to one CSV file, and\n'
              '      the output directory is not specified, the input\n'
@@ -90,7 +90,9 @@ def get_output_args_parser():
         '--separate-save',
         action='store_true',
         dest='separate_save',
-        help='saves each curve as separate CSV file.\n\n')
+        help='saves the shot data to several CSV files '
+             'after all the changes have been applied.\n'
+             'NOTE: Each curve will be saved in separate file.\n\n')
 
     return output_params_parser
 
