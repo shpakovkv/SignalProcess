@@ -262,15 +262,41 @@ class SignalsData:
                                  "must be the same."
                                  "".format(curves_count, len(new_labels)))
 
-    def get_array(self):
-        """Returns all curves data as united 2D array
-        short curve arrays are supplemented with
-        required amount of rows (filled with 'nan')
+    # def get_array(self):
+    #     """Returns all curves data as united 2D array
+    #     short curve arrays are supplemented with
+    #     required amount of rows (filled with 'nan')
+    #
+    #     return -- 2d ndarray
+    #     """
+    #     list_of_2d_arr = [self.curves[idx].data for
+    #                       idx in sorted(self.idx_to_label.keys())]
+    #     if DEBUG:
+    #         print("len(lest of 2D arr) = {}".format(len(list_of_2d_arr)))
+    #     return align_and_append_ndarray(*list_of_2d_arr)
 
-        return -- 2d ndarray
+    def get_array(self, curves_list=None):
+        """Returns selected curves data as 2D array
+        short curve arrays are supplemented with
+        required amount of rows (filled with 'nan').
+
+        Selects all curves if curves_list=None.
+
+        :param curves_list: None or list of curves to be exported as 2D array
+        :return: 2d ndarray
         """
+
+        # check for default value
+        if curves_list is None:
+            curves_list = self.idx_to_label.keys()
+        else:
+            # check inputs
+            for idx in curves_list:
+                assert idx in self.idx_to_label.keys(), ("Curve index ({}) is out of bounds ({})."
+                                                         "".format(idx, self.idx_to_label.keys()))
+
         list_of_2d_arr = [self.curves[idx].data for
-                          idx in sorted(self.idx_to_label.keys())]
+                          idx in sorted(curves_list)]
         if DEBUG:
             print("len(lest of 2D arr) = {}".format(len(list_of_2d_arr)))
         return align_and_append_ndarray(*list_of_2d_arr)
