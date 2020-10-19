@@ -573,7 +573,7 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
     return headers
 
 
-def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False):
+def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separate_files=False):
     """Makes filename, saves changed data,
     prints info about saving process.
 
@@ -582,12 +582,14 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False):
     :param shot_name: shot number, needed for saving
     :param save_as: fulllpath to save as
     :param verbose: show additional information or no
+    :param separate_files: save each curve in separate file
 
     :type signals_data: SignalsData
     :type cl_args: argparse.Namespace
     :type shot_name: str
     :type save_as: str
     :type verbose: bool
+    :type separate_files: bool
 
     :return: filename (full path)
     :rtype: str
@@ -599,7 +601,20 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False):
                      "".format(pref=cl_args.prefix, number=shot_name,
                                postf=cl_args.postfix))
         save_as = os.path.join(cl_args.save_to, save_name)
-    save_signals_csv(save_as, signals_data)
+
+    if separate_files:
+        # delete extension
+        if len(save_as) > 4 and save_as[-4:].upper() == ".CSV":
+            save_as = save_as[:-4]
+        # save single curve
+        for curve in sorted(signals_data.idx_to_label.keys()):
+            save_curve_as = save_as + ".curve{}".format(curve) + ".csv"
+            save_signals_csv(save_curve_as, signals_data, curves_list=[curve])
+
+    else:
+        save_signals_csv(save_as, signals_data)
+
+    #TODO: logging with separate_files==True
     if verbose:
         max_rows = max(curve.data.shape[0] for curve in
                        signals_data.curves.values())
@@ -610,7 +625,7 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False):
     return save_as
 
 
-def save_signals_csv(filename, signals, delimiter=",", precision=18):
+def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list=None):
     """Saves SignalsData to a CSV file.
     First three lines will be filled with header:
         1) the labels
@@ -623,7 +638,7 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18):
     precision -- the precision of storing numbers
     """
     # check precision value
-    table = signals.get_array()
+    table = signals.get_array(curves_list)
     if DEBUG:
         print("Save columns count = {}".format(table.shape[1]))
     if not isinstance(precision, int):

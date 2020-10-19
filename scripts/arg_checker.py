@@ -520,6 +520,9 @@ def save_arg_check(options):
     :return: changed options
     :rtype: argparse.Namespace
     """
+    if options.separate_save:
+        options.save = True
+
     options.save_to = check_param_path(options.save_to, '--save-to')
     if not options.save_to:
         options.save_to = os.path.dirname(options.gr_files[0][0])

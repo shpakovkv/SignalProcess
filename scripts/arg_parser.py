@@ -85,6 +85,13 @@ def get_output_args_parser():
              'generation of file names.\n'
              'NOTE: you must enter file names for \n'
              '      all the input shots.\n\n')
+
+    output_params_parser.add_argument(
+        '--separate-save',
+        action='store_true',
+        dest='separate_save',
+        help='saves each curve as separate CSV file.\n\n')
+
     return output_params_parser
 
 

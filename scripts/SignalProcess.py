@@ -764,7 +764,8 @@ if __name__ == "__main__":
             if args.save:
                 saved_as = file_handler.do_save(data, args, shot_name,
                                                 save_as=args.out_names[shot_idx],
-                                                verbose=verbose)
+                                                verbose=verbose,
+                                                separate_files=args.separate_save)
                 labels = [data.label(cr) for cr in data.idx_to_label.keys()]
                 file_handler.save_m_log(file_list, saved_as, labels, args.multiplier,
                                         args.delay, args.offset_by_front,
