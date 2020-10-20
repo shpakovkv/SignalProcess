@@ -430,7 +430,20 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
 
     import csv
 
-    if filename[-3:].upper() != 'WFM':
+    # data type initialization
+    data = np.ndarray(shape=(2, 2), dtype=np.float64, order='F')
+    header = None
+
+    ext_upper = filename[-3:].upper()
+
+    if ext_upper == 'WFM':
+        data = WFMReader.read_wfm_group([filename], start_index=start,
+                                        number_of_points=points,
+                                        read_step=step)
+    # elif ext_upper == 'ISF':
+    #     # TODO
+    #     pass
+    else:
         with open(filename, "r") as datafile:
             text_data = datafile.readlines()
             try:
@@ -480,11 +493,6 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
                                  delimiter=str(dialect.delimiter),
                                  usecols=usecols)
 
-    else:
-        data = WFMReader.read_wfm_group([filename], start_index=start,
-                                        number_of_points=points,
-                                        read_step=step)
-        header = None
     if VERBOSE:
         if data.shape[1] % 2 == 0:
             curves_count = data.shape[1] // 2
@@ -604,12 +612,18 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
 
     if separate_files:
         # delete extension
-        if len(save_as) > 4 and save_as[-4:].upper() == ".CSV":
+        if len(save_as) > 4 and save_as[-4] == ".":
             save_as = save_as[:-4]
         # save single curve
-        for curve in sorted(signals_data.idx_to_label.keys()):
-            save_curve_as = save_as + ".curve{}".format(curve) + ".csv"
-            save_signals_csv(save_curve_as, signals_data, curves_list=[curve])
+        if signals_data.count == 1:
+            save_curve_as = "{}.csv".format(save_as)
+            save_signals_csv(save_curve_as, signals_data, curves_list=[0])
+        else:
+            for curve in sorted(signals_data.idx_to_label.keys()):
+                save_curve_as = "{}.curve{}.csv".format(save_as, curve)
+                save_signals_csv(save_curve_as, signals_data, curves_list=[curve])
+        # restore extension
+        save_as = "{}.csv".format(save_as)
 
     else:
         save_signals_csv(save_as, signals_data)

@@ -43,7 +43,8 @@ def get_parser():
                  arg_parser.get_mult_del_args_parser(),
                  arg_parser.get_data_corr_args_parser(),
                  arg_parser.get_plot_args_parser(),
-                 arg_parser.get_output_args_parser()],
+                 arg_parser.get_output_args_parser(),
+                 arg_parser.get_specific_output_args_parser()],
         prog='SignalProcess.py',
         description=p_disc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
@@ -691,6 +692,9 @@ def global_check(options):
 
     # save data args check
     options = arg_checker.save_arg_check(options)
+
+    # convert_only arg check
+    options = arg_checker.convert_only_arg_check(options)
 
     return options
 

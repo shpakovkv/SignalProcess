@@ -533,7 +533,7 @@ def save_arg_check(options):
     if options.postfix:
         options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
 
-    if options.out_names is None:
+    if options.out_names is None and options.convert_only is None:
         options.out_names = [None for _ in range(len(options.gr_files))]
     return options
 
@@ -590,4 +590,44 @@ def data_corr_arg_check(options):
              " to the number of delays ({})."
              "".format(len(options.multiplier), len(options.delay)))
 
+    return options
+
+
+def convert_only_arg_check(options):
+    """If convert-only was specified
+     checks prohibited options, creates output filename list.
+
+     Use it only after file_arg_check() and save_arg_check().
+
+    :param options: namespace with args
+    :type options: argparse.Namespace
+
+    :return: changed options
+    :rtype: argparse.Namespace
+    """
+    if options.convert_only:
+        # turn on save options
+        options.save = True
+
+        # prohibited args check
+        assert options.out_names is None, "Argument --convert-only: not allowed with argument -o/--output-files"
+        assert options.multiplier is None, "Argument --convert-only: not allowed with argument --multiplier"
+        assert options.delay is None, "Argument --convert-only: not allowed with argument --delay"
+        assert options.offset_by_front is None, "Argument --convert-only: not allowed with argument --offset-by-curve-front"
+        assert options.y_auto_zero is None, "Argument --convert-only: not allowed with argument --y-auto-zero"
+        assert options.zero is None, "Argument --convert-only: not allowed with argument --set-to-zero"
+        assert options.plot is None, "Argument --convert-only: not allowed with argument -p/--plot"
+        assert options.multiplot is None, "Argument --convert-only: not allowed with argument -m/--multiplot"
+        assert options.group_size == 1, "Argument --convert-only: not allowed with group size > 1 (-g/--grouped-by)"
+        # assert options. is None, "Argument --convert-only: not allowed with argument "
+
+        # fill output files name
+        options.out_names = [os.path.join(options.save_to, os.path.basename(group[0])[:-4])
+                             for group in options.gr_files]
+        print("options.src_dir = {}".format(options.src_dir))
+        print("options.save_to = {}".format(options.save_to))
+        print("Input names:")
+        print(options.gr_files)
+        print("Output names:")
+        print(options.out_names)
     return options
