@@ -689,6 +689,9 @@ def global_check(options):
     # data manipulation args check
     options = arg_checker.data_corr_arg_check(options)
 
+    # save data args check
+    options = arg_checker.save_arg_check(options)
+
     return options
 
 
