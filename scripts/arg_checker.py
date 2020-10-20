@@ -624,10 +624,4 @@ def convert_only_arg_check(options):
         # fill output files name
         options.out_names = [os.path.join(options.save_to, os.path.basename(group[0])[:-4])
                              for group in options.gr_files]
-        print("options.src_dir = {}".format(options.src_dir))
-        print("options.save_to = {}".format(options.save_to))
-        print("Input names:")
-        print(options.gr_files)
-        print("Output names:")
-        print(options.out_names)
     return options
