@@ -1,0 +1,3 @@
+[submodule "isf-converter-py"]
+	path = isf-converter-py
+	url = https://github.com/shpakovkv/isf-converter-py

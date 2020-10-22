@@ -14,7 +14,13 @@ import numpy as np
 import argparse
 import WFMReader
 
+import sys
+sys.path.append('../isf-converter-py/')
+
+from isfconverter import isfreader as isf
+
 from data_types import SignalsData
+from data_types import SinglePeak
 
 
 LOGDIRECTORY = "LOG_SignalProcess"
@@ -440,9 +446,12 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
         data = WFMReader.read_wfm_group([filename], start_index=start,
                                         number_of_points=points,
                                         read_step=step)
-    # elif ext_upper == 'ISF':
-    #     # TODO
-    #     pass
+    elif ext_upper == 'ISF':
+        x_data, y_data, head = isf.read_isf(filename)
+        x_data = np.expand_dims(x_data, axis=1)
+        y_data = np.expand_dims(y_data, axis=1)
+        data = np.append(x_data, y_data, axis=1)
+        header = ["{}: {}".format(key, val) for key, val in head.items()]
     else:
         with open(filename, "r") as datafile:
             text_data = datafile.readlines()

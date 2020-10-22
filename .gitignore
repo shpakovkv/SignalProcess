@@ -10,7 +10,7 @@
 *.wfm
 *.dat
 *.png
-*test*.py
+scripts/test.py
 *.xml
 untracked/
 scripts/new_test.py

@@ -533,7 +533,7 @@ def save_arg_check(options):
     if options.postfix:
         options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
 
-    if options.out_names is None and options.convert_only is None:
+    if options.out_names is None and not options.convert_only:
         options.out_names = [None for _ in range(len(options.gr_files))]
     return options
 
