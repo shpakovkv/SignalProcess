@@ -15,7 +15,7 @@ import argparse
 import WFMReader
 
 import sys
-sys.path.append('../isf-converter-py/')
+sys.path.append(os.path.join(os.path.dirname(__file__), '../isf-converter-py/'))
 
 from isfconverter import isfreader as isf
 
@@ -443,6 +443,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
     ext_upper = filename[-3:].upper()
 
     if ext_upper == 'WFM':
+        # TODO: add header output to the WFMReader
         data = WFMReader.read_wfm_group([filename], start_index=start,
                                         number_of_points=points,
                                         read_step=step)
@@ -481,7 +482,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
             if dialect.delimiter == ";":
                 text_data = origin_to_csv(text_data)
                 dialect.delimiter = ','
-            skip_header = get_csv_headers(text_data)
+            skip_header = get_csv_headers(text_data, delimiter=dialect.delimiter)
             usecols = valid_cols(text_data, skip_header,
                                  delimiter=str(dialect.delimiter))
 
@@ -564,26 +565,43 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
                    to numeric with the float() function, but the csv reader
                    may considered it as a valid value.
     """
-    cols_count = len(read_lines[-1].strip().split(delimiter))
+
+    # get last line with data
+    last_idx = len(read_lines) - 1
+    while last_idx > 0:
+        try:
+            vals = [float(val) for val in
+                    read_lines[last_idx].strip().split(delimiter)
+                    if val not in except_list]
+            # find at least 1 numeric value
+            if len(vals) > 0:
+                break
+        except ValueError:
+            # pass non numeric values at the end of a file
+            pass
+        last_idx -= 1
+
+    cols_count = len(read_lines[last_idx].strip().split(delimiter))
+
     headers = 0
     idx = 0
     lines = len(read_lines)
 
-    # column number difference
-    while (len(read_lines[-1].strip().split(delimiter)) !=
-           cols_count and idx < lines):
-        idx += 1
-        headers += 1
+    for idx in range(0, lines):
+        # column number difference check
+        if len(read_lines[idx].strip().split(delimiter)) == cols_count:
 
-    # non numeric value check
-    for idx in range(headers, lines):
-        try:
-            [float(val) for val in read_lines[idx].strip().split(delimiter) if
-             val not in except_list]
-        except ValueError:
-            headers += 1
+            # non numeric values check
+            try:
+                [float(val) for val in read_lines[idx].strip().split(delimiter) if
+                 val not in except_list]
+            except ValueError:
+                headers += 1
+            else:
+                break
         else:
-            break
+            headers += 1
+
     if VERBOSE:
         print("Header lines = {}   |   ".format(headers), end="")
         # print("Columns count = {}  |  ".format(cols_count), end="")
