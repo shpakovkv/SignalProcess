@@ -172,47 +172,68 @@ def plot_multiplot(data, peak_data, curves_list,
     """
     # TODO: new args description
 
+    print("data = {}\n"
+          "peak_data = {}\n"
+          "curves_list = {}\n"
+          "xlim = {}\n"
+          "amp_unit = {}\n"
+          "time_unit = {}\n"
+          "title = {}\n"
+          "unixtime = {}"
+          "".format(data,
+                    str([peak.get_time_val() for peak in peak_data[0]]),
+                    curves_list,
+                    xlim, amp_unit,
+                    time_unit, title,
+                    unixtime))
+
     plt.close('all')
-    fig, axes = plt.subplots(len(curves_list), 1, sharex='all')
+    fig, axes = plt.subplots(len(curves_list), 1, sharex='all', squeeze=False)
     # # an old color scheme
     # colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
     #           '#8c564b', '#17becf', '#bcbd22', '#e377c2']
     if title is not None:
         fig.suptitle(title)
 
+    print("================================")
+    print(peak_data)
+    print(axes)
+    print(axes[0, 0])
+    print("================================")
+
     for wf in range(len(curves_list)):
         # plot curve
 
         if unixtime:
-            axes[wf].plot(md.epoch2num(data.time(curves_list[wf])),
-                          data.value(curves_list[wf]),
-                          '-', color='#9999aa', linewidth=0.5)
+            axes[wf, 0].plot(md.epoch2num(data.time(curves_list[wf])),
+                             data.value(curves_list[wf]),
+                             '-', color='#9999aa', linewidth=0.5)
         else:
-            axes[wf].plot(data.time(curves_list[wf]),
-                          data.value(curves_list[wf]),
-                          '-', color='#9999aa', linewidth=0.5)
-        axes[wf].tick_params(direction='in', top=True, right=True)
+            axes[wf, 0].plot(data.time(curves_list[wf]),
+                             data.value(curves_list[wf]),
+                             '-', color='#9999aa', linewidth=0.5)
+        axes[wf, 0].tick_params(direction='in', top=True, right=True)
 
         # set bounds
         if xlim is not None and xlim[0] is not None and xlim[1] is not None:
-            axes[wf].set_xlim(xlim)
-            axes[wf].set_ylim(calc_y_lim(data.time(curves_list[wf]),
-                                         data.value(curves_list[wf]),
-                                         xlim, reserve=0.1))
+            axes[wf, 0].set_xlim(xlim)
+            axes[wf, 0].set_ylim(calc_y_lim(data.time(curves_list[wf]),
+                                            data.value(curves_list[wf]),
+                                            xlim, reserve=0.1))
         # y label (units only)
         if amp_unit is None:
-            axes[wf].set_ylabel(data.curves[curves_list[wf]].unit,
-                                size=10, rotation='horizontal')
+            axes[wf, 0].set_ylabel(data.curves[curves_list[wf]].unit,
+                                   size=10, rotation='horizontal')
         else:
-            axes[wf].set_ylabel(amp_unit, size=10, rotation='horizontal')
+            axes[wf, 0].set_ylabel(amp_unit, size=10, rotation='horizontal')
 
         # subplot title
         amp_label = data.curves[curves_list[wf]].label
         # if data.curves[curves_list[wf]].unit:
         #     amp_label += ", " + data.curves[curves_list[wf]].unit
-        axes[wf].text(0.99, 0.01, amp_label, verticalalignment='bottom',
-                      horizontalalignment='right',
-                      transform=axes[wf].transAxes, size=8)
+        axes[wf, 0].text(0.99, 0.01, amp_label, verticalalignment='bottom',
+                         horizontalalignment='right',
+                         transform=axes[wf, 0].transAxes, size=8)
 
         # Time axis label
         if wf == len(curves_list) - 1:
@@ -221,13 +242,13 @@ def plot_multiplot(data, peak_data, curves_list,
                 time_label += ", " + time_unit
             else:
                 time_label += ", " + data.curves[curves_list[wf]].time_unit
-            axes[wf].set_xlabel(time_label, size=10)
+            axes[wf, 0].set_xlabel(time_label, size=10)
             if unixtime:
                 dt_fmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
-                axes[wf].xaxis.set_major_formatter(dt_fmt)  # set format
+                axes[wf, 0].xaxis.set_major_formatter(dt_fmt)  # set format
                 plt.subplots_adjust(bottom=0.22)  # make more space for datetime values
                 plt.xticks(rotation=25)  # rotate long datetime values to avoid overlapping
-        axes[wf].tick_params(labelsize=8)
+        axes[wf, 0].tick_params(labelsize=8)
 
         # plot peaks scatter
         if peak_data is not None:
@@ -235,12 +256,12 @@ def plot_multiplot(data, peak_data, curves_list,
             for pk in peak_data[curves_list[wf]]:
                 color = next(color_iter)
                 if pk is not None:
-                    axes[wf].scatter([pk.time], [pk.val], s=20,
-                                     edgecolors=color, facecolors='none',
-                                     linewidths=1.5)
-                    # axes[wf].scatter([pk.time], [pk.val], s=50,
-                    #                  edgecolors='none', facecolors=color,
-                    #                  linewidths=1, marker='x')
+                    axes[wf, 0].scatter([pk.time], [pk.val], s=20,
+                                        edgecolors=color, facecolors='none',
+                                        linewidths=1.5)
+                    # axes[wf, 0].scatter([pk.time], [pk.val], s=50,
+                    #                     edgecolors='none', facecolors=color,
+                    #                     linewidths=1, marker='x')
     fig.subplots_adjust(hspace=0)
 
 
