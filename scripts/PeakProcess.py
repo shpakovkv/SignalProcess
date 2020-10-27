@@ -7,6 +7,8 @@ import sys
 import numpy
 import bisect
 import argparse
+
+import numpy as np
 import scipy.integrate as integrate
 
 # import SignalProcess as sp
@@ -744,12 +746,18 @@ def read_single_peak(filename):
                         else peaks[curve_idx][0] == None.
     """
     data = numpy.genfromtxt(filename, delimiter=',')
+
+    if data.ndim == 1:
+        data = np.expand_dims(data, axis=1)
+
     peaks = []
-    curves_count = data.shape[0]
+    curves_count = data.shape[1]
     for idx in range(curves_count):
-        new_peak = SinglePeak(time=data[idx, 1], value=data[idx, 2],
-                              sqr_l=data[idx, 3], sqr_r=data[idx, 4])
-        if new_peak.time != 0 and new_peak.val != 0:
+        # new_peak = SinglePeak(time=data[idx, 1], value=data[idx, 2],
+        #                       sqr_l=data[idx, 3], sqr_r=data[idx, 4])
+        new_peak = SinglePeak(time=data[1, idx], value=data[2, idx],
+                              sqr_l=data[3, idx], sqr_r=data[4, idx])
+        if new_peak.time != 0 or new_peak.val != 0:
             peaks.append([new_peak])
             # peaks[idx].append(new_peak)
         else:
@@ -761,7 +769,7 @@ def read_single_peak(filename):
 def read_peaks(file_list):
     """Reads all the files containing the data of the peaks.
 
-    :param file_list:   file with peak (one group of peaks) data
+    :param file_list:   list of files with peak (one group of peaks) data
     :return:            grouped peaks data
                         peaks[curve_idx][group_idx] == SinglePeak instance if
                         this curve has a peak related to this event (group), 

@@ -172,20 +172,20 @@ def plot_multiplot(data, peak_data, curves_list,
     """
     # TODO: new args description
 
-    print("data = {}\n"
-          "peak_data = {}\n"
-          "curves_list = {}\n"
-          "xlim = {}\n"
-          "amp_unit = {}\n"
-          "time_unit = {}\n"
-          "title = {}\n"
-          "unixtime = {}"
-          "".format(data,
-                    str([peak.get_time_val() for peak in peak_data[0]]),
-                    curves_list,
-                    xlim, amp_unit,
-                    time_unit, title,
-                    unixtime))
+    # print("data = {}\n"
+    #       "peak_data = {}\n"
+    #       "curves_list = {}\n"
+    #       "xlim = {}\n"
+    #       "amp_unit = {}\n"
+    #       "time_unit = {}\n"
+    #       "title = {}\n"
+    #       "unixtime = {}"
+    #       "".format(data,
+    #                 str([peak.get_time_val() for peak in peak_data[0]]),
+    #                 curves_list,
+    #                 xlim, amp_unit,
+    #                 time_unit, title,
+    #                 unixtime))
 
     plt.close('all')
     fig, axes = plt.subplots(len(curves_list), 1, sharex='all', squeeze=False)
@@ -194,12 +194,6 @@ def plot_multiplot(data, peak_data, curves_list,
     #           '#8c564b', '#17becf', '#bcbd22', '#e377c2']
     if title is not None:
         fig.suptitle(title)
-
-    print("================================")
-    print(peak_data)
-    print(axes)
-    print(axes[0, 0])
-    print("================================")
 
     for wf in range(len(curves_list)):
         # plot curve

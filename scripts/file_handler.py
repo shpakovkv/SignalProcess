@@ -421,7 +421,7 @@ def read_signals(file_list, start=0, step=1, points=-1,
     return data
 
 
-def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
+def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
     """
     Return ndarray instance filled with data
     read from csv or wfm file.
@@ -485,6 +485,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
             skip_header = get_csv_headers(text_data, delimiter=dialect.delimiter)
             usecols = valid_cols(text_data, skip_header,
                                  delimiter=str(dialect.delimiter))
+            header = text_data[0: skip_header]
 
             # remove excess
             last_row = len(text_data) - 1
@@ -504,10 +505,14 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=3):
                                  usecols=usecols)
 
     if VERBOSE:
-        if data.shape[1] % 2 == 0:
-            curves_count = data.shape[1] // 2
+        columns = 1
+        if data.ndim > 1:
+            columns = data.shape[1]
+
+        if columns % 2 == 0:
+            curves_count = columns // 2
         else:
-            curves_count = data.shape[1] - 1
+            curves_count = columns - 1
         print("Curves loaded: {}".format(curves_count))
         print("Maximum points: {}".format(data.shape[0]))
     return data, header
