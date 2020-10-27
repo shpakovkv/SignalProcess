@@ -14,7 +14,7 @@ import arg_parser
 import arg_checker
 import file_handler
 import plotter
-from SignalProcess import multiplier_and_delay
+from multiplier_and_delay import multiplier_and_delay
 from data_types import SinglePeak
 
 
@@ -44,7 +44,8 @@ def get_parser():
         parents=[arg_parser.get_input_files_args_parser(),
                  arg_parser.get_mult_del_args_parser(),
                  arg_parser.get_plot_args_parser(),
-                 arg_parser.get_peak_args_parser()],
+                 arg_parser.get_peak_args_parser(),
+                 arg_parser.get_output_args_parser()],
         prog='PeakProcess.py',
         description=p_desc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
@@ -280,6 +281,15 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
     :rtype: (list, str)
     """
 
+    # print("============ peak_finder ================")
+    # print("level : {}\ndiff_time : {}\ntime_bounds : {}\ntnoise : {}\n"
+    #       "is_negative : {}\ngraph : {}\nnoise_attenuation : {}\n"
+    #       "start_idx : {}\nstop_idx : {}"
+    #       "".format(level, diff_time, time_bounds, tnoise,
+    #                 is_negative, graph, noise_attenuation,
+    #                 start_idx, stop_idx))
+    # print("-------------------")
+
     # Checkout the inputs
     peak_log = ""
     assert level != 0, 'Invalid level value!'
@@ -304,15 +314,25 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
         time_bounds = (time_bounds[0], x[-1])
     start_idx = find_nearest_idx(x, time_bounds[0], side='right')
     stop_idx = find_nearest_idx(x, time_bounds[1], side='left')
-    diff_idx = int(diff_time // (x[1] - x[0]))
-    if PEAKFINDERDEBUG:
-        print("Diff_time = {}, Diff_idx = {}".format(diff_time, diff_idx))
 
     peak_list = []
 
     if start_idx is None or stop_idx is None:
+        # the interval is [start_idx, stop_idx)
+        # start_idx is included; stop_idx is excluded
         peak_log += "Time bounds is out of range.\n"
         return peak_list, peak_log
+
+    time_delta = 0.0
+    if x[0] != x[1]:
+        time_delta = x[1] - x[0]
+    else:
+        time_part = x[stop_idx] - x[start_idx]
+        time_delta = time_part / (stop_idx - start_idx - 1)
+    diff_idx = int(diff_time / time_delta)
+
+    if PEAKFINDERDEBUG:
+        print("Diff_time = {}, Diff_idx = {}".format(diff_time, diff_idx))
 
     i = start_idx
     while i < stop_idx :
@@ -380,13 +400,12 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
 
     # LOCAL INTEGRAL CHECK
     # needed for error probability estimation
-    dt = x[1] - x[0]
-    di = int(diff_time * 2 // dt)    # diff window in index units
+    di = int(diff_time * 2 // time_delta)    # diff window in index units
 
     if di > 3:
         for idx in range(len(peak_list)):
             pk = peak_list[idx]
-            # square = pk.val * dt * di
+            # square = pk.val * time_delta * di
             square = pk.val * di
             
             intgr_l = 0
@@ -650,113 +669,34 @@ def check_curves_list(curves, signals_data):
 
 def global_check(options):
     """Input options global check.
-    
-    Checks the input arguments and converts them to the required format.
 
-    :param options: namespace with options
-    :type options:  argparse.namespace
-    
-    :return: changed namespace with converted values
+    Returns changed options with converted values.
+
+    options -- namespace with options
     """
+    # file import args check
+    options = arg_checker.file_arg_check(options)
 
-    if options.src_dir:
-        options.src_dir = options.src_dir.strip()
-        assert os.path.isdir(options.src_dir), \
-            "Can not find directory {}".format(options.src_dir)
-    if options.files:
-        gr_files = arg_checker.check_file_list(options.src_dir, options.files)
-        if not options.src_dir:
-            options.src_dir = os.path.dirname(gr_files[0][0])
-    else:
-        gr_files = arg_checker.get_grouped_file_list(options.src_dir,
-                                                     options.ext_list,
-                                                     options.group_size,
-                                                     options.sorted_by_ch)
-    options.gr_files = gr_files
+    # partial import args check
+    options = arg_checker.check_partial_args(options)
 
-    # Now we have the list of files, grouped by shots:
-    # gr_files == [
-    #               ['shot001_osc01.wfm', 'shot001_osc02.csv', ...],
-    #               ['shot002_osc01.wfm', 'shot002_osc02.csv', ...],
-    #               ...etc.
-    #             ]
+    # plot args check
+    options = arg_checker.plot_arg_check(options)
 
-    options.partial = arg_checker.check_partial_args(options.partial)
+    # curve labels check
+    arg_checker.label_check(options.labels)
 
-    # # Raw check labels. Not used.
-    # # instead: the forbidden symbols are replaced during CSV saving
-    # if options.labels:
-    #     assert global_check_labels(options.labels), \
-    #         "Label value error! Only latin letters, " \
-    #         "numbers and underscore are allowed."
+    # # data manipulation args check
+    # options = arg_checker.data_corr_arg_check(options)
+    #
+    # # save data args check
+    # options = arg_checker.save_arg_check(options)
+    #
+    # # convert_only arg check
+    # options = arg_checker.convert_only_arg_check(options)
 
-    def path_constructor(path, arg_name, default_path, default_dir):
-        """Checks path, makes dir if not exists.
-        
-        :param path: user entered path
-        :param arg_name: the name of the command line argument 
-                         through which the path was entered
-        :param default_path: the default output path 
-        :param default_dir: the destination folder inside the default path
-        :return: path
-        """
-        if not path:
-            path = os.path.join(default_path, default_dir)
-        path = arg_checker.check_param_path(path, arg_name)
-        return path
-
-    options.save_to = path_constructor(None, '--save-to',
-                                       os.path.dirname(gr_files[0][0]),
-                                       SAVETODIR)
-
-    options.plot_dir = path_constructor(options.plot_dir, '--p-save',
-                                        options.save_to, SINGLEPLOTDIR)
-
-    options.multiplot_dir = path_constructor(options.multiplot_dir,
-                                             '--mp-save', options.save_to,
-                                             MULTIPLOTDIR)
-
-    # check and convert plot and multiplot options
-    if options.plot:
-        options.plot = arg_checker.global_check_idx_list(options.plot, '--plot',
-                                                         allow_all=True)
-    if options.multiplot:
-        for idx, m_param in enumerate(options.multiplot):
-            options.multiplot[idx] = arg_checker.global_check_idx_list(m_param,
-                                                                       '--multiplot')
-
-    # raw check multiplier and delay
-    if options.multiplier is not None and options.delay is not None:
-        assert len(options.multiplier) == len(options.delay), \
-            ("The number of multipliers ({}) is not equal"
-             " to the number of delays ({})."
-             "".format(len(options.multiplier), len(options.delay)))
-
-    # ==============================================================
-    # original PeakProcess args
-    if any([options.level, options.pk_diff, options.gr_width, options.curves]):
-        assert all([options.level, options.pk_diff, options.gr_width, options.curves]), \
-            "To start the process of finding peaks, '--level', " \
-            "'--diff-time', '--group-diff', '--curves' arguments are needed."
-        assert options.pk_diff >=0, \
-            "'--diff-time' value must be non negative real number."
-        assert options.gr_width >=0, \
-            "'--group-diff' must be non negative real number."
-        assert all(idx >= 0 for idx in options.curves), \
-            "Curve index must be non negative integer"
-
-    if options.t_noise:
-        assert options.t_noise >= 0, \
-            "'--noise-half-period' must be non negative real number."
-    assert options.noise_att > 0, \
-        "'--noise-attenuation' must be real number > 0."
-
-    if all(bound is not None for bound in options.t_bounds):
-        assert options.t_bounds[0] < options.t_bounds[1], \
-            "The left time bound must be less then the right one."
-
-    if options.hide_all:
-        options.p_hide = options.mp_hide = options.peak_hide = True
+    # peak search args check
+    options = arg_checker.peak_param_check(options)
 
     return options
 
@@ -876,119 +816,113 @@ if __name__ == '__main__':
     args = parser.parse_args()
     verbose = not args.silent
 
-    try:
-        args = global_check(args)
+    # try:
+    args = global_check(args)
 
-        '''
-        num_mask (tuple) - contains the first and last index
-        of substring of filename
-        That substring contains the shot number.
-        The last idx is excluded: [first, last).
-        Read numbering_parser docstring for more info.
-        '''
+    '''
+    num_mask (tuple) - contains the first and last index
+    of substring of filename
+    That substring contains the shot number.
+    The last idx is excluded: [first, last).
+    Read numbering_parser docstring for more info.
+    '''
 
-        num_mask = file_handler.numbering_parser([files[0] for
-                                                 files in args.gr_files])
-        # MAIN LOOP
-        if DEBUG:
-            print("Check Loop in")
-        if (args.level or
-                args.plot or
-                args.multiplot or
-                args.read):
-            if DEBUG:
-                print("==> In loop")
-            for shot_idx, file_list in enumerate(args.gr_files):
-                shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
-                                                             args.ext_list)
+    num_mask = file_handler.numbering_parser([files[0] for
+                                             files in args.gr_files])
+    # MAIN LOOP
+    if (args.level or
+            args.read):
+        for shot_idx, file_list in enumerate(args.gr_files):
+            shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
+                                                         args.ext_list)
 
-                # get SignalsData
-                data = file_handler.read_signals(file_list,
-                                                 start=args.partial[0],
-                                                 step=args.partial[1],
-                                                 points=args.partial[2],
-                                                 labels=args.labels,
-                                                 units=args.units,
-                                                 time_unit=args.time_unit)
+            # get SignalsData
+            data = file_handler.read_signals(file_list,
+                                             start=args.partial[0],
+                                             step=args.partial[1],
+                                             points=args.partial[2],
+                                             labels=args.labels,
+                                             units=args.units,
+                                             time_unit=args.time_unit)
+            if verbose:
+                print("The number of curves = {}".format(data.count))
+
+            # checks the number of columns with data,
+            # and the number of multipliers, delays, labels
+            args.multiplier = arg_checker.check_multiplier(args.multiplier,
+                                                           count=data.count)
+            args.delay = arg_checker.check_delay(args.delay,
+                                                 count=data.count)
+            arg_checker.check_coeffs_number(data.count, ["label", "unit"],
+                                            args.labels, args.units)
+
+            # multiplier and delay
+            data = multiplier_and_delay(data,
+                                        args.multiplier,
+                                        args.delay)
+
+            # find peaks
+            peaks_data = None
+            if args.level:
+                print('LEVEL = {}'.format(args.level))
+                check_curves_list(args.curves, data)
                 if verbose:
-                    print("The number of curves = {}".format(data.count))
+                    print("Searching for peaks...")
 
-                # checks the number of columns with data,
-                # and the number of multipliers, delays, labels
-                args.multiplier = arg_checker.check_multiplier(args.multiplier,
-                                                               count=data.count)
-                args.delay = arg_checker.check_delay(args.delay,
-                                                     count=data.count)
-                arg_checker.check_coeffs_number(data.count, ["label", "unit"],
-                                                args.labels, args.units)
+                unsorted_peaks = get_peaks(data, args, verbose)
 
-                # multiplier and delay
-                data = multiplier_and_delay(data,
-                                            args.multiplier,
-                                            args.delay)
+                # step 7 - group peaks [and plot all curves with peaks]
+                peaks_data = group_peaks(unsorted_peaks, args.gr_width)
 
-                # find peaks
-                peaks_data = None
-                if args.level:
-                    print('LEVEL = {}'.format(args.level))
-                    check_curves_list(args.curves, data)
-                    if verbose:
-                        print("Searching for peaks...")
+                # step 8 - save peaks data
+                if verbose:
+                    print("Saving peak data...")
 
-                    unsorted_peaks = get_peaks(data, args, verbose)
+                # full path without peak number and extension:
+                pk_filename = get_pk_filename(file_list,
+                                              args.save_to,
+                                              shot_name)
 
-                    # step 7 - group peaks [and plot all curves with peaks]
-                    peaks_data = group_peaks(unsorted_peaks, args.gr_width)
+                file_handler.save_peaks_csv(pk_filename, peaks_data, args.labels)
 
-                    # step 8 - save peaks data
-                    if verbose:
-                        print("Saving peak data...")
+                # step 9 - save multicurve plot
+                multiplot_name = pk_filename + ".plot.png"
 
-                    # full path without peak number and extension:
-                    pk_filename = get_pk_filename(file_list,
-                                                  args.save_to,
-                                                  shot_name)
+                if verbose:
+                    print("Saving all peaks as " + multiplot_name)
+                plotter.plot_multiplot(data, peaks_data, args.curves,
+                                       xlim=args.t_bounds)
+                pyplot.savefig(multiplot_name, dpi=400)
+                if args.peak_hide:
+                    pyplot.show(block=False)
+                else:
+                    pyplot.show()
 
-                    file_handler.save_peaks_csv(pk_filename, peaks_data, args.labels)
+            if args.read:
+                if verbose:
+                    print("Reading peak data...")
 
-                    # step 9 - save multicurve plot
-                    multiplot_name = pk_filename + ".plot.png"
+                pk_filename = get_pk_filename(file_list,
+                                              args.save_to,
+                                              shot_name)
+                peak_files = get_peak_files(pk_filename)
+                peaks_data = read_peaks(peak_files)
+                renumber_peak_files(peak_files)
 
-                    if verbose:
-                        print("Saving all peaks as " + multiplot_name)
-                    plotter.plot_multiplot(data, peaks_data, args.curves,
-                                           xlim=args.t_bounds)
-                    pyplot.savefig(multiplot_name, dpi=400)
-                    if args.peak_hide:
-                        pyplot.show(block=False)
-                    else:
-                        pyplot.show()
+            # plot preview and save
+            if args.plot:
+                plotter.do_plots(data, args, shot_name,
+                                 peaks=peaks_data, verbose=verbose)
 
-                if args.read:
-                    if verbose:
-                        print("Reading peak data...")
+            # plot and save multi-plots
+            if args.multiplot:
+                plotter.do_multiplots(data, args, shot_name,
+                                      peaks=peaks_data, verbose=verbose)
 
-                    pk_filename = get_pk_filename(file_list,
-                                                  args.save_to,
-                                                  shot_name)
-                    peak_files = get_peak_files(pk_filename)
-                    peaks_data = read_peaks(peak_files)
-                    renumber_peak_files(peak_files)
-
-                # plot preview and save
-                if args.plot:
-                    plotter.do_plots(data, args, shot_name,
-                                     peaks=peaks_data, verbose=verbose)
-
-                # plot and save multi-plots
-                if args.multiplot:
-                    plotter.do_multiplots(data, args, shot_name,
-                                          peaks=peaks_data, verbose=verbose)
-
-        file_handler.print_duplicates(args.gr_files, 30)
-    except Exception as e:
-        print()
-        sys.exit(e)
+    arg_checker.print_duplicates(args.gr_files, 30)
+    # except Exception as e:
+    #     print()
+    #     sys.exit(e)
 
     # TODO: cl description
     # TODO: test refactored PeakProcess

@@ -625,3 +625,34 @@ def convert_only_arg_check(options):
         options.out_names = [os.path.join(options.save_to, os.path.basename(group[0])[:-4])
                              for group in options.gr_files]
     return options
+
+
+def peak_param_check(options):
+    # original PeakProcess args
+    if any([options.level, options.pk_diff, options.gr_width, options.curves]):
+        assert all([options.level, options.pk_diff, options.gr_width, options.curves]), \
+            "To start the process of finding peaks, '--level', " \
+            "'--diff-time', '--group-diff', '--curves' arguments are needed."
+        assert options.pk_diff >= 0, \
+            "'--diff-time' value must be non negative real number."
+        assert options.gr_width >= 0, \
+            "'--group-diff' must be non negative real number."
+        assert all(idx >= 0 for idx in options.curves), \
+            "Curve index must be non negative integer"
+
+    if options.t_noise:
+        assert options.t_noise >= 0, \
+            "'--noise-half-period' must be non negative real number."
+    assert options.noise_att > 0, \
+        "'--noise-attenuation' must be real number > 0."
+
+    if all(bound is not None for bound in options.t_bounds):
+        assert options.t_bounds[0] < options.t_bounds[1], \
+            "The left time bound must be less then the right one."
+
+    if options.hide_all:
+        options.p_hide = True
+        options.mp_hide = True
+        options.peak_hide = True
+
+    return options

@@ -18,7 +18,9 @@ import arg_checker
 import file_handler
 import plotter
 
-import PeakProcess
+from multiplier_and_delay import *
+
+from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front
 
 verbose = True
 global_log = ""
@@ -61,98 +63,6 @@ def add_to_log(s, print_to_console=True):
     global_log += s
     if print_to_console:
         print(s, end="")
-
-
-def multiplier_and_delay(data, multiplier, delay):
-    """Returns the modified data.
-    Each column of the data is first multiplied by
-    the corresponding multiplier value and
-    then the corresponding delay value is subtracted from it.
-
-    data       -- an instance of the SignalsData class
-                  OR 2D numpy.ndarray
-    multiplier -- the list of multipliers for each columns
-                  in the input data.
-    delay      -- the list of delays (subtrahend) for each
-                  columns in the input data.
-    """
-    if multiplier is None and delay is None:
-        return data
-
-    if isinstance(data, np.ndarray):
-        row_number = data.shape[0]
-        col_number = data.shape[1]
-
-        if not multiplier:
-            multiplier = [1 for _ in range(col_number)]
-        if not delay:
-            delay = [0 for _ in range(col_number)]
-        # check_coeffs_number(col_number, ["multiplier", "delay"],
-        #                     multiplier, delay)
-        for col_idx in range(col_number):
-            for row_idx in range(row_number):
-                data[row_idx][col_idx] = (data[row_idx][col_idx] *
-                                          multiplier[col_idx] -
-                                          delay[col_idx])
-        return data
-    elif isinstance(data, data_types.SignalsData):
-        if not multiplier:
-            multiplier = [1 for _ in range(data.count * 2)]
-        if not delay:
-            delay = [0 for _ in range(data.count * 2)]
-
-        # check_coeffs_number(data.count * 2, ["multiplier", "delay"],
-        #                     multiplier, delay)
-        for curve_idx in range(data.count):
-            col_idx = curve_idx * 2  # index of time-column of current curve
-            data.curves[curve_idx].data = \
-                multiplier_and_delay(data.curves[curve_idx].data,
-                                     multiplier[col_idx:col_idx + 2],
-                                     delay[col_idx:col_idx + 2]
-                                     )
-        return data
-    else:
-        raise TypeError("Data must be an instance of "
-                        "numpy.ndarray or SignalsData.")
-
-
-def multiplier_and_delay_peak(peaks, multiplier, delay, curve_idx):
-    """Returns the modified peaks data.
-    Each time and amplitude of each peak is first multiplied by
-    the corresponding multiplier value and
-    then the corresponding delay value is subtracted from it.
-
-    peaks       -- the list of the SinglePeak instance
-    multiplier  -- the list of multipliers for each columns
-                   in the SignalsData.
-    delay       -- the list of delays (subtrahend)
-                   for each columns in the SignalsData.
-    curve_idx   -- the index of the curve to which the peaks belong
-    """
-    for peak in peaks:
-        if not isinstance(peak, PeakProcess.SinglePeak):
-            raise ValueError("'peaks' must be a list of "
-                             "the SinglePeak instance.")
-    if not multiplier and not delay:
-        raise ValueError("Specify multipliers or delays.")
-    if not multiplier:
-        multiplier = [1 for _ in range(len(delay))]
-    if not delay:
-        delay = [0 for _ in range(multiplier)]
-    if curve_idx >= len(multiplier):
-        raise IndexError("The curve index({}) is greater than the length "
-                         "({}) of multiplier/delay."
-                         "".format(curve_idx, len(multiplier)))
-    corr_peaks = []
-    time_mult = multiplier[curve_idx * 2]
-    time_del = delay[curve_idx * 2]
-    amp_mult = multiplier[curve_idx * 2 + 1]
-    amp_del = delay[curve_idx * 2 + 1]
-    for peak in peaks:
-        corr_peaks.append(PeakProcess.SinglePeak(peak.time * time_mult - time_del,
-                                                 peak.val * amp_mult - amp_del,
-                                                 peak.idx, peak.sqr_l, peak.sqr_r))
-    return corr_peaks
 
 
 def smooth_voltage(y_data, window=101, poly_order=3):
@@ -251,8 +161,8 @@ def y_zero_offset(curve, start_x, stop_x):
          "".format(start_x, stop_x))
     if start_x > curve.time[-1] or stop_x < curve.time[0]:
         return 0
-    start_idx = PeakProcess.find_nearest_idx(curve.time, start_x, side='right')
-    stop_idx = PeakProcess.find_nearest_idx(curve.time, stop_x, side='left')
+    start_idx = find_nearest_idx(curve.time, start_x, side='right')
+    stop_idx = find_nearest_idx(curve.time, stop_x, side='left')
     amp_sum = 0.0
     for val in curve.val[start_idx:stop_idx + 1]:
         amp_sum += val
@@ -449,7 +359,7 @@ def get_front_point(signals_data, args, multiplier, delay,
     :type interactive: bool
 
     :return: front point
-    :rtype: PeakProcess.SinglePeak
+    :rtype: SinglePeak
     """
     if not os.path.isdir(os.path.dirname(front_plot_name)):
         os.makedirs(os.path.dirname(front_plot_name))
@@ -459,8 +369,8 @@ def get_front_point(signals_data, args, multiplier, delay,
     window = args[2]
     poly_order = args[3]
 
-    polarity = PeakProcess.check_polarity(signals_data.curves[curve_idx])
-    if PeakProcess.is_pos(polarity):
+    polarity = check_polarity(signals_data.curves[curve_idx])
+    if is_pos(polarity):
         level = abs(level)
     else:
         level = -abs(level)
@@ -514,12 +424,12 @@ def get_front_point(signals_data, args, multiplier, delay,
                                                 curve.label, curve.unit,
                                                 curve.time_unit)
         # find front
-        front_x, front_y = PeakProcess.find_curve_front(smoothed_curve,
-                                                        level, polarity)
+        front_x, front_y = find_curve_front(smoothed_curve,
+                                            level, polarity)
         plot_title = ("Curve[{idx}] \"{label}\"\n"
                       "".format(idx=curve_idx, label=curve.label))
         if front_x is not None:
-            front_point = PeakProcess.SinglePeak(front_x, front_y, 0)
+            front_point = data_types.SinglePeak(front_x, front_y, 0)
             plot_title += "Found front at [{},  {}]".format(front_x, front_y)
         else:
             plot_title += "No front found."
