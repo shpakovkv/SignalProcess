@@ -1,4 +1,12 @@
-"""Peak handle functions."""
+# Python 3.6
+"""
+Peak handle functions.
+
+
+Maintainer: Shpakov Konstantin
+Link: https://github.com/shpakovkv/SignalProcess
+"""
+
 from __future__ import print_function
 
 from matplotlib import pyplot

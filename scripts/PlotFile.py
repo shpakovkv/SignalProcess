@@ -2,7 +2,7 @@
 """
 
 Maintainer: Shpakov Konstantin
-Link: https://github.com/shpakovkv/ProcessSignals_Python
+Link: https://github.com/shpakovkv/SignalProcess
 """
 
 import argparse

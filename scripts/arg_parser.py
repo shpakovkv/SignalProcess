@@ -4,7 +4,7 @@ Universal and specific command line interface argument parsers.
 
 
 Maintainer: Shpakov Konstantin
-Link: https://github.com/shpakovkv/ProcessSignals_Python
+Link: https://github.com/shpakovkv/SignalProcess
 """
 
 
