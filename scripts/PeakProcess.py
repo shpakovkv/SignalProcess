@@ -935,7 +935,7 @@ if __name__ == '__main__':
                 plotter.do_multiplots(data, args, shot_name,
                                       peaks=peaks_data, verbose=verbose)
 
-    arg_checker.print_duplicates(args.gr_files, 30)
+    arg_checker.print_duplicates(args.gr_files)
     # except Exception as e:
     #     print()
     #     sys.exit(e)

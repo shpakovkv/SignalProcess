@@ -393,25 +393,27 @@ def read_signals(file_list, start=0, step=1, points=-1,
         if labels:
             # user input
             current_labels = labels[current_count: current_count + add_count]
-        elif new_header:
+        # elif new_header:
             # from file
-            current_labels = check_header_label(new_header[0], add_count)
+            # current_labels = check_header_label(new_header[0], add_count)
 
         if units:
             # user input
             current_units = units[current_count: current_count + add_count]
-        elif new_header:
+        # elif new_header:
             # from file
-            current_units = check_header_label(new_header[1], add_count)
+            # current_units = check_header_label(new_header[1], add_count)
 
         if time_unit:
             current_time_unit = time_unit
-        elif new_header:
-            head = check_header_label(new_header[2], 1)
-            if head:
-                current_time_unit = head[0]
-            else:
-                current_time_unit = None
+        # elif new_header:
+        #     head = check_header_label(new_header[2], 1)
+        #     if head:
+        #         current_time_unit = head[0]
+        #     else:
+        #         current_time_unit = None
+
+        print(current_labels)
 
         data.add_curves(new_data, current_labels, current_units, current_time_unit)
 

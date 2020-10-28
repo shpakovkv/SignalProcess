@@ -6,6 +6,7 @@ Link: https://github.com/shpakovkv/SignalProcess
 
 import re
 import os
+import hashlib
 from file_handler import get_grouped_file_list
 
 
@@ -322,39 +323,54 @@ def check_idx_list(idx_list, max_idx, arg_name):
             "".format(idx=idx, name=arg_name, max=max_idx)
 
 
-def compare_2_files(first_file_name, second_file_name, lines=30):
-    """Compares a number of first lines of two files
-    return True if lines matches exactly.
+def files_are_equal(first_file_name, second_file_name):
+    """Compares md5 sum of 2 files.
+    Returns True or False.
 
-    first_file_name  --  the full path to the first file
-    second_file_name --  the full path to the second file
-    lines            --  the number of lines to compare
+    :param first_file_name: the full path to the first file
+    :param second_file_name: the full path to the second file
+
+    :type first_file_name: str
+    :type second_file_name: str
+
+    :return: True if md5 is equal, else False
+    :rtype: bool
     """
+
+    chunk_size = 1024
+
+    file1_md5 = hashlib.md5()
+    file2_md5 = hashlib.md5()
+
     with open(first_file_name, 'r') as file1:
-        with open(second_file_name, 'r') as file2:
-            for idx in range(lines):
-                if file1.readline() != file2.readline():
-                    return False
-            return True
+        for chunk in iter(file1.read(chunk_size)):
+            file1_md5.update(chunk)
+
+    with open(second_file_name, 'r') as file2:
+        for chunk in iter(file2.read(chunk_size)):
+            file2_md5.update(chunk)
+
+    if file1_md5 != file2_md5:
+        return False
+    return True
 
 
 def compare_grouped_files(group_list, lines=30):
-    """Compares files with corresponding indexes
-    in neighboring groups if the number of files in
-    these groups is the same.
+    """Compares files with neighboring shot (group) indexes.
+    Compares only
 
     Returns a list of pairs of matching files.
-    The files in each pair are sorted by
-    modification time in ascending order.
 
-    group_list -- the list of groups of files
-    lines      -- the number of files lines to compare
+    :param group_list: the list of groups of files
+    :param lines: the number of files lines to compare
+    :return: a list of pairs (sub-list) of matching files
     """
+
     match_list = []
     for group_1, group_2 in zip(group_list[0:-2], group_list[1:]):
         if len(group_1) == len(group_2):
             for file_1, file_2 in zip(group_1, group_2):
-                if compare_2_files(file_1, file_2, lines=lines):
+                if files_are_equal(file_1, file_2):
                     if os.path.getmtime(file_1) > os.path.getmtime(file_2):
                         match_list.append([file_2, file_1])
                     else:
