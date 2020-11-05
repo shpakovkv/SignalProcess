@@ -9,6 +9,8 @@ import os
 import hashlib
 from file_handler import get_grouped_file_list
 
+ENCODING = 'latin-1'
+
 
 # ========================================
 # -----     CHECKERS     -----------------
@@ -342,13 +344,13 @@ def files_are_equal(first_file_name, second_file_name):
     file1_md5 = hashlib.md5()
     file2_md5 = hashlib.md5()
 
-    with open(first_file_name, 'r') as file1:
+    with open(first_file_name, 'r', encoding=ENCODING) as file1:
         for chunk in iter(file1.read(chunk_size)):
-            file1_md5.update(chunk)
+            file1_md5.update(chunk.encode(ENCODING))
 
-    with open(second_file_name, 'r') as file2:
+    with open(second_file_name, 'r', encoding=ENCODING) as file2:
         for chunk in iter(file2.read(chunk_size)):
-            file2_md5.update(chunk)
+            file2_md5.update(chunk.encode(ENCODING))
 
     if file1_md5 != file2_md5:
         return False
@@ -483,10 +485,7 @@ def file_arg_check(options):
                                            "must belong to one group "
                                            "(logger).")
 
-    # Now we have the list of files, grouped by shots:
-
-    # check partial import options
-    options = check_partial_args(options)
+    # Now we have the list of files, grouped by shots
     return options
 
 

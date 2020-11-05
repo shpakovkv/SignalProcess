@@ -628,14 +628,34 @@ if __name__ == "__main__":
     The last idx is excluded: [first, last).
     Read numbering_parser docstring for more info.
     '''
-    num_mask = file_handler.numbering_parser([files[0] for
-                                             files in args.gr_files])
 
-    # MAIN LOOP
-    if (args.save or
+    if args.convert_only:
+        for shot_idx, file_list in enumerate(args.gr_files):
+            shot_name = file_list[0]
+
+            # get SignalsData
+            data = file_handler.read_signals(file_list, start=args.partial[0],
+                                             step=args.partial[1], points=args.partial[2],
+                                             labels=args.labels, units=args.units,
+                                             time_unit=args.time_unit)
+
+            # save data
+            if args.save:
+                saved_as = file_handler.do_save(data, args, shot_name,
+                                                save_as=args.out_names[shot_idx],
+                                                verbose=verbose,
+                                                separate_files=args.separate_save)
+                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+                file_handler.save_m_log(file_list, saved_as, labels, args.multiplier,
+                                        args.delay, args.offset_by_front,
+                                        args.y_auto_zero, args.partial)
+    elif (args.save or
             args.plot or
             args.multiplot or
             args.offset_by_front):
+
+        num_mask = file_handler.numbering_parser([files[0] for
+                                                 files in args.gr_files])
 
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
