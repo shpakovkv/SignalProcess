@@ -530,6 +530,9 @@ def group_peaks(data, window):
         num_peak_in_gr[gr] += 1
         peak_data[wf][gr] = SinglePeak(*peak.data_full)
 
+    if len(data) == 1 and len(data[0]) == 0:
+        return [[]]
+
     # wf == waveform == curve
     start_wf = 0
     # skip first curves if they have no peaks
