@@ -7,7 +7,7 @@ Link: https://github.com/shpakovkv/SignalProcess
 import re
 import os
 import hashlib
-from file_handler import get_grouped_file_list
+from file_handler import get_grouped_file_list, get_csv_headers, get_dialect
 
 ENCODING = 'latin-1'
 
@@ -325,6 +325,38 @@ def check_idx_list(idx_list, max_idx, arg_name):
             "".format(idx=idx, name=arg_name, max=max_idx)
 
 
+# def files_are_equal(first_file_name, second_file_name):
+#     """Compares md5 sum of 2 files.
+#     Returns True or False.
+#
+#     :param first_file_name: the full path to the first file
+#     :param second_file_name: the full path to the second file
+#
+#     :type first_file_name: str
+#     :type second_file_name: str
+#
+#     :return: True if md5 is equal, else False
+#     :rtype: bool
+#     """
+#
+#     chunk_size = 1024
+#
+#     file1_md5 = hashlib.md5()
+#     file2_md5 = hashlib.md5()
+#
+#     with open(first_file_name, 'r', encoding=ENCODING) as file1:
+#         for chunk in iter(file1.read(chunk_size)):
+#             file1_md5.update(chunk.encode(ENCODING))
+#
+#     with open(second_file_name, 'r', encoding=ENCODING) as file2:
+#         for chunk in iter(file2.read(chunk_size)):
+#             file2_md5.update(chunk.encode(ENCODING))
+#
+#     if file1_md5 != file2_md5:
+#         return False
+#     return True
+
+
 def files_are_equal(first_file_name, second_file_name):
     """Compares md5 sum of 2 files.
     Returns True or False.
@@ -338,22 +370,14 @@ def files_are_equal(first_file_name, second_file_name):
     :return: True if md5 is equal, else False
     :rtype: bool
     """
+    dialect1, text1 = get_dialect(first_file_name)
+    dialect2, text2 = get_dialect(second_file_name)
 
-    chunk_size = 1024
-
-    file1_md5 = hashlib.md5()
-    file2_md5 = hashlib.md5()
-
-    with open(first_file_name, 'r', encoding=ENCODING) as file1:
-        for chunk in iter(file1.read(chunk_size)):
-            file1_md5.update(chunk.encode(ENCODING))
-
-    with open(second_file_name, 'r', encoding=ENCODING) as file2:
-        for chunk in iter(file2.read(chunk_size)):
-            file2_md5.update(chunk.encode(ENCODING))
-
-    if file1_md5 != file2_md5:
-        return False
+    head1 = get_csv_headers(text1, delimiter=dialect1.delimiter, except_list=('', 'nan'))
+    head2 = get_csv_headers(text2, delimiter=dialect2.delimiter, except_list=('', 'nan'))
+    for file_1_line, file_2_line in zip(text1[head1:], text2[head2:]):
+        if file_1_line != file_2_line:
+            return False
     return True
 
 
@@ -369,7 +393,7 @@ def compare_grouped_files(group_list, lines=30):
     """
 
     match_list = []
-    for group_1, group_2 in zip(group_list[0:-2], group_list[1:]):
+    for group_1, group_2 in zip(group_list[0:-1], group_list[1:]):
         if len(group_1) == len(group_2):
             for file_1, file_2 in zip(group_1, group_2):
                 if files_are_equal(file_1, file_2):
