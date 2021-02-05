@@ -13,6 +13,7 @@ import datetime
 import numpy as np
 import argparse
 import WFMReader
+import csv
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../isf-converter-py/'))
@@ -23,8 +24,9 @@ from data_types import SignalsData
 from data_types import SinglePeak
 
 
+CSV_DELIMITER_LIST = [',', ';', ' ', ':', '\t']
 LOGDIRECTORY = "LOG_SignalProcess"
-VERBOSE = 1
+VERBOSE = 0
 DEBUG = 0
 
 
@@ -413,7 +415,8 @@ def read_signals(file_list, start=0, step=1, points=-1,
         #     else:
         #         current_time_unit = None
 
-        print(current_labels)
+        if VERBOSE:
+            print(current_labels)
 
         data.add_curves(new_data, current_labels, current_units, current_time_unit)
 
@@ -421,6 +424,36 @@ def read_signals(file_list, start=0, step=1, points=-1,
             print()
         current_count += add_count
     return data
+
+
+def get_dialect(filename):
+    with open(filename, "r") as datafile:
+        datalines = datafile.readlines()
+        try:
+            dialect = csv.Sniffer().sniff(datalines[-1])
+        except csv.Error:
+            datafile.seek(0)
+            dialect = csv.Sniffer().sniff(datafile.read(4096))
+
+        # # old version
+        # try:
+        #     dialect = csv.Sniffer().sniff(datafile.read(4096))
+        # except csv.Error:
+        #     datafile.seek(0)
+        #     dialect = csv.Sniffer().sniff(datafile.readline())
+        # datafile.seek(0)
+
+        if dialect.delimiter not in CSV_DELIMITER_LIST:
+            dialect.delimiter = ','
+
+        #TODO: datalines[-1] may be empty line or contain spacebar
+        if ';' in datalines[-1]:
+            dialect.delimiter = ';'
+
+        if dialect.delimiter == ";":
+            datalines = origin_to_csv(datalines)
+            dialect.delimiter = ','
+    return dialect, datalines
 
 
 def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
@@ -433,10 +466,6 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
     step -- read data points with this step
     points -- data points to read (-1 == all)
     """
-
-    valid_delimiters = [',', ';', ' ', ':', '\t']
-
-    import csv
 
     # data type initialization
     data = np.ndarray(shape=(2, 2), dtype=np.float64, order='F')
@@ -456,55 +485,33 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
         data = np.append(x_data, y_data, axis=1)
         header = ["{}: {}".format(key, val) for key, val in head.items()]
     else:
-        with open(filename, "r") as datafile:
-            text_data = datafile.readlines()
-            try:
-                dialect = csv.Sniffer().sniff(text_data[-1])
-            except csv.Error:
-                datafile.seek(0)
-                dialect = csv.Sniffer().sniff(datafile.read(4096))
+        dialect, text_data = get_dialect(filename)
 
-            # # old version
-            # try:
-            #     dialect = csv.Sniffer().sniff(datafile.read(4096))
-            # except csv.Error:
-            #     datafile.seek(0)
-            #     dialect = csv.Sniffer().sniff(datafile.readline())
-            # datafile.seek(0)
+        if VERBOSE:
+            print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
+                  end="")
 
-            if dialect.delimiter not in valid_delimiters:
-                dialect.delimiter = ','
-            if ';' in text_data[-1]:
-                dialect.delimiter = ';'
+        skip_header = get_csv_headers(text_data, delimiter=dialect.delimiter)
+        usecols = valid_cols(text_data, skip_header,
+                             delimiter=str(dialect.delimiter))
+        header = text_data[0: skip_header]
 
-            if VERBOSE:
-                print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
-                      end="")
-            header = text_data[0: h_lines]
-            if dialect.delimiter == ";":
-                text_data = origin_to_csv(text_data)
-                dialect.delimiter = ','
-            skip_header = get_csv_headers(text_data, delimiter=dialect.delimiter)
-            usecols = valid_cols(text_data, skip_header,
-                                 delimiter=str(dialect.delimiter))
-            header = text_data[0: skip_header]
+        # remove excess
+        last_row = len(text_data) - 1
+        if points > 0:
+            available = int(math.ceil((len(text_data) - skip_header -
+                                       start) / float(step)))
+            if points < available:
+                last_row = points * step + skip_header + start - 1
+        text_data = text_data[skip_header + start: last_row + 1: step]
+        assert len(text_data) >= 2, \
+            "\nError! Not enough data lines in the file."
 
-            # remove excess
-            last_row = len(text_data) - 1
-            if points > 0:
-                available = int(math.ceil((len(text_data) - skip_header -
-                                           start) / float(step)))
-                if points < available:
-                    last_row = points * step + skip_header + start - 1
-            text_data = text_data[skip_header + start: last_row + 1: step]
-            assert len(text_data) >= 2, \
-                "\nError! Not enough data lines in the file."
-
-            if VERBOSE:
-                print("Valid columns = {}".format(usecols))
-            data = np.genfromtxt(text_data,
-                                 delimiter=str(dialect.delimiter),
-                                 usecols=usecols)
+        if VERBOSE:
+            print("Valid columns = {}".format(usecols))
+        data = np.genfromtxt(text_data,
+                             delimiter=str(dialect.delimiter),
+                             usecols=usecols)
 
     if VERBOSE:
         columns = 1
@@ -561,7 +568,7 @@ def valid_cols(read_lines, skip_header, delimiter=','):
     return tuple(valid_col_list)
 
 
-def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
+def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan'), verbose=False):
     """
     Returns the number of header lines
     for the given list of lines of a .csv file.
@@ -609,7 +616,7 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan')):
         else:
             headers += 1
 
-    if VERBOSE:
+    if verbose:
         print("Header lines = {}   |   ".format(headers), end="")
         # print("Columns count = {}  |  ".format(cols_count), end="")
     return headers
