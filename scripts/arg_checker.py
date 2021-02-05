@@ -7,7 +7,7 @@ Link: https://github.com/shpakovkv/SignalProcess
 import re
 import os
 import hashlib
-from file_handler import get_grouped_file_list
+from file_handler import get_grouped_file_list, get_csv_headers, get_dialect
 
 ENCODING = 'latin-1'
 
@@ -325,36 +325,65 @@ def check_idx_list(idx_list, max_idx, arg_name):
             "".format(idx=idx, name=arg_name, max=max_idx)
 
 
-def files_are_equal(first_file_name, second_file_name):
-    """Compares md5 sum of 2 files.
+def files_are_equal(first_file_name, second_file_name, lines=30):
+    """Compares data lines of 2 files line by line.
+    Header lines are not included in the comparison.
+
     Returns True or False.
 
     :param first_file_name: the full path to the first file
     :param second_file_name: the full path to the second file
+    :param lines: number of data lines to check
 
     :type first_file_name: str
     :type second_file_name: str
+    :type lines: int
 
-    :return: True if md5 is equal, else False
+    :return: True if all selected lines are equal, else False
     :rtype: bool
     """
+    dialect1, text1 = get_dialect(first_file_name)
+    dialect2, text2 = get_dialect(second_file_name)
 
-    chunk_size = 1024
-
-    file1_md5 = hashlib.md5()
-    file2_md5 = hashlib.md5()
-
-    with open(first_file_name, 'r', encoding=ENCODING) as file1:
-        for chunk in iter(file1.read(chunk_size)):
-            file1_md5.update(chunk.encode(ENCODING))
-
-    with open(second_file_name, 'r', encoding=ENCODING) as file2:
-        for chunk in iter(file2.read(chunk_size)):
-            file2_md5.update(chunk.encode(ENCODING))
-
-    if file1_md5 != file2_md5:
-        return False
+    head1 = get_csv_headers(text1, delimiter=dialect1.delimiter, except_list=('', 'nan'))
+    head2 = get_csv_headers(text2, delimiter=dialect2.delimiter, except_list=('', 'nan'))
+    lines = min(lines, len(text1) - head1, len(text2) - head2)
+    for idx in range(lines):
+        if text1[head1 + idx:] != text2[head2 + idx:]:
+            return False
     return True
+
+
+# def files_are_equal_md5(first_file_name, second_file_name):
+#     """Compares md5 sum of 2 files.
+#     Returns True or False.
+
+#     :param first_file_name: the full path to the first file
+#     :param second_file_name: the full path to the second file
+
+#     :type first_file_name: str
+#     :type second_file_name: str
+
+#     :return: True if md5 is equal, else False
+#     :rtype: bool
+#     """
+
+#     chunk_size = 1024
+
+#     file1_md5 = hashlib.md5()
+#     file2_md5 = hashlib.md5()
+
+#     with open(first_file_name, 'r', encoding=ENCODING) as file1:
+#         for chunk in iter(file1.read(chunk_size)):
+#             file1_md5.update(chunk.encode(ENCODING))
+
+#     with open(second_file_name, 'r', encoding=ENCODING) as file2:
+#         for chunk in iter(file2.read(chunk_size)):
+#             file2_md5.update(chunk.encode(ENCODING))
+
+#     if file1_md5 != file2_md5:
+#         return False
+#     return True
 
 
 def compare_grouped_files(group_list, lines=30):
@@ -466,8 +495,8 @@ def file_arg_check(options):
     # input directory and files check
     if options.src_dir:
         options.src_dir = options.src_dir.strip()
-        assert os.path.isdir(options.src_dir), \
-            "Can not find directory {}".format(options.src_dir)
+        assert os.path.isdir(options.src_dir), ("Can not find directory {}"
+                                                "".format(options.src_dir))
     if options.files:
         gr_files = check_file_list(options.src_dir, options.files)
         if not options.src_dir:
