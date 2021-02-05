@@ -94,16 +94,6 @@ def get_output_args_parser():
              'after all the changes have been applied.\n'
              'NOTE: Each curve will be saved in separate file.\n\n')
 
-    return output_params_parser
-
-
-def get_specific_output_args_parser():
-    """Returns the parser of parameters of save data.
-
-    :return: file save arguments parser
-    :rtype: argparse.ArgumentParser
-    """
-    output_params_parser = argparse.ArgumentParser(add_help=False)
     output_params_parser.add_argument(
         '--convert-only',
         action='store_true',
@@ -116,6 +106,26 @@ def get_specific_output_args_parser():
              'NOTE 2: this option can be used with --separate-save\n\n')
 
     return output_params_parser
+
+
+def get_utility_args_parser():
+    """Returns the parser of parameters of save data.
+
+    :return: file save arguments parser
+    :rtype: argparse.ArgumentParser
+    """
+    utility_params_parser = argparse.ArgumentParser(add_help=False)
+    utility_params_parser.add_argument(
+        '--threads',
+        action='store',
+        type=int,
+        metavar='NUMBER',
+        dest='threads',
+        default=1,
+        help='specify the number of threads to use. Default=1. \n'
+             'Multithreading is used only in non-interactive mode. \n\n')
+
+    return utility_params_parser
 
 
 def get_input_files_args_parser():

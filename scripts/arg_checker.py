@@ -671,6 +671,12 @@ def convert_only_arg_check(options):
     return options
 
 
+def check_utility_args(options):
+    assert options.threads > 0, "The number of threads must be > 0."
+    # TODO: check interactive mode on/off status
+    return options
+
+
 def peak_param_check(options):
     # original PeakProcess args
     if any([options.level, options.pk_diff, options.gr_width, options.curves]):

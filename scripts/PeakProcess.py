@@ -9,7 +9,9 @@ Link: https://github.com/shpakovkv/SignalProcess
 
 from __future__ import print_function
 
-from matplotlib import pyplot
+import matplotlib
+import matplotlib.pyplot as pyplot
+
 import os
 import sys
 import numpy
@@ -24,6 +26,8 @@ import arg_parser
 import arg_checker
 import file_handler
 import plotter
+from multiprocessing import Pool
+
 from multiplier_and_delay import multiplier_and_delay
 from data_types import SinglePeak
 
@@ -36,7 +40,7 @@ SAVETODIR = 'Peaks'
 SINGLEPLOTDIR = 'SinglePlot'
 MULTIPLOTDIR = 'MultiPlot'
 PEAKDATADIR = 'PeakData'
-DEBUG = True
+DEBUG = False
 PEAKFINDERDEBUG = False
 
 
@@ -55,7 +59,8 @@ def get_parser():
                  arg_parser.get_mult_del_args_parser(),
                  arg_parser.get_plot_args_parser(),
                  arg_parser.get_peak_args_parser(),
-                 arg_parser.get_output_args_parser()],
+                 arg_parser.get_output_args_parser(),
+                 arg_parser.get_utility_args_parser()],
         prog='PeakProcess.py',
         description=p_desc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
@@ -711,6 +716,8 @@ def global_check(options):
     # peak search args check
     options = arg_checker.peak_param_check(options)
 
+    options = arg_checker.check_utility_args(options)
+
     return options
 
 
@@ -823,7 +830,126 @@ def renumber_peak_files(file_list, start=1):
             file_list[i] = new_name
 
 
-if __name__ == '__main__':
+def do_job(args, shot_idx):
+    """Process one shot according to the input arguments:
+        - applies multiplier, delay
+        - finds peaks
+        - groups peaks from different curves by time
+        - saves peaks and peak plots
+        - re-read peak files after peak plot closed
+          (user may delete false-positive peak files
+          while peak plot window is not closed)
+        - plots and saves user specified plots and multiplots
+
+
+    :param args: namespace with all input args
+    :param shot_idx: the number of shot to process
+
+    :type args: argparse.Namespace
+    :type shot_idx: int
+
+    :return: None
+    """
+    number_of_shots = len(args.gr_files)
+    if shot_idx < 0 or shot_idx > number_of_shots:
+        raise IndexError("Error! The shot_index ({}) is out of range ({} shots given)."
+                         "".format(shot_idx, number_of_shots))
+
+    file_list = args.gr_files[shot_idx]
+    verbose = not args.silent
+    shot_name = file_handler.get_shot_number_str(file_list[0], args.num_mask,
+                                                 args.ext_list)
+    # get SignalsData
+    data = file_handler.read_signals(file_list,
+                                     start=args.partial[0],
+                                     step=args.partial[1],
+                                     points=args.partial[2],
+                                     labels=args.labels,
+                                     units=args.units,
+                                     time_unit=args.time_unit)
+    if verbose:
+        print("The number of curves = {}".format(data.count))
+
+    # checks the number of columns with data,
+    # and the number of multipliers, delays, labels
+    args.multiplier = arg_checker.check_multiplier(args.multiplier,
+                                                   count=data.count)
+    args.delay = arg_checker.check_delay(args.delay,
+                                         count=data.count)
+    arg_checker.check_coeffs_number(data.count, ["label", "unit"],
+                                    args.labels, args.units)
+
+    # multiplier and delay
+    data = multiplier_and_delay(data,
+                                args.multiplier,
+                                args.delay)
+
+    # find peaks
+    peaks_data = None
+    if args.level:
+        if verbose:
+            print('LEVEL = {}'.format(args.level))
+
+        check_curves_list(args.curves, data)
+
+        if verbose:
+            print("Searching for peaks...")
+
+        unsorted_peaks = get_peaks(data, args, verbose)
+
+        # step 7 - group peaks [and plot all curves with peaks]
+        peaks_data = group_peaks(unsorted_peaks, args.gr_width)
+
+        # step 8 - save peaks data
+        if verbose:
+            print("Saving peak data...")
+
+        # full path without peak number and extension:
+        pk_filename = get_pk_filename(file_list,
+                                      args.save_to,
+                                      shot_name)
+
+        file_handler.save_peaks_csv(pk_filename, peaks_data, args.labels)
+
+        # step 9 - save multicurve plot
+        multiplot_name = pk_filename + ".plot.png"
+
+        if verbose:
+            print("Saving all peaks as " + multiplot_name)
+        fig = plotter.plot_multiplot(data, peaks_data, args.curves,
+                                     xlim=args.t_bounds, hide=args.peak_hide)
+        pyplot.savefig(multiplot_name, dpi=300)
+        if args.peak_hide:
+            pyplot.close(fig)
+
+        else:
+            pyplot.show()
+
+    if args.read:
+        if verbose:
+            print("Reading peak data...")
+
+        pk_filename = get_pk_filename(file_list,
+                                      args.save_to,
+                                      shot_name)
+        peak_files = get_peak_files(pk_filename)
+        peaks_data = read_peaks(peak_files)
+        renumber_peak_files(peak_files)
+
+    # plot preview and save
+    if args.plot:
+        plotter.do_plots(data, args, shot_name,
+                         peaks=peaks_data, verbose=verbose,
+                         hide=args.p_hide)
+
+    # plot and save multi-plots
+    if args.multiplot:
+        plotter.do_multiplots(data, args, shot_name,
+                              peaks=peaks_data, verbose=verbose,
+                              hide=args.mp_hide)
+
+
+def main():
     parser = get_parser()
 
     # # for debugging
@@ -833,6 +959,7 @@ if __name__ == '__main__':
     # args = parser.parse_args(file_lines)
 
     args = parser.parse_args()
+
     verbose = not args.silent
 
     # try:
@@ -840,108 +967,56 @@ if __name__ == '__main__':
 
     '''
     num_mask (tuple) - contains the first and last index
-    of substring of filename
+    of substring of filenamepyplot.show
     That substring contains the shot number.
     The last idx is excluded: [first, last).
     Read numbering_parser docstring for more info.
     '''
 
     num_mask = file_handler.numbering_parser([files[0] for
-                                             files in args.gr_files])
+                                              files in args.gr_files])
+    args_dict = vars(args)
+    args_dict["num_mask"] = num_mask
+
+    if args.hide_all:
+        # by default backend == Qt5Agg
+        # savefig() time for Qt5Agg == 0.926 s
+        #                for Agg == 0.561 s
+        # for single curve with 10000 points and one peak
+        # run on Intel Core i5-4460 (average for 100 runs)
+        # measured by cProfile
+        matplotlib.use("Agg")
+
     # MAIN LOOP
+    import time
+    start_time = time.time()
     if (args.level or
             args.read):
-        for shot_idx, file_list in enumerate(args.gr_files):
-            shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
-                                                         args.ext_list)
+        # for shot_idx in range(len(args.gr_files)):
+        #     do_job(args, shot_idx)
+        with Pool(args.threads) as p:
+            p.starmap(do_job, [(args, shot_idx) for shot_idx in range(len(args.gr_files))])
+    stop_time = time.time()
 
-            # get SignalsData
-            data = file_handler.read_signals(file_list,
-                                             start=args.partial[0],
-                                             step=args.partial[1],
-                                             points=args.partial[2],
-                                             labels=args.labels,
-                                             units=args.units,
-                                             time_unit=args.time_unit)
-            if verbose:
-                print("The number of curves = {}".format(data.count))
+    # arg_checker.print_duplicates(args.gr_files)
 
-            # checks the number of columns with data,
-            # and the number of multipliers, delays, labels
-            args.multiplier = arg_checker.check_multiplier(args.multiplier,
-                                                           count=data.count)
-            args.delay = arg_checker.check_delay(args.delay,
-                                                 count=data.count)
-            arg_checker.check_coeffs_number(data.count, ["label", "unit"],
-                                            args.labels, args.units)
+    print()
+    print("--------- Finished ---------")
+    spent = stop_time - start_time
+    units = "seconds"
+    if spent > 3600:
+        spent /= 3600
+        units = "hours"
+    elif spent > 60:
+        spent /= 60
+        units = "minutes"
 
-            # multiplier and delay
-            data = multiplier_and_delay(data,
-                                        args.multiplier,
-                                        args.delay)
+    print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
 
-            # find peaks
-            peaks_data = None
-            if args.level:
-                print('LEVEL = {}'.format(args.level))
-                check_curves_list(args.curves, data)
-                if verbose:
-                    print("Searching for peaks...")
 
-                unsorted_peaks = get_peaks(data, args, verbose)
-
-                # step 7 - group peaks [and plot all curves with peaks]
-                peaks_data = group_peaks(unsorted_peaks, args.gr_width)
-
-                # step 8 - save peaks data
-                if verbose:
-                    print("Saving peak data...")
-
-                # full path without peak number and extension:
-                pk_filename = get_pk_filename(file_list,
-                                              args.save_to,
-                                              shot_name)
-
-                file_handler.save_peaks_csv(pk_filename, peaks_data, args.labels)
-
-                # step 9 - save multicurve plot
-                multiplot_name = pk_filename + ".plot.png"
-
-                if verbose:
-                    print("Saving all peaks as " + multiplot_name)
-                plotter.plot_multiplot(data, peaks_data, args.curves,
-                                       xlim=args.t_bounds)
-                pyplot.savefig(multiplot_name, dpi=400)
-                if args.peak_hide:
-                    pyplot.show(block=False)
-                else:
-                    pyplot.show()
-
-            if args.read:
-                if verbose:
-                    print("Reading peak data...")
-
-                pk_filename = get_pk_filename(file_list,
-                                              args.save_to,
-                                              shot_name)
-                peak_files = get_peak_files(pk_filename)
-                peaks_data = read_peaks(peak_files)
-                renumber_peak_files(peak_files)
-
-            # plot preview and save
-            if args.plot:
-                plotter.do_plots(data, args, shot_name,
-                                 peaks=peaks_data, verbose=verbose)
-
-            # plot and save multi-plots
-            if args.multiplot:
-                plotter.do_multiplots(data, args, shot_name,
-                                      peaks=peaks_data, verbose=verbose)
-
-    arg_checker.print_duplicates(args.gr_files)
-    # except Exception as e:
-    #     print()
-    #     sys.exit(e)
+if __name__ == '__main__':
+    main()
 
     # TODO: cl description
     # TODO: test refactored PeakProcess
+    # TODO: refactor verbose mode

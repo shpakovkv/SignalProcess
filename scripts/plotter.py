@@ -79,7 +79,8 @@ class ColorRange:
                     yield self.hsl_to_rgb_code(new_hue, sat, lumi)
 
 
-def do_multiplots(signals_data, cl_args, plot_name, peaks=None, verbose=False):
+def do_multiplots(signals_data, cl_args, plot_name,
+                  peaks=None, verbose=False, hide=False):
     """Plots all the multiplot graphs specified by the user.
     Saves the graphs that the user specified to save.
 
@@ -107,7 +108,9 @@ def do_multiplots(signals_data, cl_args, plot_name, peaks=None, verbose=False):
 
     for curve_list in cl_args.multiplot:
         plot_multiplot(signals_data, peaks, curve_list,
-                       xlim=cl_args.t_bounds, unixtime=cl_args.unixtime)
+                       xlim=cl_args.t_bounds,
+                       unixtime=cl_args.unixtime,
+                       hide=hide)
         if cl_args.multiplot_dir is not None:
             idx_list = "_".join(str(i) for
                                 i in sorted(curve_list))
@@ -146,7 +149,7 @@ def check_plot_param(idx_list, curves_count):
 def plot_multiplot(data, peak_data, curves_list,
                    xlim=None, amp_unit=None,
                    time_unit=None, title=None,
-                   unixtime=False):
+                   unixtime=False, hide=False):
     """Plots subplots for all curves with index in curve_list.
     Optional: plots peaks.
     Subplots are located one under the other.
@@ -169,6 +172,7 @@ def plot_multiplot(data, peak_data, curves_list,
                    If not specified, the time_unit parameter of
                    the first curve in curves_list will be used
     title       -- the main title of the figure.
+    hide        -- truth turns interactive graph mode off (time save option)
     """
     # TODO: new args description
 
@@ -188,6 +192,11 @@ def plot_multiplot(data, peak_data, curves_list,
     #                 unixtime))
 
     plt.close('all')
+    if hide is True:
+        plt.ioff()
+    else:
+        plt.ion()
+
     fig, axes = plt.subplots(len(curves_list), 1, sharex='all', squeeze=False)
     # # an old color scheme
     # colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
@@ -257,9 +266,10 @@ def plot_multiplot(data, peak_data, curves_list,
                     #                     edgecolors='none', facecolors=color,
                     #                     linewidths=1, marker='x')
     fig.subplots_adjust(hspace=0)
+    return fig
 
 
-def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
+def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False, hide=False):
     """Plots all the single curve graphs specified by the user.
     Saves the graphs that the user specified to save.
 
@@ -271,12 +281,14 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
                   peak_data[1] == list of peaks for data.curves[curves_list[1]]
                   etc.
     :param verbose: show additional information or no
+    :param hide: truth turns interactive graph mode off (time save option)
 
     :type signals_data: SignalsData
     :type cl_args: argparse.Namespace
     :type shot_name: str
     :type peaks: list
     :type verbose: bool
+    :type hide: bool
 
     :return: None
     """
@@ -286,8 +298,8 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
         check_plot_param(cl_args.plot, signals_data.count)
     for curve_idx in cl_args.plot:
         curve_peaks = peaks[curve_idx] if peaks is not None else None
-        plot_multiple_curve(signals_data.curves[curve_idx], curve_peaks,
-                            unixtime=cl_args.unixtime)
+        fig = plot_multiple_curve(signals_data.curves[curve_idx], curve_peaks,
+                                  unixtime=cl_args.unixtime, hide=hide)
         if cl_args.plot_dir is not None:
             plot_name = (
                 "{shot}_curve_{idx}_{label}.plot.png"
@@ -297,16 +309,16 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
             plt.savefig(plot_path, dpi=400)
             if verbose:
                 print("Plot is saved as {}".format(plot_path))
-        if not cl_args.p_hide:
+        if not hide:
             plt.show()
         else:
-            plt.show(block=False)
+            plt.close(fig)
 
 
 def plot_multiple_curve(curve_list, peaks=None,
                         xlim=None, amp_unit=None,
                         time_unit=None, title=None,
-                        unixtime=False):
+                        unixtime=False, hide=False):
     """Draws one or more curves on one graph.
     Additionally draws peaks on the underlying layer
     of the same graph, if the peaks exists.
@@ -322,8 +334,18 @@ def plot_multiple_curve(curve_list, peaks=None,
     amp_unit    -- the units for curves Y scale
     time_unit   -- the unit for time scale
     xlim        -- the tuple with the left and the right X bounds
+    hide        -- truth turns interactive graph mode off (time save option)
     """
     plt.close('all')
+
+    # turn on/off interactive mode
+    if hide is True:
+        plt.ioff()
+    else:
+        plt.ion()
+
+    fig = plt.figure()
+
     if xlim is not None:
         plt.xlim(xlim)
     color_iter = iter(ColorRange())
@@ -349,7 +371,6 @@ def plot_multiple_curve(curve_list, peaks=None,
             axes_obj.xaxis.set_major_formatter(dt_fmt)      # set format
             plt.subplots_adjust(bottom=0.22)                # make more space for datetime values
             plt.xticks(rotation=25)                         # rotate long datetime values to avoid overlapping
-
 
     time_label = "Time"
     amp_label = "Amplitude"
@@ -382,6 +403,7 @@ def plot_multiple_curve(curve_list, peaks=None,
                     facecolors='none', linewidths=2)
         # plt.scatter(peak_x, peak_y, s=150, edgecolors='none',
         #             facecolors='#133cac', linewidths=1.5, marker='x')
+    return fig
 
 
 def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
@@ -450,3 +472,6 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
         return idx if after - value < value - before else idx - 1
     else:
         return idx if side == 'right' else idx - 1
+
+# TODO: add save option to plot_multiplot()
+# TODO: unify do_plots() and plot_multiplot()
