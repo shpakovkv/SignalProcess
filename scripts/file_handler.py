@@ -26,8 +26,8 @@ from data_types import SinglePeak
 
 CSV_DELIMITER_LIST = [',', ';', ' ', ':', '\t']
 LOGDIRECTORY = "LOG_SignalProcess"
-VERBOSE = 0
-DEBUG = 0
+VERBOSE = 1
+DEBUG = 1
 
 
 # =======================================================================
@@ -350,7 +350,7 @@ def read_log(file_list, start=0, step=1, points=-1,
 
 
 def read_signals(file_list, start=0, step=1, points=-1,
-                 labels=None, units=None, time_unit=None):
+                 labels=None, units=None, time_units=None):
     """Function returns one SignalsData object filled with
     data from files in file_list.
     Do not forget to sort the list of files
@@ -381,8 +381,10 @@ def read_signals(file_list, start=0, step=1, points=-1,
             print("Loading {}".format(filename))
         new_data, new_header = load_from_file(filename, start,
                                               step, points, h_lines=3)
+        single_time_column = False
         if new_data.shape[1] % 2 != 0:
             # multiple_X_columns = False
+            single_time_column = True
             add_count = new_data.shape[1] - 1
         else:
             # multiple_X_columns = True
@@ -390,7 +392,7 @@ def read_signals(file_list, start=0, step=1, points=-1,
 
         current_labels = None
         current_units = None
-        current_time_unit = None
+        current_time_units = None
 
         if labels:
             # user input
@@ -406,23 +408,25 @@ def read_signals(file_list, start=0, step=1, points=-1,
             # from file
             # current_units = check_header_label(new_header[1], add_count)
 
-        if time_unit:
-            current_time_unit = time_unit
+        if time_units:
+            current_time_units = time_units
         # elif new_header:
         #     head = check_header_label(new_header[2], 1)
         #     if head:
-        #         current_time_unit = head[0]
+        #         current_time_units = head[0]
         #     else:
-        #         current_time_unit = None
+        #         current_time_units = None
 
         if VERBOSE:
             print(current_labels)
 
-        data.add_curves(new_data, current_labels, current_units, current_time_unit)
+        data.add_from_array(new_data.transpose(), current_labels, current_units, current_time_units,
+                            force_single_time_row=single_time_column)
 
         if VERBOSE:
             print()
         current_count += add_count
+    data.time_units = time_units
     return data
 
 
@@ -468,7 +472,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
     """
 
     # data type initialization
-    data = np.ndarray(shape=(2, 2), dtype=np.float64, order='F')
+    data = np.ndarray(shape=(0, 0), dtype=np.float64, order='F')
     header = None
 
     ext_upper = filename[-3:].upper()
@@ -656,7 +660,7 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
         if len(save_as) > 4 and save_as[-4] == ".":
             save_as = save_as[:-4]
         # save single curve
-        if signals_data.count == 1:
+        if signals_data.cnt_curves == 1:
             save_curve_as = "{}.csv".format(save_as)
             save_signals_csv(save_curve_as, signals_data, curves_list=[0])
         else:
@@ -671,11 +675,12 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
 
     #TODO: logging with separate_files==True
     if verbose:
-        max_rows = max(curve.data.shape[0] for curve in
-                       signals_data.curves.values())
+        max_rows = signals_data.max_points
         if verbose:
             print("Curves count = {};    "
-                  "Rows count = {} ".format(signals_data.count, max_rows))
+                  "Rows count = {} "
+                  "".format(signals_data.cnt_curves,
+                            signals_data.max_points))
         print("Saved as {}".format(save_as))
     return save_as
 
@@ -693,7 +698,10 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
     precision -- the precision of storing numbers
     """
     # check precision value
-    table = signals.get_array(curves_list)
+    table = signals.get_array_to_print(curves_list)
+
+    # turn row-oriented array to column-oriented
+    table = table.transpose()
     if DEBUG:
         print("Save columns count = {}".format(table.shape[1]))
     if not isinstance(precision, int):
@@ -721,7 +729,7 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
                  idx in signals.idx_to_label.keys()]
         units = [re.sub(r'[^-.\w_]', '_', unit) for unit in units]
         units = delimiter.join(units) + "\n"
-        time_unit = "{}\n".format(signals.curves[0].time_unit)
+        time_unit = "{}\n".format(signals.time_units)
         lines.append(labels)
         lines.append(units)
         lines.append(time_unit)

@@ -24,7 +24,7 @@ from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_fro
 
 verbose = True
 global_log = ""
-DEBUG = False
+DEBUG = True
 
 
 # ========================================
@@ -46,7 +46,7 @@ def get_parser():
                  arg_parser.get_data_corr_args_parser(),
                  arg_parser.get_plot_args_parser(),
                  arg_parser.get_output_args_parser(),
-                 arg_parser.get_specific_output_args_parser()],
+                 arg_parser.get_utility_args_parser()],
         prog='SignalProcess.py',
         description=p_disc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
@@ -361,6 +361,7 @@ def get_front_point(signals_data, args, multiplier, delay,
     :return: front point
     :rtype: SinglePeak
     """
+    # TODO: fix for new SignalsData class
     if not os.path.isdir(os.path.dirname(front_plot_name)):
         os.makedirs(os.path.dirname(front_plot_name))
 
@@ -629,6 +630,9 @@ if __name__ == "__main__":
     Read numbering_parser docstring for more info.
     '''
 
+    print("Groups: {}".format(args.gr_files))
+    print("Save?: {}".format(args.save))
+
     if args.convert_only:
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = file_list[0]
@@ -637,7 +641,7 @@ if __name__ == "__main__":
             data = file_handler.read_signals(file_list, start=args.partial[0],
                                              step=args.partial[1], points=args.partial[2],
                                              labels=args.labels, units=args.units,
-                                             time_unit=args.time_unit)
+                                             time_units=args.time_units)
 
             # save data
             if args.save:
@@ -657,6 +661,8 @@ if __name__ == "__main__":
         num_mask = file_handler.numbering_parser([files[0] for
                                                  files in args.gr_files])
 
+        print("Groups: {}".format(args.gr_files))
+
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
                                                          args.ext_list)
@@ -665,13 +671,13 @@ if __name__ == "__main__":
             data = file_handler.read_signals(file_list, start=args.partial[0],
                                              step=args.partial[1], points=args.partial[2],
                                              labels=args.labels, units=args.units,
-                                             time_unit=args.time_unit)
+                                             time_units=args.time_units)
 
             # checks the number of columns with data,
             # as well as the number of multipliers, delays, labels
-            arg_checker.check_coeffs_number(data.count * 2, ["multiplier", "delay"],
+            arg_checker.check_coeffs_number(data.cnt_curves * 2, ["multiplier", "delay"],
                                             args.multiplier, args.delay)
-            arg_checker.check_coeffs_number(data.count, ["label", "unit"],
+            arg_checker.check_coeffs_number(data.cnt_curves, ["label", "unit"],
                                             args.labels, args.units)
 
             # check y_zero_offset parameters (if idx is out of range)
@@ -699,11 +705,13 @@ if __name__ == "__main__":
 
             # save data
             if args.save:
+                print("Saving as {}".format(args.out_names[shot_idx]))
                 saved_as = file_handler.do_save(data, args, shot_name,
                                                 save_as=args.out_names[shot_idx],
                                                 verbose=verbose,
                                                 separate_files=args.separate_save)
                 labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+
                 file_handler.save_m_log(file_list, saved_as, labels, args.multiplier,
                                         args.delay, args.offset_by_front,
                                         args.y_auto_zero, args.partial)

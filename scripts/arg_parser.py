@@ -191,10 +191,10 @@ def get_input_files_args_parser():
              'Needed for correct graph labels.\n\n')
 
     input_params_parser.add_argument(
-        '--time-unit',
+        '--time-units',
         action='store',
         metavar='UNIT',
-        dest='time_unit',
+        dest='time_units',
         help='specify the unit of time scale (uniform for all \n'
              'curves). Needed for correct graph labels.\n\n')
 

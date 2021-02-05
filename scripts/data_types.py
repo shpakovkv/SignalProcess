@@ -5,7 +5,7 @@ Link: https://github.com/shpakovkv/SignalProcess
 """
 
 import numpy as np
-
+from numba import jit, guvectorize, float64, float32, int32, int64
 
 # =======================================================================
 # -----     CONST     ---------------------------------------------------
@@ -17,125 +17,127 @@ VERBOSE = 0
 # =======================================================================
 # -----     CLASSES     -------------------------------------------------
 # =======================================================================
-class SingleCurve:
-    def __init__(self, in_x=None, in_y=None,
-                 label=None, unit=None, time_unit=None):
-        self.data = np.empty([0, 2], dtype=float, order='F')
-        self.label = label
-        self.unit = unit
-        self.time_unit = time_unit
-        if in_x is not None and in_y is not None:
-            self.append(in_x, in_y)
-
-    def append(self, x_in, y_in):
-        # INPUT DATA CHECK
-        x_data = x_in
-        y_data = y_in
-        if (not isinstance(x_data, np.ndarray) or
-                not isinstance(y_data, np.ndarray)):
-            raise TypeError("Input time and value arrays must be "
-                            "instances of numpy.ndarray class.")
-        if len(x_data) != len(y_data):
-            raise IndexError("Input time and value arrays must "
-                             "have same length.")
-        # self.points = len(x_data)
-
-        # dimension check
-        if np.ndim(x_data) == 1:
-            x_data = np.expand_dims(x_in, axis=1)
-        if np.ndim(y_data) == 1:
-            y_data = np.expand_dims(y_in, axis=1)
-
-        if x_data.shape[1] != 1 or y_data.shape[1] != 1:
-            raise ValueError("Input time and value arrays must "
-                             "have 1 column and any number of rows.")
-
-        start_idx = None
-        stop_idx = None
-        for i in range(len(x_data) - 1, 0, -1):
-            if not np.isnan(x_data[i]) and not np.isnan(y_data[i]):
-                stop_idx = i
-                break
-        for i in range(0, stop_idx + 1):
-            if not np.isnan(x_data[i]) and not np.isnan(y_data[i]):
-                start_idx = i
-                break
-        if start_idx is None or stop_idx is None:
-            raise ValueError("Can not append array of empty "
-                             "values to SingleCurve's data.")
-        # CONVERT TO NDARRAY
-        temp = np.append(x_data[start_idx: stop_idx + 1],
-                         y_data[start_idx: stop_idx + 1],
-                         axis=1)
-        self.data = np.append(self.data, temp, axis=0)
-
-    def get_x(self):
-        return self.data[:, 0]
-
-    def get_y(self):
-        return self.data[:, 1]
-
-    def get_points(self):
-        return self.data.shape[0]
-
-    time = property(get_x, doc="Get curve's 1D array of time points")
-    val = property(get_y, doc="Get curve's 1D array of value points")
-    points = property(get_points, doc="Get the number of points in curve")
-
-
 class SignalsData:
 
-    def __init__(self, input_data=None, labels=None,
-                 units=None, time_units=None):
-        # EMPTY INSTANCE
-        # number of curves:
-        self.count = 0
-        # dict with indexes as keys and SingleCurve instances as values:
-        self.curves = {}
+    def __init__(self, from_array=None, labels=None,
+                 units=None, time_units=None, dtype=np.float64):
+        """
+
+        :param from_array:
+        :param labels:
+        :param units:
+        :param time_units:
+        :param dtype:
+
+        :type from_array: np.ndarray
+        :type labels: list
+        :type units: list
+        :type time_units: list
+        :type dtype: np.dtype
+        """
+        # CONST  --------------------------------------------------------------
+
+        # [0]: time axis;  [1]: amplitude axis
+        self._axes_number = 2
+
+        # [curve-idx][axis-idx][point-idx]
+        self._data_ndim = 3
+
+        # VARIABLES   ---------------------------------------------------------
+
         # dict with curve labels as keys and curve indexes as values:
         self.label_to_idx = dict()
         # dict with curve indexes as keys and curve labels as values:
         self.idx_to_label = dict()
 
-        # FILL WITH VALUES
-        if input_data is not None:
-            self.add_curves(input_data, labels, units, time_units)
+        self._time_units = ""
+        self.units = list()
+        self.labels = list()
 
-    def append(self, input_data):
-        """Appends new points from ndarray to existing curves in self.
+        # EMPTY INSTANCE
+        # number of curves:
+        self.cnt_curves = 0
+        self.max_points = 0
+        self.min_points = 0
+        self.dtype = dtype
+
+        self.data = np.zeros(shape=(0, self._axes_number, 0), dtype=self.dtype, order="C")
+
+        # fill with input data
+        if isinstance(from_array, np.ndarray):
+            self.add_from_array(from_array, labels=labels, units=units, time_units=time_units)
+        # wrong input type
+        elif from_array is not None:
+            raise TypeError("Wrong data inpyt option type ({})"
+                            "".format(type(from_array)))
+
+    def append_2d_array(self, input_data, labels=None, units=None,
+                        force_single_time_row=False,
+                        column_oriented=False):
+        """
+        Appends new points from ndarray to existing curves in self.
         Rise exception if the number of curves in the self
         and the input data do not match.
 
         :param input_data: ndarray with curves data. if the array has
-                            an even number of columns, then the first
-                            two curves will form the first curve,
-                            the next two columns will result in the second
-                            curve, etc.
-                            If the array has an odd number of columns,
-                            then the first column will be considered as
-                            an X-column for all the curves added. And the
-                            rest of the columns will be treated as Y-columns.
+                           an even number of columns, then the first
+                           two curves will form the first curve,
+                           the next two columns will result in the second
+                           curve, etc.
+                           If the array has an odd number of columns,
+                           then the first column will be considered as
+                           an X-column for all the curves added. And the
+                           rest of the columns will be treated as Y-columns.
 
         :type input_data: np.ndarray
 
-        :return: None
-        :rtype: None
+        :param labels: list of labels for new curves (one y_label for all new curves)
+        :type labels: list
+
+        :param units: list of units for new curves (one y_unit for all new curves)
+        :type units: list
+
+        :param force_single_time_row:
+        :type force_single_time_row:
+
+        :param column_oriented:
+        :type column_oriented:
+
+        :return: number of added curves
+        :rtype: int
         """
-        self.check_ndarray(input_data)
-        if input_data.shape[1] % 2 != 0:
-            multiple_x_columns = False
-        else:
-            multiple_x_columns = True
 
-        for idx in range(0, self.count):
-            if multiple_x_columns:
-                self.curves[idx].append(input_data[:, idx * 2],
-                                        input_data[:, idx * 2 + 1])
-            else:
-                self.curves[idx].append(input_data[:, 0],
-                                        input_data[:, idx + 1])
+        # check data
+        assert isinstance(input_data, np.ndarray), ("Expected 2-dimensional numpy.ndarray as input data, " 
+                                                    "got {} instead.".format(type(input_data)))
+        assert input_data.ndim == 2, ("Expected 2-dimensional numpy.ndarray as input data, " 
+                                      "got {} dimensions instead.".format(input_data.ndim))
+        if column_oriented:
+            input_data = np.transpose(input_data)
 
-    def add_curves(self, input_data, labels=None, units=None, time_unit=None):
+        # expected structure: time_row1, val_row1, time_row2, val_row2, etc.
+        new_curves = input_data.shape[0] // self._axes_number
+
+        # check if rows number is even/odd
+        if not force_single_time_row:
+            if input_data.shape[0] % 2 != 0:
+                force_single_time_row = True
+
+        if force_single_time_row:
+            new_curves = input_data.shape[0] - 1
+            # if rows number is odd add time rows for all input curves except first
+            input_data = multiply_time_column_2d(input_data, self._axes_number)
+
+        self.data = align_and_append_2d_arrays(self.data,
+                                               input_data,
+                                               dtype=self.dtype,
+                                               axes_number=self._axes_number)
+
+        # check & append new labels and units
+        # TODO: append labels and units
+        return new_curves
+
+    def add_from_array(self, input_data, labels=None, units=None, time_units=None, force_single_time_row=False):
         """Separates the input ndarray data into SingleCurves
         and adds it to the self.curves dict.
 
@@ -152,184 +154,493 @@ class SignalsData:
         units      -- the list of labels for the added curves
         time_unit  -- the unit of the time scale
         """
-        new_data = np.array(input_data, dtype=float, order='F')
-        self.check_ndarray(new_data)
-        self.check_labels(new_data, labels, units)
-        if new_data.shape[1] % 2 != 0:
-            multiple_x_columns = False
-            add_count = new_data.shape[1] - 1
+        # TODO: append multiple ndarrays (mixed 2-dimension and 3-dimension)
+        assert isinstance(input_data, np.ndarray), \
+            "Expected ndarray, got {} instead.".format(type(input_data))
+        new_curves = 0
+        new_min_points = 0
+        if input_data.ndim == 2:
+            new_min_points = input_data.shape[1]
+            new_curves = self.append_2d_array(input_data, labels=labels, units=units,
+                                              force_single_time_row=force_single_time_row)
+        elif input_data.ndim == 3:
+            new_curves = input_data.shape[0]
+            new_min_points = input_data.shape[2]
+            self.data = align_and_append_3d_arrays(self.data, input_data, dtype=self.dtype)
         else:
-            multiple_x_columns = True
-            add_count = new_data.shape[1] // 2
+            raise AssertionError("Input array mast be 2-dimension or 3-dimension.")
 
-        for old_idx in range(0, add_count):
-            # old_idx -- the curve index inside the adding ndarray
-            # new_idx -- the curve index inside the output SignalsData
-            new_idx = self.count
-            if labels:
-                current_label = labels[old_idx]
-            else:
-                current_label = "Curve[{}]".format(new_idx)
-            if units:
-                current_unit = units[old_idx]
-            else:
-                current_unit = "a.u."
-            if time_unit:
-                current_time_unit = time_unit
-            else:
-                current_time_unit = "a.u."
+        # update curves count
+        self.cnt_curves += new_curves
 
-            if multiple_x_columns:
-                self.curves[self.count] = \
-                    SingleCurve(new_data[:, old_idx * 2],
-                                new_data[:, old_idx * 2 + 1],
-                                current_label, current_unit,
-                                current_time_unit)
-            else:
-                self.curves[self.count] = \
-                    SingleCurve(new_data[:, 0], new_data[:, old_idx + 1],
-                                current_label, current_unit,
-                                current_time_unit)
-            self.curves[current_label] = self.curves[self.count]
-            self.count += 1
+        # update minimum points (some curve may have less points than others)
+        if self.cnt_curves == new_curves:
+            self.min_points = new_min_points
+        elif new_min_points < self.min_points:
+            self.min_points = new_min_points
 
-            self.label_to_idx[current_label] = new_idx
-            self.idx_to_label[new_idx] = current_label
+        # update maximum points (some curves may have more points than others)
+        self.max_points = self.data.shape[2]
 
-    def check_ndarray(self, data_ndarray):
-        """
-        Checks the correctness of input data_ndarray.
-        Raises exception if data_ndarray check fails.
+        # check and append labels and units
+        self.append_labels(new_curves, labels, units)
 
-        :param data_ndarray: ndarray with data to add to a SignalsData instance
-        :type data_ndarray: np.ndarray
-
-        :return: None
-        :rtype: None
-        """
-        # CHECK INPUT DATA
-
-        if np.ndim(data_ndarray) != 2:
-            raise ValueError("Input array must have 2 dimensions.")
-        if data_ndarray.shape[1] % 2 != 0:
-            if VERBOSE:
-                print("The input array has an odd number of columns! "
-                      "The first column is considered as X column, "
-                      "and the rest as Y columns.")
-
-    def check_labels(self, data_ndarray, new_labels=None, new_units=None):
+    def check_new_labels(self, new_curves, new_labels=None, new_units=None):
         """
         Checks the correctness of input new labels and units.
         Raises exception if check fails.
 
-        :param data_ndarray: ndarray with data to add to a SignalsData instance
+        :param new_curves: number of added curves
         :param new_labels: the list of labels for the new curves
-        :param new_units: he list of units for the new curves
+        :param new_units: the list of units for the new curves
 
         :return: None
         :rtype: None
         """
 
-        if data_ndarray.shape[1] % 2 != 0:
-            # multiple_X_columns = False
-            curves_count = data_ndarray.shape[1] - 1
-        else:
-            # multiple_X_columns = True
-            curves_count = data_ndarray.shape[1] // 2
-
         if new_labels is not None:
-            if not isinstance(new_labels, list):
-                raise TypeError("The variable 'labels' must be "
-                                "an instance of the list class.")
-            if len(new_labels) != curves_count:
-                raise IndexError("The number of curves ({}) (the pair "
-                                 "of time-value columns) in the appending "
-                                 "data and tne number of new labels ({}) "
-                                 "must be the same."
-                                 "".format(curves_count, len(new_labels)))
-            for label in new_labels:
-                if label in self.label_to_idx.keys():
-                    raise ValueError("Label \"{}\" is already exist."
-                                     "".format(label))
+            assert isinstance(new_labels, list), \
+                "New labels list must be list type. Got {} instead." \
+                "".format(type(new_labels))
+
+            assert len(new_labels) == new_curves, \
+                "The number of new labels ({}) differs from the number of new curves ({})" \
+                "".format(len(new_labels), new_curves)
+            for idx, item in enumerate(new_labels):
+                assert isinstance(item, str), \
+                    "The type of each labels in list must be str. Got {} instead at index {}." \
+                    "".format(type(item), idx)
+                assert item not in new_labels[: idx], \
+                    "All new labels must be unique. Label[{}] '{}' was used as label[{}]" \
+                    "".format(idx, item, new_labels[: idx].index(item))
+                assert item not in self.labels, \
+                    "Label[ '{}' is already used as label[{}]" \
+                    "".format(item, self.labels.index(item))
+
         if new_units is not None:
-            if not isinstance(new_labels, list):
-                raise TypeError("The variable 'units' must be "
-                                "an instance of the list class.")
-            if len(new_labels) != curves_count:
-                raise IndexError("The number of curves ({}) (the pair "
-                                 "of time-value columns) in the appending "
-                                 "data and tne number of new units ({}) "
-                                 "must be the same."
-                                 "".format(curves_count, len(new_labels)))
+            assert isinstance(new_units, list), \
+                "New units list must be list type. Got {} instead." \
+                "".format(type(new_units))
+            assert len(new_units) == new_curves, \
+                "The number of new units ({}) differs from the number of new curves ({})" \
+                "".format(len(new_units), new_curves)
+            for idx, item in enumerate(new_units):
+                assert isinstance(item, str), \
+                    "The type of each units in new units list must be str. Got {} instead at index {}." \
+                    "".format(type(item), idx)
 
-    # def get_array(self):
-    #     """Returns all curves data as united 2D array
-    #     short curve arrays are supplemented with
-    #     required amount of rows (filled with 'nan')
-    #
-    #     return -- 2d ndarray
-    #     """
-    #     list_of_2d_arr = [self.curves[idx].data for
-    #                       idx in sorted(self.idx_to_label.keys())]
-    #     if DEBUG:
-    #         print("len(lest of 2D arr) = {}".format(len(list_of_2d_arr)))
-    #     return align_and_append_ndarray(*list_of_2d_arr)
-
-    def get_array(self, curves_list=None):
-        """Returns selected curves data as 2D array
-        short curve arrays are supplemented with
-        required amount of rows (filled with 'nan').
-
-        Selects all curves if curves_list=None.
-
-        :param curves_list: None or list of curves to be exported as 2D array
-        :return: 2d ndarray
+    def append_labels(self, new_curves, new_labels=None, new_units=None):
         """
+        Checks the correctness of input new labels and units.
+        Raises exception if check fails.
 
-        # check for default value
-        if curves_list is None:
-            curves_list = self.idx_to_label.keys()
-        else:
-            # check inputs
-            for idx in curves_list:
-                assert idx in self.idx_to_label.keys(), ("Curve index ({}) is out of bounds ({})."
-                                                         "".format(idx, self.idx_to_label.keys()))
+        Appends fills labels and units for new curves
 
-        list_of_2d_arr = [self.curves[idx].data for
-                          idx in sorted(curves_list)]
-        if DEBUG:
-            print("len(lest of 2D arr) = {}".format(len(list_of_2d_arr)))
+        :param new_curves: number of added curves
+        :param new_labels: the list of labels for the new curves
+        :param new_units: the list of units for the new curves
+
+        :return: None
+        :rtype: None
+        """
+        if new_curves > 0:
+            if new_labels is not None:
+                new_labels = list(new_labels)
+            else:
+                start = self.cnt_curves - new_curves
+                new_labels = ["curve{}".format(idx) for idx in range(start, self.cnt_curves)]
+            if new_units is not None:
+                new_units = list(new_units)
+            else:
+                new_units = ["a.u." for _ in range(new_curves)]
+
+            self.check_new_labels(new_curves, new_labels, new_units)
+            self.labels.extend(new_labels)
+            self.units.extend(new_units)
+
+    def get_array_to_print(self, curves_list=None):
+        # DOTO: test SignalsData save
+        list_of_2d_arr = list()
+        for curve in self.data:
+            list_of_2d_arr.append(curve)
         return align_and_append_ndarray(*list_of_2d_arr)
 
-    def by_label(self, label):
-        # returns SingleCurve by name
-        return self.curves[self.label_to_idx[label]]
+    def get_x(self, curve_idx=-1, curve_label=None):
+        curve_idx = self._check_and_get_index(curve_idx, curve_label)
+        return self.data[curve_idx][0]
 
-    def get_label(self, idx):
-        # return label of the SingleCurve by index
-        for key, value in self.label_to_idx.items():
-            if value == idx:
-                return key
+    def get_y(self, curve_idx=-1, curve_label=None):
+        curve_idx = self._check_and_get_index(curve_idx, curve_label)
+        return self.data[curve_idx][1]
 
-    def get_idx(self, label):
-        # returns index of the SingleCurve by label
-        if label in self.label_to_idx:
-            return self.label_to_idx[label]
+    def get_curve(self, idx=-1, label=None):
+        idx = self._check_and_get_index(idx, label)
+        return self.data[idx]
 
-    def time(self, curve):
-        return self.curves[curve].get_x()
+    def get_labels(self):
+        """Returns a list of the curves labels
+        (copy of the self.labels list).
 
-    def value(self, curve):
-        return self.curves[curve].get_y()
+        :return: labels (copy)
+        :rtype: list
+        """
+        return list(self.labels)
 
-    def label(self, curve):
-        return self.curves[curve].label
+    def get_units(self):
+        """Returns a list of the curves units
+        (copy of the self.units list).
 
-    def unit(self, curve):
-        return self.curves[curve].unit
+        :return: units (copy)
+        :rtype: list
+        """
+        return list(self.units)
 
-    def time_unit(self, curve):
-        return self.curves[curve].time_unit
+    def get_curve_units(self, idx=-1, label=None):
+        idx = self._check_and_get_index(idx, label)
+        return self.units[idx]
+
+    def get_curve_label(self, idx):
+        idx = self._check_and_get_index(idx=idx)
+        return self.labels[idx]
+
+    def get_curve_idx(self, label):
+        if label in self.labels:
+            return self.labels.index(label)
+        return None
+
+    def _check_and_get_index(self, idx=-1, label=None):
+        if label is not None:
+            assert label in self.labels, \
+                "No curve with label '{}' found.".format(label)
+            idx = self.get_curve_idx(label)
+        assert 0 <= idx < self.cnt_curves, \
+            "Curve index [{}] is out of bounds.".format(idx)
+        return idx
+
+    def set_units(self, units_list):
+        units_list = list(units_list)
+        assert len(units_list) == self.cnt_curves, \
+            "The number of new units ({}) differs from the number of self curves ({})" \
+            "".format(len(units_list), self.cnt_curves)
+        for idx, item in enumerate(units_list):
+            assert isinstance(item, str), \
+                "The type of each units in list must be str. Got {} instead at index {}." \
+                "".format(type(item), idx)
+        self.units = units_list
+
+    def set_labels(self, labels_list):
+        labels_list = list(labels_list)
+        assert len(labels_list) == self.cnt_curves, \
+            "The number of new labels ({}) differs from the number of self curves ({})" \
+            "".format(len(labels_list), self.cnt_curves)
+        for idx, item in enumerate(labels_list):
+            assert isinstance(item, str), \
+                "The type of each labels in list must be str. Got {} instead at index {}." \
+                "".format(type(item), idx)
+            assert item not in labels_list[: idx], \
+                "Label[{}] '{}' is already used as label[{}]" \
+                "".format(idx, item, labels_list[: idx].index(item))
+        self.labels = labels_list
+
+    @property
+    def time_units(self):
+        return self._time_units
+
+    @time_units.setter
+    def time_units(self, s):
+        """Sets new time unit for all curves
+        (need for graph captions).
+
+        :param s: new time units for all curves
+        :type s: str
+
+        :return: None
+        :rtype: NoneType
+        """
+        assert isinstance(s, str), \
+            "Wrong type. Expected str, got {} instead.".format(type(s))
+        self._time_units = s
+
+    def is_empty(self):
+        """Check if there are no curves (no data) in this structure.
+
+        :return: True if there are no curves, else False
+        :rtype: bool
+        """
+        return True if self.cnt_curves == 0 else False
+
+
+def multiply_time_column_2d(arr_2d, axes_number):
+    """
+
+    :param arr_2d: 2-dimension ndarray
+    :param axes_number:
+    :return:
+    """
+
+    assert arr_2d.ndim == 2, \
+        "Expected 2-dimensional numpy.ndarray as input data, " \
+        "got {} dimensions instead.".format(arr_2d.ndim)
+
+    curves = (arr_2d.shape[0] - 1) // (axes_number - 1)
+
+    # for axes_number > 2
+    assert (arr_2d.shape[0] - 1) % (axes_number - 1) == 0, \
+        "Unsuitable number of non-time rows ({}) for self data axes number ({})." \
+        "".format(arr_2d.shape[0] - 1, axes_number)
+
+    points = arr_2d.shape[1]
+    data = np.ndarray(shape=(curves * axes_number, points), dtype=arr_2d.dtype, order='C')
+
+    print()
+    print("EMPTY DATA")
+    print(data)
+    for cur in range(curves):
+        cur_row = cur * axes_number
+        fill_2d_array(arr_2d[0: 1, :], data[cur_row: cur_row + 1, :])
+
+    print()
+    print("DATA WITH TIME")
+    print(data)
+
+    time_rows = 0
+    for row in range(1, arr_2d.shape[0]):
+        fill_2d_array(arr_2d[row: row + 1, :], data[row + time_rows: row + time_rows + 1, :])
+        print("Copy from [{} : {}]  to  [{} : {}]".format(row, row + 1, row + time_rows, row + time_rows + 1))
+        if row % (axes_number - 1) == 0:
+            time_rows += 1
+
+    print()
+    print("DATA FILLED")
+    print(data)
+
+    # fill_2d_array_and_multiply_time_jit(time, arr_2d[1:], axes_number, data)
+    return data
+
+
+def align_and_append_2d_arrays(base_3d_array, *arrays, dtype=np.float64, axes_number=2):
+    """Returns 3-dimension numpy.ndarray containing all input curves.
+
+    First array must be 3-dimension ndarray [curve_idx][axis_idx][point_idx]
+    Curves from other arrays will be added to the copy of this array.
+
+    All other ndarray must be 2D: [row_idx][point_idx] where rows 0, 2, 4, etc. are time-rows
+    and rows 1, 3, 5, etc. are amplitude-rows
+
+    Output data:
+    Each curve consist of 2 rows: time-row and amplitude-row
+    and have the shape == (1, 2, N),
+    where N is the number of maximum points among all curves
+    if the curve have n points and N > n:
+    then the last (N - n) values of time-row and amp-row
+    is filled with NaNs.
+
+    :param base_3d_array: 3-dimension ndarray to append data to
+    :type base_3d_array: np.ndarray
+
+    :param arrays: a number of 2-dimension ndarray to append data from
+    :type arrays: np.ndarray
+
+    :param dtype: values type output array
+    :type dtype: np.dtype
+
+    :param axes_number: number of axes for output array
+    :type axes_number: int
+
+    :return: united ndarray
+    :rtype: np.ndarray
+    """
+
+    # @jit(nopython=True, nogil=True)
+    # def fill_data(data, args):
+    #     """
+    #
+    #     :param data: 3-dimension ndarray to copy values to
+    #     :param args: 2-dimension ndarrays to copy data from
+    #     :return: data,- 3-dimension ndarray filled with data from other arrays
+    #     """
+    #     axes_number = data.shape[1]
+    #     max_points = data.shape[2]
+    #     curve_idx = 0
+    #     for arr in args:
+    #         # print("Adding array with shape {}".format(arr.shape))
+    #         for sub_cur in range(arr.shape[0] // axes_number):
+    #             # print("process subcurve {} from [0..{}]".format(sub_cur, arr.shape[0] // axes_number - 1))
+    #             for axis in range(axes_number):
+    #                 # print("Current axis: {} from [0..{}]".format(axis, axes_number - 1))
+    #                 for idx in range(arr.shape[1]):
+    #                     data[curve_idx][axis][idx] = arr[sub_cur * axes_number + axis][idx]
+    #                 for idx in range(arr.shape[1], max_points):
+    #                     data[curve_idx][axis][idx] = np.nan
+    #             curve_idx += 1
+    #
+    # @jit(nopython=True, nogil=True)
+    # def fill_data_once(data, source, curve_idx):
+    #     """
+    #
+    #     :param data: 3-dimension ndarray to copy values to
+    #     :param args: 2-dimension ndarrays to copy data from
+    #     :return: data,- 3-dimension ndarray filled with data from other arrays
+    #     """
+    #     axes_number = data.shape[1]
+    #     max_points = data.shape[2]
+    #     for axis in range(axes_number):
+    #         # print("Current axis: {} from [0..{}]".format(axis, axes_number - 1))
+    #         for idx in range(source.shape[1]):
+    #             data[curve_idx][axis][idx] = source[axis][idx]
+    #         for idx in range(source.shape[1], max_points):
+    #             data[curve_idx][axis][idx] = np.nan
+
+    # this method works for 2-d arrays only (except first 3-d array)
+    input_ndim = 2
+    base_ndim = 3
+
+    for arr in (base_3d_array, *arrays):
+        assert isinstance(arr, np.ndarray), \
+            "Expected ndarray, got {} instead.".format(type(arr))
+
+    # use fix_axes_number instead
+    # cnt_axes = arrays[0].shape[1]
+
+    assert base_3d_array.ndim == base_ndim, \
+        "Base ndarray must have 3 dimension. " \
+        "Got {} instead.".format(base_3d_array.ndim)
+
+    assert base_3d_array.shape[1] == axes_number, \
+        "Wrong axes number in base ndarray. " \
+        "Expected {}, got {}.".format(axes_number, base_3d_array.shape[0])
+
+    for idx in range(len(arrays)):
+        assert arrays[idx].ndim == input_ndim, \
+            "Number of dimension must be {} for all ndarrays\n" \
+            "Got {} in arrays[{}]".format(input_ndim, arrays[idx].ndim, idx)
+
+        assert arrays[idx].shape[0] % axes_number == 0, \
+            "Unsuitable number of rows ({}) for self data axes number ({})" \
+            "".format(arrays[idx].shape[0], axes_number)
+
+    # TODO: handle arrays with odd row number (or not...)
+
+    max_points = max(arr.shape[2] if (arr.ndim == 3) else arr.shape[1]
+                     for arr in (base_3d_array, *arrays))
+
+    curves_count = sum(arr.shape[0] if (arr.ndim == 3) else (arr.shape[0] // axes_number)
+                       for arr in (base_3d_array, *arrays))
+
+    # tmp buffer
+    data = np.full(shape=(curves_count, axes_number, max_points), fill_value=np.nan, dtype=dtype, order='C')
+
+    # prepare 2-dimension slices [axis][point] to represent each curve
+    # each slice have 2xN size,
+    # where N - number of points in current sub array
+    # first row is time row
+    # and 2nd row is amplitude row
+    slices_2d = list()
+
+    for arr in (*(arr_2d for arr_2d in base_3d_array), *arrays):
+        new_curves = arr.shape[0] // axes_number
+        for idx in range(0, arr.shape[0], axes_number):
+            slices_2d.append(arr[idx: idx + axes_number, :])
+
+    for idx in range(curves_count):
+        points = slices_2d[idx].shape[1]
+        fill_2d_array(slices_2d[idx], data[idx, :, 0: points])
+
+    return data
+
+
+def align_and_append_3d_arrays(*args, dtype=np.float64, axes_number=2):
+    """Returns 3-dimension numpy.ndarray containing all input numpy.ndarrays.
+    Input ndarray must be 3D: [curve_idx][axis][point_idx] where axes are time-axis and amplitude-axis
+
+    Output data:
+    Each curve consist of 2 rows: time-row and amplitude-row
+    and have the shape == (1, 2, N),
+    where N is the number of maximum points among all curves
+    if the curve have n points and N > n:
+    then the last (N - n) values of time-row and amp-row
+    is filled with NaNs.
+
+    :param args: a number of 3-dimension ndarray
+    :type args: np.ndarray
+
+    :param dtype: values type output array
+    :type dtype: np.dtype
+
+    :param axes_number: number of axes for output array
+    :type axes_number: int
+
+    :return: united ndarray
+    :rtype: np.ndarray
+    """
+
+    # slower version
+    #
+    # @jit(nopython=True, nogil=True)
+    # def fill_data(data, *args):
+    #     curve_idx = 0
+    #     for arr in args:
+    #         for sub_cur in range(arr.shape[0]):
+    #             for axis in range(2):
+    #                 for idx in range(arr.shape[2]):
+    #                     data[curve_idx][axis][idx] = arr[sub_cur][axis][idx]
+    #                 for idx in range(arr.shape[2], max_points):
+    #                     data[curve_idx][axis][idx] = np.nan
+    #             curve_idx += 1
+
+    fix_ndim = 3
+    axes_number = 2
+
+    for arr in args:
+        assert isinstance(arr, np.ndarray), \
+            "Expected ndarray, got {} instead.".format(type(arr))
+
+    # use fix_axes_number instead
+    # cnt_axes = args[0].shape[1]
+
+    for idx in range(len(args)):
+        assert args[idx].ndim == fix_ndim, \
+            "Number of dimension must be {} for all ndarrays\n" \
+            "Got {} in args[{}]".format(fix_ndim, args[idx].ndim, idx)
+        assert args[idx].shape[1] == axes_number, \
+            "Number of axes (shape[1] value) must be the same for all ndarrays\n" \
+            "Expected {}, got {} in args[{}]".format(axes_number, args[idx].shape[0], idx)
+
+    max_points = max(arr.shape[2] if (arr.ndim == 3) else arr.shape[1] for arr in args)
+    curves_count = sum(arr.shape[0] if (arr.ndim == 3) else (arr.shape[0] // 2) for arr in args)
+
+    # tmp buffer
+    # data = np.ndarray(shape=(curves_count, 2, max_points), dtype=dtype, order='C')
+    data = np.full(shape=(curves_count, axes_number, max_points), fill_value=np.nan, dtype=dtype, order='C')
+
+    slices_2d = list()
+
+    for arr in args:
+        for idx in range(arr.shape[0]):
+            slices_2d.append(arr[idx])
+
+    for idx in range(curves_count):
+        points = slices_2d[idx].shape[1]
+        fill_2d_array(slices_2d[idx], data[idx, :, 0: points])
+
+    return data
+
+
+@guvectorize([(float64[:, :], float64[:, :])], '(a,n)->(a,n)', nopython=True, target="cpu")
+def fill_2d_array(source, res):
+    """
+
+    :param source: 2-dimension ndarrays to copy data from
+    :type source: np.ndarray
+
+    :param res: 2-dimension ndarray to copy values to
+    :type res: np.ndarray
+
+    :return: None
+    """
+    for axis in range(source.shape[0]):
+        for idx in range(source.shape[1]):
+            res[axis][idx] = source[axis][idx]
 
 
 class SinglePeak:
