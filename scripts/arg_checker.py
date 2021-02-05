@@ -325,21 +325,49 @@ def check_idx_list(idx_list, max_idx, arg_name):
             "".format(idx=idx, name=arg_name, max=max_idx)
 
 
-def files_are_equal(first_file_name, second_file_name, lines=30):
-    """Compares data lines of 2 files line by line.
-    Header lines are not included in the comparison.
+# def files_are_equal(first_file_name, second_file_name):
+#     """Compares md5 sum of 2 files.
+#     Returns True or False.
+#
+#     :param first_file_name: the full path to the first file
+#     :param second_file_name: the full path to the second file
+#
+#     :type first_file_name: str
+#     :type second_file_name: str
+#
+#     :return: True if md5 is equal, else False
+#     :rtype: bool
+#     """
+#
+#     chunk_size = 1024
+#
+#     file1_md5 = hashlib.md5()
+#     file2_md5 = hashlib.md5()
+#
+#     with open(first_file_name, 'r', encoding=ENCODING) as file1:
+#         for chunk in iter(file1.read(chunk_size)):
+#             file1_md5.update(chunk.encode(ENCODING))
+#
+#     with open(second_file_name, 'r', encoding=ENCODING) as file2:
+#         for chunk in iter(file2.read(chunk_size)):
+#             file2_md5.update(chunk.encode(ENCODING))
+#
+#     if file1_md5 != file2_md5:
+#         return False
+#     return True
 
+
+def files_are_equal(first_file_name, second_file_name):
+    """Compares md5 sum of 2 files.
     Returns True or False.
 
     :param first_file_name: the full path to the first file
     :param second_file_name: the full path to the second file
-    :param lines: number of data lines to check
 
     :type first_file_name: str
     :type second_file_name: str
-    :type lines: int
 
-    :return: True if all selected lines are equal, else False
+    :return: True if md5 is equal, else False
     :rtype: bool
     """
     dialect1, text1 = get_dialect(first_file_name)
@@ -347,43 +375,10 @@ def files_are_equal(first_file_name, second_file_name, lines=30):
 
     head1 = get_csv_headers(text1, delimiter=dialect1.delimiter, except_list=('', 'nan'))
     head2 = get_csv_headers(text2, delimiter=dialect2.delimiter, except_list=('', 'nan'))
-    lines = min(lines, len(text1) - head1, len(text2) - head2)
-    for idx in range(lines):
-        if text1[head1 + idx:] != text2[head2 + idx:]:
+    for file_1_line, file_2_line in zip(text1[head1:], text2[head2:]):
+        if file_1_line != file_2_line:
             return False
     return True
-
-
-# def files_are_equal_md5(first_file_name, second_file_name):
-#     """Compares md5 sum of 2 files.
-#     Returns True or False.
-
-#     :param first_file_name: the full path to the first file
-#     :param second_file_name: the full path to the second file
-
-#     :type first_file_name: str
-#     :type second_file_name: str
-
-#     :return: True if md5 is equal, else False
-#     :rtype: bool
-#     """
-
-#     chunk_size = 1024
-
-#     file1_md5 = hashlib.md5()
-#     file2_md5 = hashlib.md5()
-
-#     with open(first_file_name, 'r', encoding=ENCODING) as file1:
-#         for chunk in iter(file1.read(chunk_size)):
-#             file1_md5.update(chunk.encode(ENCODING))
-
-#     with open(second_file_name, 'r', encoding=ENCODING) as file2:
-#         for chunk in iter(file2.read(chunk_size)):
-#             file2_md5.update(chunk.encode(ENCODING))
-
-#     if file1_md5 != file2_md5:
-#         return False
-#     return True
 
 
 def compare_grouped_files(group_list, lines=30):
@@ -398,7 +393,7 @@ def compare_grouped_files(group_list, lines=30):
     """
 
     match_list = []
-    for group_1, group_2 in zip(group_list[0:-2], group_list[1:]):
+    for group_1, group_2 in zip(group_list[0:-1], group_list[1:]):
         if len(group_1) == len(group_2):
             for file_1, file_2 in zip(group_1, group_2):
                 if files_are_equal(file_1, file_2):
@@ -495,8 +490,8 @@ def file_arg_check(options):
     # input directory and files check
     if options.src_dir:
         options.src_dir = options.src_dir.strip()
-        assert os.path.isdir(options.src_dir), ("Can not find directory {}"
-                                                "".format(options.src_dir))
+        assert os.path.isdir(options.src_dir), \
+            "Can not find directory {}".format(options.src_dir)
     if options.files:
         gr_files = check_file_list(options.src_dir, options.files)
         if not options.src_dir:
@@ -668,12 +663,6 @@ def convert_only_arg_check(options):
         # fill output files name
         options.out_names = [os.path.join(options.save_to, os.path.basename(group[0])[:-4])
                              for group in options.gr_files]
-    return options
-
-
-def check_utility_args(options):
-    assert options.threads > 0, "The number of threads must be > 0."
-    # TODO: check interactive mode on/off status
     return options
 
 
