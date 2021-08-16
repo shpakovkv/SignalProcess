@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
             # checks the number of data curves,
             # and the number of labels and units
-            arg_checker.check_coeffs_number(data.count, ["label", "unit"],
+            arg_checker.check_coeffs_number(data.curves_count, ["label", "unit"],
                                             args.labels, args.units)
 
             # preview and save single plots

@@ -350,7 +350,7 @@ def read_log(file_list, start=0, step=1, points=-1,
 
 
 def read_signals(file_list, start=0, step=1, points=-1,
-                 labels=None, units=None, time_units=None):
+                 labels=None, units=None, time_unit=None):
     """Function returns one SignalsData object filled with
     data from files in file_list.
     Do not forget to sort the list of files
@@ -408,8 +408,8 @@ def read_signals(file_list, start=0, step=1, points=-1,
             # from file
             # current_units = check_header_label(new_header[1], add_count)
 
-        if time_units:
-            current_time_units = time_units
+        if time_unit:
+            current_time_units = time_unit
         # elif new_header:
         #     head = check_header_label(new_header[2], 1)
         #     if head:
@@ -426,7 +426,7 @@ def read_signals(file_list, start=0, step=1, points=-1,
         if VERBOSE:
             print()
         current_count += add_count
-    data.time_units = time_units
+    data.time_units = time_unit
     return data
 
 

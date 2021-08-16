@@ -346,6 +346,10 @@ class SignalsData:
     def time_units(self):
         return self._time_units
 
+    @property
+    def curves_count(self):
+        return self.cnt_curves
+
     @time_units.setter
     def time_units(self, s):
         """Sets new time unit for all curves

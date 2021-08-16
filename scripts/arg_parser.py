@@ -191,10 +191,10 @@ def get_input_files_args_parser():
              'Needed for correct graph labels.\n\n')
 
     input_params_parser.add_argument(
-        '--time-units',
+        '--time-unit',
         action='store',
         metavar='UNIT',
-        dest='time_units',
+        dest='time_unit',
         help='specify the unit of time scale (uniform for all \n'
              'curves). Needed for correct graph labels.\n\n')
 
@@ -375,6 +375,10 @@ def get_plot_args_parser():
     :rtype: argparse.ArgumentParser
     """
     plot_args_parser = argparse.ArgumentParser(add_help=False)
+
+    # TODO: Multiple curves on single plot feature (--plot action=append)
+
+    # TODO: add Title feature to plot, multiplot, customplot
 
     plot_args_parser.add_argument(
         '-p', '--plot',

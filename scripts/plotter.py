@@ -13,7 +13,8 @@ import bisect
 import colorsys
 import argparse
 
-from data_types import SingleCurve
+# from data_types import SingleCurve
+from data_types import SignalsData
 
 
 class ColorRange:
@@ -103,7 +104,7 @@ def do_multiplots(signals_data, cl_args, plot_name, peaks=None, verbose=False):
     """
 
     for curve_list in cl_args.multiplot:
-        check_plot_param(curve_list, signals_data.count)
+        check_plot_param(curve_list, signals_data.curves_count)
 
     for curve_list in cl_args.multiplot:
         plot_multiplot(signals_data, peaks, curve_list,
@@ -259,70 +260,121 @@ def plot_multiplot_old(data, peak_data, curves_list,
     fig.subplots_adjust(hspace=0)
 
 
-def plot_multiplot(data, peak_data, curves_list,
+def plot_multiplot(data, peak_data, curve_nums,
                    xlim=None, amp_unit=None,
                    time_unit=None, title=None,
                    unixtime=False):
-    """Plots subplots for all curves with index in curve_list.
+    """
+    Plots subplots for all curves with index in curve_nums.
     Optional: plots peaks.
     Subplots are located one under the other.
 
-    data -- the SignalsData instance
-    peak_data -- the list of list of peaks (SinglePeak instance)
-                 of curves with index in curve_list
-                 peak_data[0] == list of peaks for first curve data.curves[curves_list[0]]
-                 peak_data[1] == list of peaks for second curve data.curves[curves_list[1]]
-                 etc.
-    curves_list -- the list of curve indexes in data to be plotted
-    xlim        -- the tuple/list with the left and
-                   the right X bounds in X units.
-    show        -- (bool) show/hide the graph window
-    save_as     -- filename (full path) to save the plot as .png
-                   Does not save by default.
-    amp_unit    -- the unit of Y scale for all subplots.
-                   If not specified, the curve.unit parameter will be used
-    time_unit   -- the unit of time scale for all subplots.
-                   If not specified, the time_unit parameter of
-                   the first curve in curves_list will be used
-    title       -- the main title of the figure.
+    :param data: the SignalsData instance
+    :type data: SignalsData
+
+    :param peak_data: the list of list of peaks (SinglePeak instance)
+                      of curves with index in curve_nums
+                      peak_data[0] == list of peaks for first curve data.curves[curve_nums[0]]
+                      peak_data[1] == list of peaks for second curve data.curves[curve_nums[1]]
+                      etc.
+    :type peak_data: list
+
+    :param curve_nums: the list of curve indexes in data to be plotted
+    :type curve_nums: list
+
+    :param xlim: the tuple/list with the left and the right X bounds in X units.
+    :type xlim: tuple
+
+    :param amp_unit: the unit of Y scale for all subplots. If not specified, the curve.unit parameter will be used
+    :type amp_unit: str
+
+    :param time_unit: the unit of time scale for all subplots.
+                      If not specified, the time_unit parameter of
+                      the first curve in curves_list will be used
+    :type time_unit: str
+
+    :param title: the main title of the figure.
+    :type title: str
+
+    :param unixtime: Handle all time values as unix timestamp.
+                     The values will be converted to matplotlib datetime.
+    :type unixtime: bool
+
+    :return: None
     """
     # TODO: new args description
 
     plt.close('all')
-    fig, axes = plt.subplots(len(curves_list), 1, sharex='all', squeeze=False)
+    fig, axes = plt.subplots(len(curve_nums), 1, sharex='all', squeeze=False)
     if title is not None:
         fig.suptitle(title)
 
-    for wf in range(len(curves_list)):
+    for wf in range(len(curve_nums)):
         # plot curve
 
-        axes_fill(axes[wf, 0], data, curves_list[wf], unixtime)
-        axes_fill_peaks(axes[wf, 0], peak_data, curves_list[wf])
-        axes_adjust(axes[wf, 0], data, curves_list[wf], xlim, amp_unit, unixtime)
+        axes_fill(axes[wf, 0], data, curve_nums[wf], unixtime)
+        axes_fill_peaks(axes[wf, 0], peak_data, curve_nums[wf])
+        axes_adjust(axes[wf, 0], data, curve_nums[wf], xlim, amp_unit, unixtime)
 
     # last plot
-    wf = len(curves_list) - 1
-    axes_adjust_xlabel(axes[wf, 0], data, curves_list[wf], time_unit, unixtime)
+    wf = len(curve_nums) - 1
+    axes_adjust_xlabel(axes[wf, 0], data, time_unit, unixtime)
 
     fig.subplots_adjust(hspace=0)
 
 
-def axes_fill(ax, data, curve, unixtime=False):
+def axes_fill(ax, data, curve_id, unixtime=False, color='#9999aa'):
+    """ Fills axes with new curve with selected color.
+    Converts time values from unixtime to matplotlib datetime if needed.
+
+    :param ax: plot Axes
+    :type ax: matplotlib.axes.Axes
+
+    :param data: SignalsData instance
+    :type data: SignalsData
+
+    :param curve_id: curve index (0-based) in data
+    :type curve_id: int
+
+
+    :param unixtime: handels time values as unixtime if True
+    :type unixtime: bool
+
+    :param color: color HEX code string
+    :type color: str
+
+    :return: None
+    """
     if unixtime:
-        ax.plot(md.epoch2num(data.time(curve)),
-                data.value(curve),
-                '-', color='#9999aa', linewidth=0.5)
+        ax.plot(md.epoch2num(data.get_x(curve_id)),
+                data.get_y(curve_id),
+                '-', color=color, linewidth=0.5)
     else:
-        ax.plot(data.time(curve),
-                data.value(curve),
-                '-', color='#9999aa', linewidth=0.5)
+        ax.plot(data.get_x(curve_id),
+                data.get_y(curve_id),
+                '-', color=color, linewidth=0.5)
 
 
-def axes_fill_peaks(ax, peak_data, curve):
+def axes_fill_peaks(ax, peak_data, curve_id):
+    """Fill axes with curve peaks.
+
+    :param ax: plot Axes
+    :type ax: matplotlib.axes.Axes
+
+    :param peak_data: the list of list of peaks (SinglePeak instance)
+    :type peak_data: list
+
+    :param curve_id: curve index (0-based) in data
+    :type curve_id: int
+
+    :return: None
+    """
+    # TODO: check peak groups color (peaks from different curves but same group have the same color)
+
     # plot peaks scatter
     if peak_data is not None:
         color_iter = iter(ColorRange())
-        for pk in peak_data[curve]:
+        for pk in peak_data[curve_id]:
             color = next(color_iter)
             if pk is not None:
                 ax.scatter([pk.time], [pk.val], s=20,
@@ -330,22 +382,44 @@ def axes_fill_peaks(ax, peak_data, curve):
                            linewidths=1.5)
 
 
-def axes_adjust(ax, data, curve, xlim, amp_unit, unixtime=False):
+def axes_adjust(ax, data, curve_id, xlim, amp_unit, unixtime=False):
+    """ Adjust axes ticks, X limits, Y limits, print labels and units.
+
+    :param ax: plot Axes
+    :type ax: matplotlib.axes.Axes
+
+    :param data: SignalsData instance
+    :type data: SignalsData
+
+    :param curve_id: curve index (0-based) in data
+    :type curve_id: int
+
+    :param xlim: time bounds for plot
+    :type xlim: tuple
+
+    :param amp_unit: amplitude unit
+    :type amp_unit: str
+
+    :param unixtime: handels time values as unixtime if True
+    :type unixtime: bool
+
+    :return: None
+    """
     ax.tick_params(direction='in', top=True, right=True)
 
     # set bounds
     if xlim is not None and xlim[0] is not None and xlim[1] is not None:
         ax.set_xlim(xlim)
-        ax.set_ylim(calc_y_lim(data.time(curve),
-                               data.value(curve),
+        ax.set_ylim(calc_y_lim(data.get_x(curve_id),
+                               data.get_y(curve_id),
                                xlim, reserve=0.1))
     # y label (units only)
     if amp_unit is None:
-        amp_unit = data.curves[curve].unit
+        amp_unit = data.get_curve_units(curve_id)
     ax.set_ylabel(amp_unit, size=10, rotation='horizontal')
 
     # subplot title
-    amp_label = data.curves[curve].label
+    amp_label = data.get_curve_label(curve_id)
     # if data.curves[curves_list[wf]].unit:
     #     amp_label += ", " + data.curves[curves_list[wf]].unit
     ax.text(0.99, 0.01, amp_label, verticalalignment='bottom',
@@ -354,13 +428,13 @@ def axes_adjust(ax, data, curve, xlim, amp_unit, unixtime=False):
     ax.tick_params(labelsize=8)
 
 
-def axes_adjust_xlabel(ax, data, curve, time_unit=None, unixtime=None):
+def axes_adjust_xlabel(ax, data, time_unit=None, unixtime=None):
     # Time axis label
     time_label = "Time"
     if time_unit is not None:
         time_label += ", " + time_unit
     else:
-        time_label += ", " + data.curves[curve].time_unit
+        time_label += ", " + data.time_units
     ax.set_xlabel(time_label, size=10)
     if unixtime:
         dt_fmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
@@ -391,18 +465,18 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
     :return: None
     """
     if cl_args.plot[0] == -1:  # 'all'
-        cl_args.plot = list(range(0, signals_data.count))
+        cl_args.plot = list(range(0, signals_data.curves_count))
     else:
-        check_plot_param(cl_args.plot, signals_data.count)
+        check_plot_param(cl_args.plot, signals_data.curves_count)
     for curve_idx in cl_args.plot:
         curve_peaks = peaks[curve_idx] if peaks is not None else None
-        plot_multiple_curve(signals_data.curves[curve_idx], curve_peaks,
+        plot_multiple_curve(signals_data, curve_idx, curve_peaks,
                             unixtime=cl_args.unixtime)
         if cl_args.plot_dir is not None:
             plot_name = (
                 "{shot}_curve_{idx}_{label}.plot.png"
                 "".format(shot=shot_name, idx=curve_idx,
-                          label=signals_data.curves[curve_idx].label))
+                          label=signals_data.get_curve_label(curve_idx)))
             plot_path = os.path.join(cl_args.plot_dir, plot_name)
             plt.savefig(plot_path, dpi=400)
             if verbose:
@@ -413,7 +487,7 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False):
             plt.show(block=False)
 
 
-def plot_multiple_curve(curve_list, peaks=None,
+def plot_multiple_curve(data, curve_nums, peaks=None,
                         xlim=None, amp_unit=None,
                         time_unit=None, title=None,
                         unixtime=False):
@@ -425,8 +499,8 @@ def plot_multiple_curve(curve_list, peaks=None,
     NOTE: after the function execution you need to show() or save() pyplot
           otherwise the figure will not be saved or shown
 
-    curve_list  -- the list of SingleCurve instances
-                   or SingleCurve instance
+    deta        -- SignalsData
+    curve_list  -- the list of curve indexes (0-based)
     peaks       -- the list or SinglePeak instances
     title       -- the title for plot
     amp_unit    -- the units for curves Y scale
@@ -437,21 +511,21 @@ def plot_multiple_curve(curve_list, peaks=None,
     if xlim is not None:
         plt.xlim(xlim)
     color_iter = iter(ColorRange())
-    if isinstance(curve_list, SingleCurve):
-        curve_list = [curve_list]
-    for curve in curve_list:
-        if len(curve_list) > 1:
+    if isinstance(curve_nums, int):
+        curve_nums = [curve_nums]
+    for curve_id in curve_nums:
+        if len(curve_nums) > 1:
             color = next(color_iter)
         else:
             color = '#9999aa'
         # print("||  COLOR == {} ===================".format(color))
         if unixtime:
-            plt.plot(md.epoch2num(curve.time),
-                     curve.val,
+            plt.plot(md.epoch2num(data.get_x(curve_id)),
+                     data.get_y(curve_id),
                      '-', color=color, linewidth=1)
         else:
-            plt.plot(curve.time, curve.val, '-',
-                     color=color, linewidth=1)
+            plt.plot(data.get_x(curve_id), data.get_y(curve_id),
+                     '-', color=color, linewidth=1)
         axes_obj = plt.gca()
         axes_obj.tick_params(direction='in', top=True, right=True)
         if unixtime:
@@ -465,21 +539,23 @@ def plot_multiple_curve(curve_list, peaks=None,
     amp_label = "Amplitude"
     if time_unit is not None:
         time_label += ", " + time_unit
-    elif curve_list[0].time_unit:
-        time_label += ", " + curve_list[0].time_unit
+    elif data.time_units:
+        time_label += ", " + data.time_units
 
     if amp_unit is not None:
         amp_label += ", " + amp_unit
-    elif all(curve_list[0].unit == curve.unit for curve in curve_list):
-        amp_label += ", " + curve_list[0].unit
+    elif all(data.get_curve_units(curve_nums[0]) == data.get_curve_units(idx)
+             for idx in curve_nums[1:]):
+        amp_label += ", " + data.get_curve_units(curve_nums[0])
 
     if title is not None:
         plt.title(title)
-    elif len(curve_list) > 1:
+    elif len(curve_nums) > 1:
         # LEGEND
+        # TODO: plot_multiple_curve Legend feature
         pass
     else:
-        plt.title(curve_list[0].label)
+        plt.title(data.get_curve_label(curve_nums[0]))
     plt.xlabel(time_label)
     plt.ylabel(amp_label)
 
@@ -492,6 +568,29 @@ def plot_multiple_curve(curve_list, peaks=None,
                     facecolors='none', linewidths=2)
         # plt.scatter(peak_x, peak_y, s=150, edgecolors='none',
         #             facecolors='#133cac', linewidths=1.5, marker='x')
+
+
+# def plot_multiple_curve_new(curve_list, peaks=None,
+#                         xlim=None, amp_unit=None,
+#                         time_unit=None, title=None,
+#                         unixtime=False):
+#     plt.close('all')
+#     fig, axes = plt.subplots(len(curve_list), 1, sharex='all', squeeze=False)
+#     if title is not None:
+#         fig.suptitle(title)
+#
+#     for wf in range(len(curve_list)):
+#         # plot curve
+#
+#         axes_fill(axes[wf, 0], data, curve_list[wf], unixtime)
+#         axes_fill_peaks(axes[wf, 0], peak_data, curve_list[wf])
+#         axes_adjust(axes[wf, 0], data, curve_list[wf], xlim, amp_unit, unixtime)
+#
+#     # last plot
+#     wf = len(curve_list) - 1
+#     axes_adjust_xlabel(axes[wf, 0], data, time_unit, unixtime)
+#
+#     fig.subplots_adjust(hspace=0)
 
 
 def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
