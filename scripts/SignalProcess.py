@@ -641,7 +641,7 @@ if __name__ == "__main__":
             data = file_handler.read_signals(file_list, start=args.partial[0],
                                              step=args.partial[1], points=args.partial[2],
                                              labels=args.labels, units=args.units,
-                                             time_units=args.time_units)
+                                             time_unit=args.time_units)
 
             # save data
             if args.save:
@@ -671,7 +671,7 @@ if __name__ == "__main__":
             data = file_handler.read_signals(file_list, start=args.partial[0],
                                              step=args.partial[1], points=args.partial[2],
                                              labels=args.labels, units=args.units,
-                                             time_units=args.time_units)
+                                             time_unit=args.time_units)
 
             # checks the number of columns with data,
             # as well as the number of multipliers, delays, labels
