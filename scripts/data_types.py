@@ -137,7 +137,8 @@ class SignalsData:
         # TODO: append labels and units
         return new_curves
 
-    def add_from_array(self, input_data, labels=None, units=None, time_units=None, force_single_time_row=False):
+    def add_from_array(self, input_data, labels=None, units=None,
+                       time_units=None, force_single_time_row=False):
         """Separates the input ndarray data into SingleCurves
         and adds it to the self.curves dict.
 
@@ -273,9 +274,16 @@ class SignalsData:
         curve_idx = self._check_and_get_index(curve_idx, curve_label)
         return self.data[curve_idx][1]
 
-    def get_curve(self, idx=-1, label=None):
+    def get_curve_2d_arr(self, idx=-1, label=None):
         idx = self._check_and_get_index(idx, label)
         return self.data[idx]
+
+    def get_single_curve(self, idx=-1, label=None):
+        idx = self._check_and_get_index(idx, label)
+        return SingleCurve(self.data[idx],
+                           label=self.labels[idx],
+                           units=self.units[idx],
+                           t_units=self.time_units)
 
     def get_labels(self):
         """Returns a list of the curves labels
@@ -369,6 +377,172 @@ class SignalsData:
         """
         return True if self.cnt_curves == 0 else False
 
+
+class SingleCurve:
+
+    # static
+    _label_default = ""
+    _units_default = "a.u."
+    _t_units_default = "a.u."
+
+    _label_max_len = 24
+    _units_max_len = 10
+    _t_units_max_len = 10
+
+    def __init__(self, data, label=None, units=None, t_units=None):
+        """
+
+        :param data:
+        :type data: np.ndarray
+
+        :param label:
+        :type label:
+
+        :param units:
+        :type units:
+
+        :param t_units:
+        :type t_units:
+        """
+        self.__ndim = 2
+        self.__x_row_idx = 0
+        self.__y_row_idx = 1
+
+        # check labels
+        self.label = label
+        self.units = units
+        self.t_units = t_units
+        self._check_self_labels()
+
+        # check data
+        self._check_data(data)
+        self.data = data
+
+    def get_x(self):
+        return self.data[self.__x_row_idx][:]
+
+    def get_y(self):
+        return self.data[self.__y_row_idx][:]
+
+    def get_points(self):
+        return self.data[0].size
+
+    def copy(self):
+        return self.__class__(self.data.copy(),
+                              self.label[:],
+                              self.units[:],
+                              self.t_units[:])
+
+    time = property(get_x, doc="Get curve's 1D array of time points")
+    val = property(get_y, doc="Get curve's 1D array of value points")
+    points = property(get_points, doc="Get the number of points in curve")
+
+    # internal ----------------------------------------------------------------
+    def _check_data(self, data):
+        assert isinstance(data, np.ndarray), \
+            "Expected ndarray, got {} instead.".format(type(data))
+        assert data.ndim == self.__ndim, \
+            "Number of ndarray's dimensions must be {}\n" \
+            "Got {} instead.".format(self.__ndim, data.ndim)
+        assert data.shape[0] > 1, \
+            "Number of axes (shape[0] value) must be greater than 1\n" \
+            "Got {} instead.".format(data.shape[0])
+
+    def _check_self_labels(self):
+        if self.label is not None:
+            assert isinstance(self.label, str), \
+                "The label must be of type str. Got {} instead.".format(type(self.label))
+            assert len(self.label) <= self.__class__._label_max_len, \
+                "The label is too long (more than {} characters)." \
+                "".format(self.__class__._label_max_len)
+        else:
+            self.label = self.__class__._label_default
+
+        if self.units is not None:
+            assert isinstance(self.units, str), \
+                "The units must be of type str. Got {} instead.".format(type(self.units))
+            assert len(self.units) <= self.__class__._units_max_len, \
+                "The units is too long (more than {} characters)." \
+                "".format(self.__class__._units_max_len)
+        else:
+            self.units = self.__class__._units_default
+
+        if self.t_units is not None:
+            assert isinstance(self.t_units, str), \
+                "The t_units must be of type str. Got {} instead.".format(type(self.t_units))
+            assert len(self.t_units) <= self.__class__._t_units_max_len, \
+                "The t_units is too long (more than {} characters)." \
+                "".format(self.__class__._t_units_max_len)
+        else:
+            self.t_units = self.__class__._t_units_default
+
+
+class SinglePeak:
+    """Peak object. Contains information on one peak point.
+    """
+    def __init__(self, time=None, value=None, index=None,
+                 sqr_l=0, sqr_r=0):
+        """
+        :param time: time (X) value of peak point
+        :param value: amplitude (Y) value of peak point
+        :param index: index of peak point (in SingleCurve data)
+        :param sqr_l: 'square factor' of the left edge of the peak:
+                      the closer the both sqr_l and sqr_r values
+                      to '1', the higher the probability
+                      that this is an erroneous peak
+        :param sqr_r: same as sqr_r
+        """
+        self.time = time
+        self.val = value
+        self.idx = index
+        self.sqr_l = sqr_l
+        self.sqr_r = sqr_r
+
+    def invert(self):
+        if self.val is not None:
+            self.val = -self.val
+
+    def get_time_val(self):
+        return [self.time, self.val]
+
+    def set_time_val_idx(self, data):
+        if len(data) != 3:
+            raise ValueError("Wrong number of values to unpack. "
+                             "3 expected, " + str(len(data)) +
+                             " given.")
+        self.time = data[0]
+        self.val = data[1]
+        self.idx = data[2]
+
+    def set_data_full(self, data):
+        count = 5
+        if len(data) != count:
+            raise ValueError("Wrong number of values to unpack. "
+                             "{} expected, {} given."
+                             "".format(count, len(data)))
+        self.time = data[0]
+        self.val = data[1]
+        self.idx = data[2]
+        self.sqr_l = data[3]
+        self.sqr_r = data[4]
+
+    def get_time_val_idx(self):
+        return [self.time, self.val, self.idx]
+
+    def get_data_full(self):
+        return [self.time, self.val, self.idx, self.sqr_l, self.sqr_r]
+
+    xy = property(get_time_val, doc="Get [time, value] of peak.")
+    data = property(get_time_val_idx, set_time_val_idx,
+                    doc="Get/set [time, value, index] of peak.")
+    data_full = property(get_data_full, set_data_full,
+                         doc="Get/set [time, value, index, "
+                             "sqr_l, sqr_r] of peak.")
+
+
+# =======================================================================
+# -----     FUNCTIONS     -----------------------------------------------
+# =======================================================================
 
 def multiply_time_column_2d(arr_2d, axes_number):
     """
@@ -643,72 +817,6 @@ def fill_2d_array(source, res):
             res[axis][idx] = source[axis][idx]
 
 
-class SinglePeak:
-    """Peak object. Contains information on one peak point.
-    """
-    def __init__(self, time=None, value=None, index=None,
-                 sqr_l=0, sqr_r=0):
-        """
-        :param time: time (X) value of peak point
-        :param value: amplitude (Y) value of peak point
-        :param index: index of peak point (in SingleCurve data)
-        :param sqr_l: 'square factor' of the left edge of the peak:
-                      the closer the both sqr_l and sqr_r values
-                      to '1', the higher the probability
-                      that this is an erroneous peak
-        :param sqr_r: same as sqr_r
-        """
-        self.time = time
-        self.val = value
-        self.idx = index
-        self.sqr_l = sqr_l
-        self.sqr_r = sqr_r
-
-    def invert(self):
-        if self.val is not None:
-            self.val = -self.val
-
-    def get_time_val(self):
-        return [self.time, self.val]
-
-    def set_time_val_idx(self, data):
-        if len(data) != 3:
-            raise ValueError("Wrong number of values to unpack. "
-                             "3 expected, " + str(len(data)) +
-                             " given.")
-        self.time = data[0]
-        self.val = data[1]
-        self.idx = data[2]
-
-    def set_data_full(self, data):
-        count = 5
-        if len(data) != count:
-            raise ValueError("Wrong number of values to unpack. "
-                             "{} expected, {} given."
-                             "".format(count, len(data)))
-        self.time = data[0]
-        self.val = data[1]
-        self.idx = data[2]
-        self.sqr_l = data[3]
-        self.sqr_r = data[4]
-
-    def get_time_val_idx(self):
-        return [self.time, self.val, self.idx]
-
-    def get_data_full(self):
-        return [self.time, self.val, self.idx, self.sqr_l, self.sqr_r]
-
-    xy = property(get_time_val, doc="Get [time, value] of peak.")
-    data = property(get_time_val_idx, set_time_val_idx,
-                    doc="Get/set [time, value, index] of peak.")
-    data_full = property(get_data_full, set_data_full,
-                         doc="Get/set [time, value, index, "
-                             "sqr_l, sqr_r] of peak.")
-
-
-# =======================================================================
-# -----     FUNCTIONS     -----------------------------------------------
-# =======================================================================
 def align_and_append_ndarray(*args):
     """Returns 2D numpy.ndarray containing all input 2D numpy.ndarrays.
     If input arrays have different number of rows,

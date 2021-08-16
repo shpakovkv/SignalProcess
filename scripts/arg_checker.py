@@ -7,6 +7,7 @@ Link: https://github.com/shpakovkv/SignalProcess
 import re
 import os
 import hashlib
+import numpy as np
 from file_handler import get_grouped_file_list, get_csv_headers, get_dialect
 
 ENCODING = 'latin-1'
@@ -96,6 +97,8 @@ def global_check_idx_list(args, name, allow_all=False):
 
     if len(args) == 1 and args[0].upper() == 'ALL' and allow_all:
         args = [-1]
+    elif len(args) == 1 and args[0] == -1:
+        pass
     else:
         for idx, _ in enumerate(args):
             try:
@@ -429,6 +432,44 @@ def print_duplicates(group_list, lines=30):
                                 os.path.basename(pair[1])))
 
 
+def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float64):
+    mult = options.multiplier
+    delay = options.delay
+    if mult is not None:
+        assert len(mult) % data_axes == 0, \
+            "Еhe number of elements in multiplier ({}) must be a multiple of " \
+            "the number of data axes ({}).".format(len(mult), data_axes)
+
+        assert isinstance(mult, list), \
+            "The multiplier must be of type list. " \
+            "Got {} instead.".format(type(mult))
+
+        mult = np.array(mult, dtype=dtype)
+
+        # input structure: cur0_x_mult, cur0_y_mult, cur1_x_mult, cur1_y_mult, etc.
+        # first convert list to 'table' with x_column and y_column:
+        # cur0_x_mult, cur0_y_mult
+        # cur1_x_mult, cur1_y_mult
+        # cur2_x_mult, cur2_y_mult
+        # -- etc.
+        mult = mult.reshape(len(mult) / data_axes, data_axes)
+
+        options.multiplier = mult.reshape(data_axes, len(mult) / data_axes)
+
+    if delay is not None:
+        assert len(delay) % data_axes == 0, \
+            "Еhe number of elements in delay ({}) must be a multiple of " \
+            "the number of data axes ({}).".format(len(delay), data_axes)
+
+        assert isinstance(delay, list), \
+            "The delay argument must be of type list. " \
+            "Got {} instead.".format(type(delay))
+
+    # multiplier's & delay's elements are of type float (checked by arg_parser)
+
+    #
+
+
 def check_multiplier(m, count=1):
     """Checks 'multiplier' argument, return it's copy
      or generates a list of ones.
@@ -689,9 +730,14 @@ def peak_param_check(options):
         assert options.t_bounds[0] < options.t_bounds[1], \
             "The left time bound must be less then the right one."
 
+    return options
+
+
+def check_utility_args(options):
+    assert options.threads > 0, "The number of threads must be > 0."
+
     if options.hide_all:
         options.p_hide = True
         options.mp_hide = True
         options.peak_hide = True
-
     return options

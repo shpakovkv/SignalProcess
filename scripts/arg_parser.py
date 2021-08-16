@@ -125,6 +125,14 @@ def get_utility_args_parser():
         help='specify the number of threads to use. Default=1. \n'
              'Multithreading is used only in non-interactive mode. \n\n')
 
+    utility_params_parser.add_argument(
+        '--interactive-off',
+        action='store_true',
+        dest='hide_all',
+        help='Hides all plots. The plots will be saved at their \n'
+             'default folders but not shown.\n'
+             '(Need for batch process)\n\n')
+
     return utility_params_parser
 
 
@@ -360,7 +368,7 @@ def get_data_corr_args_parser():
         default=None,
         help='specify the indexes of the fake curves, whose values\n'
              'you want to set to zero.\n'
-             'Enter \'all\' (without the quotes) to set all curves\n'
+             'Enter \'all\' or \'-1\' (without the quotes) to set all curves\n'
              'values to zero.\n\n')
     return data_corr_args_parser
 
@@ -561,14 +569,6 @@ def get_peak_args_parser():
         help='Hides the multiplot with overall found peaks.\n'
              'The multiplot will be saved at the default folder \n'
              'but not shown.\n'
-             'Needed for automation.\n\n')
-
-    peak_args_parser.add_argument(
-        '--hide-all',
-        action='store_true',
-        dest='hide_all',
-        help='Hides all plots. The plots will be saved at their \n'
-             'default folders but not shown.\n'
              'Needed for automation.\n\n')
 
     peak_args_parser.add_argument(

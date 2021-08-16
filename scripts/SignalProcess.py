@@ -11,12 +11,15 @@ import argparse
 import numpy as np
 from scipy.signal import savgol_filter
 from matplotlib import pyplot as plt
+import matplotlib
 
 import data_types
 import arg_parser
 import arg_checker
 import file_handler
 import plotter
+
+from numba import vectorize, float64
 
 from multiplier_and_delay import *
 
@@ -370,30 +373,24 @@ def get_front_point(signals_data, args, multiplier, delay,
     window = args[2]
     poly_order = args[3]
 
-    polarity = check_polarity(signals_data.curves[curve_idx])
+    curve = data_types.SingleCurve(signals_data.get_single_curve(curve_idx))
+    polarity = check_polarity(curve)
     if is_pos(polarity):
         level = abs(level)
     else:
         level = -abs(level)
 
-    x_mult = multiplier[curve_idx * 2]
-    y_mult = multiplier[curve_idx * 2 + 1]
-    x_del = delay[curve_idx * 2]
-    y_del = delay[curve_idx * 2 + 1]
+    cur_mult = multiplier[curve_idx: curve_idx + 1]
+    cur_del = delay[curve_idx: curve_idx + 1]
 
     # make local copy of target curve
-    curve = data_types.SingleCurve(signals_data.time(curve_idx),
-                                   signals_data.value(curve_idx),
-                                   signals_data.label(curve_idx),
-                                   signals_data.unit(curve_idx),
-                                   signals_data.time_unit(curve_idx))
+    curve = curve.copy()
+
     # apply multiplier and delay to local copy
-    curve.data = multiplier_and_delay(curve.data,
-                                      [x_mult, y_mult],
-                                      [x_del, y_del])
+    curve.data = multiplier_and_delay(curve.data, cur_mult, cur_del)
     # get x and y columns
-    data_x = curve.get_x()
-    data_y = curve.get_y()
+    data_x = curve.time
+    data_y = curve.val
 
     print("Time offset by curve front process.")
     print("Searching curve[{idx}] \"{label}\" front at level = {level}"
@@ -423,7 +420,7 @@ def get_front_point(signals_data, args, multiplier, delay,
         data_y_smooth = smooth_voltage(data_y, window, poly_order)
         smoothed_curve = data_types.SingleCurve(data_x, data_y_smooth,
                                                 curve.label, curve.unit,
-                                                curve.time_unit)
+                                                curve.t_unit)
         # find front
         front_x, front_y = find_curve_front(smoothed_curve,
                                             level, polarity)
@@ -508,7 +505,7 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
     :rtype: argparse.Namespace
     """
 
-    arg_checker.check_idx_list(cl_args.offset_by_front[0], signals_data.count - 1,
+    arg_checker.check_idx_list(cl_args.offset_by_front[0], signals_data.cnt_curves - 1,
                                "--offset-by-curve-front")
 
     front_plot_name = file_handler.get_front_plot_name(cl_args.offset_by_front,
@@ -526,56 +523,33 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
     return cl_args
 
 
-def zero_one_curve(curve, max_rows=30):
-    """Resets the y values to 0, leaves first 'max_rows' rows
-    and deletes the others.
-
-    Returns changed curve.
-
-    :param curve: the SingleCurve instance
-    :param max_rows: the number of rows to leave
-
-    :type curve: SingleCurve
-    :type max_rows: int
-
-    :return: changed SingleCurve
-    :rtype: SingleCurve
-    """
-    curve.data = curve.data[0:max_rows + 1, :]
-    for row in range(max_rows + 1):
-        curve.data[row, 1] = 0
-    return curve
-
-
-def zero_curves(signals, curve_indexes, verbose=False, max_rows=30):
-    """Resets the y values to 0, saves first 'max_rows' rows
-    and deletes the others for all curves with index in
+def zero_curves(signals, curve_indexes, verbose=False):
+    """Resets the y values to 0, for all curves with index in
     curve_indexes.
 
     :param signals: SignalsData instance with curves data
     :param curve_indexes: command line arguments, entered by the user
     :param verbose: shows more info during the process
-    :param max_rows: the number of rows to be saved
 
     :type signals: SignalsData
     :type curve_indexes: list
     :type verbose: bool
-    :type max_rows: int
 
     :return: changed SignalsData
     :rtype: SignalsData
     """
     arg_checker.check_idx_list(curve_indexes,
-                               signals.count - 1,
+                               signals.cnt_curves - 1,
                                "--set-to-zero")
     if verbose:
         print("Resetting to zero the values of the curves "
               "with indexes: {}".format(curve_indexes))
 
-    if curve_indexes == -1:
-        curve_indexes = list(range(0, signals.count))
+    if curve_indexes[0] == -1:
+        curve_indexes = list(range(0, signals.cnt_curves))
+        # TODO: check that args did not change
     for idx in curve_indexes:
-        signals.curves[idx] = zero_one_curve(signals.curves[idx], max_rows)
+        signals.data[idx, 1:, :].fill(0)
     return data
 
 
@@ -607,6 +581,9 @@ def global_check(options):
     # convert_only arg check
     options = arg_checker.convert_only_arg_check(options)
 
+    # other args
+    options = arg_checker.check_utility_args(options)
+
     return options
 
 
@@ -630,8 +607,14 @@ if __name__ == "__main__":
     Read numbering_parser docstring for more info.
     '''
 
-    print("Groups: {}".format(args.gr_files))
-    print("Save?: {}".format(args.save))
+    if args.hide_all:
+        # by default backend == Qt5Agg
+        # savefig() time for Qt5Agg == 0.926 s
+        #                for Agg == 0.561 s
+        # for single curve with 10000 points and one peak
+        # run on Intel Core i5-4460 (average for 100 runs)
+        # measured by cProfile
+        matplotlib.use("Agg")
 
     if args.convert_only:
         for shot_idx, file_list in enumerate(args.gr_files):
@@ -681,26 +664,27 @@ if __name__ == "__main__":
                                             args.labels, args.units)
 
             # check y_zero_offset parameters (if idx is out of range)
-            if args.y_auto_zero:
+            if args.y_auto_zero is not None:
                 args = do_y_zero_offset(data, args)
 
             # check offset_by_voltage parameters (if idx is out of range)
-            if args.offset_by_front:
+            if args.offset_by_front is not None:
                 args = do_offset_by_front(data, args, shot_name)
 
             # reset to zero
-            if args.zero:
+            if args.zero is not None:
                 data = zero_curves(data, args.zero, verbose)
 
             # multiplier and delay
             data = multiplier_and_delay(data, args.multiplier, args.delay)
 
             # plot preview and save
-            if args.plot:
-                plotter.do_plots(data, args, shot_name, verbose=verbose)
+            if args.plot is not None:
+                print("PLOT HIDE == {} ".format(args.p_hide))
+                plotter.do_plots(data, args, shot_name, verbose=verbose, hide=args.p_hide)
 
             # plot and save multi-plots
-            if args.multiplot:
+            if args.multiplot is not None:
                 plotter.do_multiplots(data, args, shot_name, verbose=verbose)
 
             # save data
@@ -710,7 +694,7 @@ if __name__ == "__main__":
                                                 save_as=args.out_names[shot_idx],
                                                 verbose=verbose,
                                                 separate_files=args.separate_save)
-                labels = [data.label(cr) for cr in data.idx_to_label.keys()]
+                labels = [data.labels(cr) for cr in data.idx_to_label.keys()]
 
                 file_handler.save_m_log(file_list, saved_as, labels, args.multiplier,
                                         args.delay, args.offset_by_front,
