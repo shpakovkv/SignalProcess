@@ -1,0 +1,15 @@
+-f
+tests\test_data\single_curve.csv
+--labels
+Detector1
+--units
+a.u.
+--time-unit
+ns
+--threads
+1
+--plot
+0
+--save-plot-to
+tests\test_output\
+--interactive-off

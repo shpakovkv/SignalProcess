@@ -1,0 +1,13 @@
+-f
+tests\test_data\single_curve.csv
+--labels
+Detector1
+--units
+a.u.
+--time-unit
+ns
+--threads
+1
+-o
+tests\test_output\single_curve_out.csv
+--save
