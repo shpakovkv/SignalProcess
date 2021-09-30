@@ -630,8 +630,8 @@ if __name__ == "__main__":
     Read numbering_parser docstring for more info.
     '''
 
-    print("Groups: {}".format(args.gr_files))
-    print("Save?: {}".format(args.save))
+    # print("Groups: {}".format(args.gr_files))
+    # print("Save?: {}".format(args.save))
 
     if args.convert_only:
         for shot_idx, file_list in enumerate(args.gr_files):
@@ -661,7 +661,7 @@ if __name__ == "__main__":
         num_mask = file_handler.numbering_parser([files[0] for
                                                  files in args.gr_files])
 
-        print("Groups: {}".format(args.gr_files))
+        # print("Groups: {}".format(args.gr_files))
 
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
@@ -671,7 +671,7 @@ if __name__ == "__main__":
             data = file_handler.read_signals(file_list, start=args.partial[0],
                                              step=args.partial[1], points=args.partial[2],
                                              labels=args.labels, units=args.units,
-                                             time_unit=args.time_units)
+                                             time_unit=args.time_unit)
 
             # checks the number of columns with data,
             # as well as the number of multipliers, delays, labels

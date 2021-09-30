@@ -410,6 +410,9 @@ def read_signals(file_list, start=0, step=1, points=-1,
 
         if time_unit:
             current_time_units = time_unit
+        else:
+            current_time_units = "a.u."
+            time_unit = "a.u."
         # elif new_header:
         #     head = check_header_label(new_header[2], 1)
         #     if head:

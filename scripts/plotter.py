@@ -144,122 +144,6 @@ def check_plot_param(idx_list, curves_count):
             (error_text.format(idx=idx, count=curves_count))
 
 
-def plot_multiplot_old(data, peak_data, curves_list,
-                   xlim=None, amp_unit=None,
-                   time_unit=None, title=None,
-                   unixtime=False):
-    """Plots subplots for all curves with index in curve_list.
-    Optional: plots peaks.
-    Subplots are located one under the other.
-
-    data -- the SignalsData instance
-    peak_data -- the list of list of peaks (SinglePeak instance)
-                 of curves with index in curve_list
-                 peak_data[0] == list of peaks for first curve data.curves[curves_list[0]]
-                 peak_data[1] == list of peaks for second curve data.curves[curves_list[1]]
-                 etc.
-    curves_list -- the list of curve indexes in data to be plotted
-    xlim        -- the tuple/list with the left and
-                   the right X bounds in X units.
-    show        -- (bool) show/hide the graph window
-    save_as     -- filename (full path) to save the plot as .png
-                   Does not save by default.
-    amp_unit    -- the unit of Y scale for all subplots.
-                   If not specified, the curve.unit parameter will be used
-    time_unit   -- the unit of time scale for all subplots.
-                   If not specified, the time_unit parameter of
-                   the first curve in curves_list will be used
-    title       -- the main title of the figure.
-    """
-    # TODO: new args description
-
-    # print("data = {}\n"
-    #       "peak_data = {}\n"
-    #       "curves_list = {}\n"
-    #       "xlim = {}\n"
-    #       "amp_unit = {}\n"
-    #       "time_unit = {}\n"
-    #       "title = {}\n"
-    #       "unixtime = {}"
-    #       "".format(data,
-    #                 str([peak.get_time_val() for peak in peak_data[0]]),
-    #                 curves_list,
-    #                 xlim, amp_unit,
-    #                 time_unit, title,
-    #                 unixtime))
-
-    plt.close('all')
-    fig, axes = plt.subplots(len(curves_list), 1, sharex='all', squeeze=False)
-    # # an old color scheme
-    # colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
-    #           '#8c564b', '#17becf', '#bcbd22', '#e377c2']
-    if title is not None:
-        fig.suptitle(title)
-
-    for wf in range(len(curves_list)):
-        # plot curve
-
-        if unixtime:
-            axes[wf, 0].plot(md.epoch2num(data.time(curves_list[wf])),
-                             data.value(curves_list[wf]),
-                             '-', color='#9999aa', linewidth=0.5)
-        else:
-            axes[wf, 0].plot(data.time(curves_list[wf]),
-                             data.value(curves_list[wf]),
-                             '-', color='#9999aa', linewidth=0.5)
-        axes[wf, 0].tick_params(direction='in', top=True, right=True)
-
-        # set bounds
-        if xlim is not None and xlim[0] is not None and xlim[1] is not None:
-            axes[wf, 0].set_xlim(xlim)
-            axes[wf, 0].set_ylim(calc_y_lim(data.time(curves_list[wf]),
-                                            data.value(curves_list[wf]),
-                                            xlim, reserve=0.1))
-        # y label (units only)
-        if amp_unit is None:
-            axes[wf, 0].set_ylabel(data.curves[curves_list[wf]].unit,
-                                   size=10, rotation='horizontal')
-        else:
-            axes[wf, 0].set_ylabel(amp_unit, size=10, rotation='horizontal')
-
-        # subplot title
-        amp_label = data.curves[curves_list[wf]].label
-        # if data.curves[curves_list[wf]].unit:
-        #     amp_label += ", " + data.curves[curves_list[wf]].unit
-        axes[wf, 0].text(0.99, 0.01, amp_label, verticalalignment='bottom',
-                         horizontalalignment='right',
-                         transform=axes[wf, 0].transAxes, size=8)
-
-        # Time axis label
-        if wf == len(curves_list) - 1:
-            time_label = "Time"
-            if time_unit:
-                time_label += ", " + time_unit
-            else:
-                time_label += ", " + data.curves[curves_list[wf]].time_unit
-            axes[wf, 0].set_xlabel(time_label, size=10)
-            if unixtime:
-                dt_fmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
-                axes[wf, 0].xaxis.set_major_formatter(dt_fmt)  # set format
-                plt.subplots_adjust(bottom=0.22)  # make more space for datetime values
-                plt.xticks(rotation=25)  # rotate long datetime values to avoid overlapping
-        axes[wf, 0].tick_params(labelsize=8)
-
-        # plot peaks scatter
-        if peak_data is not None:
-            color_iter = iter(ColorRange())
-            for pk in peak_data[curves_list[wf]]:
-                color = next(color_iter)
-                if pk is not None:
-                    axes[wf, 0].scatter([pk.time], [pk.val], s=20,
-                                        edgecolors=color, facecolors='none',
-                                        linewidths=1.5)
-                    # axes[wf, 0].scatter([pk.time], [pk.val], s=50,
-                    #                     edgecolors='none', facecolors=color,
-                    #                     linewidths=1, marker='x')
-    fig.subplots_adjust(hspace=0)
-
-
 def plot_multiplot(data, peak_data, curve_nums,
                    xlim=None, amp_unit=None,
                    time_unit=None, title=None,
@@ -302,8 +186,7 @@ def plot_multiplot(data, peak_data, curve_nums,
 
     :return: None
     """
-    # TODO: new args description
-
+    # TODO: test multiplot with unixtime
     plt.close('all')
     fig, axes = plt.subplots(len(curve_nums), 1, sharex='all', squeeze=False)
     if title is not None:
@@ -429,6 +312,21 @@ def axes_adjust(ax, data, curve_id, xlim, amp_unit, unixtime=False):
 
 
 def axes_adjust_xlabel(ax, data, time_unit=None, unixtime=None):
+    """
+    :param ax: plot Axes
+    :type ax: matplotlib.axes.Axes
+
+    :param data: SignalsData instance
+    :type data: SignalsData
+
+    :param time_unit: time unit (one for all curves)
+    :type time_unit: str
+
+    :param unixtime: handels time values as unixtime if True
+    :type unixtime: bool
+
+    :return: None
+    """
     # Time axis label
     time_label = "Time"
     if time_unit is not None:

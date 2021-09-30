@@ -201,7 +201,7 @@ def read_wfm_group(group_of_files, start_index=0, number_of_points=-1,
                  number_of_points=number_of_points,
                  read_step=read_step,
                  silent_mode=silent_mode)
-    # print(t.shape, y.shape)
+    print(t.shape, y.shape)
     data = numpy.c_[t, y]
     for i in range(1, len(group_of_files)):
         t, y, info, over_i, under_i = \
@@ -360,18 +360,24 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
         # READ DATA values from curve buffer
         # t - Time array (continuous uniform increasing sequence)
         data_t = numpy.zeros((data_points_to_read, 1), dtype='<f8')
+        # print("Started to make time col")
         for i in range(0, data_points_to_read):
             tic = (i + 1) * read_step
             data_t[i] = (file_info['id1_dim_offset'] +
                          file_info['id1_dim_scale'] * (tic + start_index))
+        # print("Ended to make time col")
 
+        # print("Started to get raw data")
         raw_data = fread(fid, data_points_to_read,
                          curve_data_format, byteorder, read_step - 1)
+        # print("Started to make data structure")
         if data_points_to_read == 1:
             numpy_type = (byteorder + numpy_type_char(curve_data_format) +
                           str(numpy_type_len(curve_data_format)))
             raw_data = raw_data * numpy.ones((data_points_to_read, ),
                                              dtype=numpy_type)
+
+        # print("Started to convert data")
         data_y = (raw_data * file_info['ed1_dim_scale'] +
                   file_info['ed1_dim_offset'])
 
