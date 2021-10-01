@@ -110,17 +110,26 @@ def global_check_idx_list(args, name, allow_all=False):
 
 
 def check_coeffs_number(need_count, coeff_names, *coeffs):
-    """Checks the needed and the actual number of the coefficients.
+    """
+    Checks the needed and the actual number of the coefficients.
     Raises an exception if they are not equal.
 
-    need_count  -- the number of needed coefficients
-    coeff_names -- the list of the coefficient names
-    coeffs      -- the list of coefficient lists to check
-                   (multiplier, delay, etc.)
+    Dimensions:
+    multiplier[ ShotNumber ][ AxisNumber ]
+    delay[ ShotNumber ][ AxisNumber ]
+
+    :param need_count: the number of needed coefficients
+    :param coeff_names: the list of the coefficient names
+    :param coeffs: the list of coefficient lists to check (multiplier, delay, etc.)
+    :return: None
     """
+
     for idx, coeff_list in enumerate(coeffs):
         if coeff_list is not None:
             coeffs_count = len(coeff_list)
+            if isinstance(coeff_list, np.ndarray) and coeff_list.ndim == 2:
+                # for multiplier and delay
+                coeffs_count = coeff_list.shape[0] * coeff_list.shape[1]
             if coeffs_count < need_count:
                 raise IndexError("Not enough {} values.\n"
                                  "Expected ({}), got ({})."
@@ -452,9 +461,10 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         # cur1_x_mult, cur1_y_mult
         # cur2_x_mult, cur2_y_mult
         # -- etc.
-        mult = mult.reshape(len(mult) / data_axes, data_axes)
 
-        options.multiplier = mult.reshape(data_axes, len(mult) / data_axes)
+        mult = mult.reshape(len(mult) // data_axes, data_axes)
+        # options.multiplier = mult.reshape(data_axes, len(mult) // data_axes)
+        options.multiplier = mult
 
     if delay is not None:
         assert len(delay) % data_axes == 0, \
@@ -464,6 +474,8 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         assert isinstance(delay, list), \
             "The delay argument must be of type list. " \
             "Got {} instead.".format(type(delay))
+    else:
+        options.delay = np.zeros(shape=mult.shape, dtype=dtype)
 
     # multiplier's & delay's elements are of type float (checked by arg_parser)
 

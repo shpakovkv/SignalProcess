@@ -123,7 +123,8 @@ def multiplier_and_delay_ndarray(data, multiplier, delay):
         "data ({})".format(delay.shape, data.shape[:-1])
 
     # process
-    return _multiplier_and_delay_jit(data, multiplier, delay)
+    _multiplier_and_delay_jit(data, multiplier, delay)
+    return data
 
 
 def multiplier_and_delay(signals, multiplier, delay):

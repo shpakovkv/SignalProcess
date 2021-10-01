@@ -23,7 +23,7 @@ from numba import vectorize, float64
 
 from multiplier_and_delay import *
 
-from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front
+from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, print_front_delay
 
 verbose = True
 global_log = ""
@@ -566,6 +566,12 @@ def global_check(options):
     # partial import args check
     options = arg_checker.check_partial_args(options)
 
+    # multiplier and delay args check
+    arg_checker.check_and_prepare_multiplier_and_delay(options,
+                                                       data_axes=2,
+                                                       dtype=np.float64)
+
+
     # plot args check
     options = arg_checker.plot_arg_check(options)
 
@@ -644,7 +650,7 @@ if __name__ == "__main__":
         num_mask = file_handler.numbering_parser([files[0] for
                                                  files in args.gr_files])
 
-        print("Groups: {}".format(args.gr_files))
+        # print("Groups: {}".format(args.gr_files))
 
         for shot_idx, file_list in enumerate(args.gr_files):
             shot_name = file_handler.get_shot_number_str(file_list[0], num_mask,
@@ -687,6 +693,10 @@ if __name__ == "__main__":
             if args.multiplot is not None:
                 plotter.do_multiplots(data, args, shot_name, verbose=verbose)
 
+            print_front_delay(data.get_single_curve(0), 1.5,
+                              data.get_single_curve(1), 1.25,
+                              save=True, prefix="voltage_front"+shot_name)
+
             # save data
             if args.save:
                 print("Saving as {}".format(args.out_names[shot_idx]))
@@ -700,8 +710,8 @@ if __name__ == "__main__":
                                         args.delay, args.offset_by_front,
                                         args.y_auto_zero, args.partial)
 
-    if verbose:
-        arg_checker.print_duplicates(args.gr_files, 30)
+    # if verbose:
+    #     arg_checker.print_duplicates(args.gr_files, 30)
 
     # except Exception as e:
     #     print()
