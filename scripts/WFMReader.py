@@ -87,6 +87,15 @@ from __future__ import print_function, with_statement
 import re
 import numpy
 
+import datetime
+
+PRINT_TIME = False
+
+
+def _printif(msg, condition):
+    if condition:
+        print(msg)
+
 
 def warning(s):
     print("Warning!\n" + s)
@@ -146,6 +155,7 @@ def fread(file_obj, count, data_type, b_order, skip=0):
     skip      - number of values to be skip every 1 read value
                 useful for reading array of values with specific step
     """
+    # TODO: fix slow reading of big files for other data types
 
     # print("bytes to read = {0}".format(type_len[data_type] * count))
     if skip < 0:  # check input parameters
@@ -155,22 +165,43 @@ def fread(file_obj, count, data_type, b_order, skip=0):
 
     # units_to_read = int(float(count) / (1 + skip))
 
-    bytes_read = bytes()
-    for _ in range(0, count):
-    #for _ in range(0, units_to_read):
-        bytes_read += file_obj.read(numpy_type_len(data_type))
-        file_obj.seek(numpy_type_len(data_type) * skip, 1)
-
-    # print("bytes read = {0}".format(bytes_read))
-    # check end of file
-    if len(bytes_read) != numpy_type_len(data_type) * count:
-        raise BinaryReadEOFException
-
+    _printif("{} FREAD - making array. Type = {}".format(datetime.datetime.now(), data_type), PRINT_TIME)
     numpy_type = (b_order + numpy_type_char(data_type) +
                   str(numpy_type_len(data_type)))
     # print("numpy dtype = " + numpy_type)
-    result = numpy.ndarray(shape=(count,), dtype=numpy_type,
-                           buffer=bytes_read)
+    if data_type == "int16":
+        _printif("Alt. reading function", PRINT_TIME)
+        result = numpy.ndarray(shape=(count,), dtype=numpy_type)
+
+    bytes_read = bytes()
+    b_order_str = "big"
+    if (b_order == '<'):
+        b_order_str = "little"
+    _printif("{} FREAD - reading values. Count = {}".format(datetime.datetime.now(), count), PRINT_TIME)
+    idx = 0
+    for _ in range(0, count):
+        if idx % 100000 == 0:
+            _printif("{} FREAD - reading value[{}]".format(datetime.datetime.now(), idx), PRINT_TIME)
+        if data_type == "int16":
+            result[idx] = int.from_bytes(file_obj.read(numpy_type_len(data_type)), byteorder=b_order_str, signed=True)
+        else:
+            bytes_read += file_obj.read(numpy_type_len(data_type))
+        file_obj.seek(numpy_type_len(data_type) * skip, 1)
+        idx += 1
+
+    # print("bytes read = {0}".format(bytes_read))
+    # check end of file
+    # if len(bytes_read) != numpy_type_len(data_type) * count:
+    if idx != count:
+        raise BinaryReadEOFException
+
+    # print("{} FREAD - making array".format(datetime.datetime.now()))
+    # numpy_type = (b_order + numpy_type_char(data_type) +
+    #               str(numpy_type_len(data_type)))
+    # # print("numpy dtype = " + numpy_type)
+    if data_type != "int16":
+        result = numpy.ndarray(shape=(count,), dtype=numpy_type,
+                               buffer=bytes_read)
     # string output:
     if data_type == 'str':
         result_str = ''
@@ -195,6 +226,7 @@ def read_wfm_group(group_of_files, start_index=0, number_of_points=-1,
 
     # print("start = {}  |  count = {}  |  step ="
     #       " {}".format(start_index, number_of_points, read_step))
+    _printif("{} Start reading first file".format(datetime.datetime.now()), PRINT_TIME)
     t, y, info, over_i, under_i = \
         read_wfm(group_of_files[0],
                  start_index=start_index,
@@ -204,6 +236,7 @@ def read_wfm_group(group_of_files, start_index=0, number_of_points=-1,
     # print(t.shape, y.shape)
     data = numpy.c_[t, y]
     for i in range(1, len(group_of_files)):
+        _printif("{} Start reading file {}".format(datetime.datetime.now(), i + 1), PRINT_TIME)
         t, y, info, over_i, under_i = \
             read_wfm(group_of_files[i],
                      start_index=start_index,
@@ -359,22 +392,28 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
 
         # READ DATA values from curve buffer
         # t - Time array (continuous uniform increasing sequence)
+        _printif("{} Start making time column".format(datetime.datetime.now()), PRINT_TIME)
         data_t = numpy.zeros((data_points_to_read, 1), dtype='<f8')
         for i in range(0, data_points_to_read):
             tic = (i + 1) * read_step
             data_t[i] = (file_info['id1_dim_offset'] +
                          file_info['id1_dim_scale'] * (tic + start_index))
 
+        _printif("{} Start reading raw data".format(datetime.datetime.now()), PRINT_TIME)
         raw_data = fread(fid, data_points_to_read,
                          curve_data_format, byteorder, read_step - 1)
+
+        _printif("{} Start making raw y ndarray".format(datetime.datetime.now()), PRINT_TIME)
         if data_points_to_read == 1:
             numpy_type = (byteorder + numpy_type_char(curve_data_format) +
                           str(numpy_type_len(curve_data_format)))
             raw_data = raw_data * numpy.ones((data_points_to_read, ),
                                              dtype=numpy_type)
+        _printif("{} Start converting y values".format(datetime.datetime.now()), PRINT_TIME)
         data_y = (raw_data * file_info['ed1_dim_scale'] +
                   file_info['ed1_dim_offset'])
 
+        _printif("{} Finalising...".format(datetime.datetime.now()), PRINT_TIME)
         # handling RAW DATA over- and underranged values
         if file_info['ed1_format'][0] < 4 or file_info['ed1_format'][0] > 5:
             # integer type
