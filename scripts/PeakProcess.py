@@ -183,7 +183,7 @@ def is_neg(polarity):
 
 
 def check_polarity(curve, time_bounds=(None, None)):
-    """Checks whether the curve is mostly positive or negative 
+    """Checks whether the curve is mostly positive or negative
     on a certain interval.
     
     :param curve:       curve data
@@ -1012,6 +1012,27 @@ def main():
         units = "minutes"
 
     print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
+
+
+def print_front_delay(curve1, level1, curve2, level2, save=False, prefix="voltage_front"):
+    save_as = prefix + ".png"
+    x1, y1 = find_curve_front(curve1,
+                              level=level1,
+                              polarity='auto',
+                              save_plot=save,
+                              plot_name=save_as)
+
+    x2, y2 = find_curve_front(curve2,
+                              level=level2,
+                              polarity='auto',
+                              save_plot=save,
+                              plot_name=save_as)
+
+    print("Delay between {} {} front (at {}) and {} {} front (at {}) == {}"
+          "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
+                    curve2.label, "negative" if level2 < 0 else "positive", level2,
+                    x2 - x1))
+    print()
 
 
 if __name__ == '__main__':
