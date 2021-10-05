@@ -375,10 +375,11 @@ def get_front_point(signals_data, args, multiplier, delay,
 
     curve = data_types.SingleCurve(signals_data.get_single_curve(curve_idx))
     polarity = check_polarity(curve)
-    if is_pos(polarity):
-        level = abs(level)
-    else:
-        level = -abs(level)
+    front = "rise" if is_pos(polarity) else "fall"
+    # if is_pos(polarity):
+    #     level = abs(level)
+    # else:
+    #     level = -abs(level)
 
     cur_mult = multiplier[curve_idx: curve_idx + 1]
     cur_del = delay[curve_idx: curve_idx + 1]
@@ -423,7 +424,7 @@ def get_front_point(signals_data, args, multiplier, delay,
                                                 curve.t_unit)
         # find front
         front_x, front_y = find_curve_front(smoothed_curve,
-                                            level, polarity)
+                                            level, front)
         plot_title = ("Curve[{idx}] \"{label}\"\n"
                       "".format(idx=curve_idx, label=curve.label))
         if front_x is not None:
@@ -693,13 +694,13 @@ if __name__ == "__main__":
             if args.multiplot is not None:
                 plotter.do_multiplots(data, args, shot_name, verbose=verbose)
 
-            print_front_delay(data.get_single_curve(0), 1.5,
-                              data.get_single_curve(1), 1.25,
-                              save=True, prefix="voltage_front"+shot_name)
+            # print_front_delay(data.get_single_curve(0), 1.5, "fall",
+            #                   data.get_single_curve(1), 1.25, "rise",
+            #                   save=True, prefix="voltage_front"+shot_name)
 
             # save data
             if args.save:
-                print("Saving as {}".format(args.out_names[shot_idx]))
+                # print("Saving as {}".format(args.out_names[shot_idx]))
                 saved_as = file_handler.do_save(data, args, shot_name,
                                                 save_as=args.out_names[shot_idx],
                                                 verbose=verbose,

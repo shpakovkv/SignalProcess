@@ -105,7 +105,7 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
 
 
 def level_excess(x, y, level, start=0, step=1,
-                 window=0, is_positive=True):
+                 window=0, rising_front=True):
     """Checks if 'Y' values excess 'level' value 
     for 'X' in range from X(start) to X(start) + window
     OR for x in range from X(start) - window to X(start)
@@ -118,17 +118,14 @@ def level_excess(x, y, level, start=0, step=1,
                         step > 0: checks elements to the RIGHT from start idx
                         step < 0: checks elements to the LEFT from start idx
     :param window:      check window width
-    :param is_positive: the direction of the check
-                        True: checks whether the 'Y' value rises above 'level'
-                        False: checks whether the 'Y' value 
-                        comes down below 'level'
+    :param rising_front:front type, rising (True) or falling (False)
     :type x:            array-like
     :type y:            array-like
     :type level:        float, int ''same as param y''
     :type start:        int
     :type step:         int
     :type window:       float, int ''same as param x''
-    :type is_positive:  bool
+    :type rising_front: bool
     :return:            True and an index of first Y element that are 
                         bigger/lower 'level' OR returns False and 
                         an index of the last checked element
@@ -140,13 +137,13 @@ def level_excess(x, y, level, start=0, step=1,
         window = x[-1] - x[start]
 
     while ((idx >= 0) and (idx < len(y)) and
-               (abs(x[idx] - x[start]) <= window)):
-        if not is_positive and (y[idx] < level):
-            # downward
-            return True, idx
-        elif is_positive and (y[idx] > level):
-            # upward
-            return True, idx
+           (abs(x[idx] - x[start]) <= window)):
+        if rising_front:
+            if y[idx] > level:
+                return True, idx
+        else:
+            if y[idx] < level:
+                return True, idx
         idx += step
     return False, idx
 
@@ -209,21 +206,25 @@ def check_polarity(curve, time_bounds=(None, None)):
 
 def find_curve_front(curve,
                      level=-0.2,
-                     polarity='auto',
+                     front="auto",
                      save_plot=False,
                      plot_name="voltage_front.png"):
     """Find time point (x) of voltage curve edge at specific level
     Default: Negative polarity, -0.2 MV level
+
+    "auto" front type selection means the first front of the signal:
+    rising front for positive signals
+    and falling front for negative signals
     
     :param curve: curve data
     :param level: amplitude value to find
-    :param polarity: the polarity of the curve
+    :param front: the polarity of the curve
     :param save_plot: bool flag
     :param plot_name: plot full file name to save as
     
     :type curve: SingleCurve
     :type level: float
-    :type polarity: str '+'/'pos'/'-'/'neg'/'auto'
+    :type front: str "rise"/"fall"/"auto"
     :type save_plot: bool
     :type plot_name: str
     
@@ -231,15 +232,27 @@ def find_curve_front(curve,
     :rtype: tuple(float, float)
     """
 
-    if polarity=='auto':
-        polarity = check_polarity(curve)
-        if is_pos(polarity):
-            level = abs(level)
-        else:
-            level = -abs(level)
+    # TODO add front type: rising, falling instead of polarity property
 
+    assert front == "auto" or front == "rise" or front == "fall", \
+        "Error! Wrong front type entered.\n" \
+        "Expected \"auto\" or \"rise\" or \"fall\". Got \"{}\" instead." \
+        "".format(front)
+    if front == 'auto':
+        # auto selection:
+        # rising front for positive signals
+        # and falling front for negative signals
+        polarity = check_polarity(curve)
+        front = "rise" if is_pos(polarity) else "fall"
+
+        # if front == "rise":
+        #     level = abs(level)
+        # else:
+        #     level = -abs(level)
+
+    is_rising = True if front == "rise" else False
     front_checked, idx = level_excess(curve.time, curve.val, level,
-                                      is_positive=is_pos(polarity))
+                                      rising_front=is_rising)
     if front_checked:
         if save_plot:
             pyplot.close('all')
@@ -376,7 +389,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
             # (not a real peak)
             [is_noise, _] = level_excess(x, y, max_y, start=max_idx,
                                          step=-1, window=diff_time,
-                                         is_positive=True)
+                                         rising_front=True)
             if PEAKFINDERDEBUG and is_noise:
                 print('Left Excess at x({:.2f}, {:.2f}) '
                       '== Not a peak at fall edge!'.format(x[i], y[i]))
@@ -389,7 +402,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                                              -max_y * noise_attenuation,
                                              start=max_idx, step=1,
                                              window=tnoise,
-                                             is_positive=False)
+                                             rising_front=False)
 
                 if PEAKFINDERDEBUG and is_noise:
                     print('Noise to the right x({:.2f}, {:.2f})'
@@ -400,7 +413,7 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
                                                  -max_y * noise_attenuation,
                                                  start=max_idx, step=-1,
                                                  window=tnoise,
-                                                 is_positive=False)
+                                                 rising_front=False)
                     if PEAKFINDERDEBUG and is_noise:
                         print('Noise to the left x({:.2f}, {:.2f})'
                               ''.format(x[j], y[j]))
@@ -1014,17 +1027,17 @@ def main():
     print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
 
 
-def print_front_delay(curve1, level1, curve2, level2, save=False, prefix="voltage_front"):
+def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False, prefix="voltage_front"):
     save_as = prefix + ".png"
     x1, y1 = find_curve_front(curve1,
                               level=level1,
-                              polarity='auto',
+                              front=front1,
                               save_plot=save,
                               plot_name=save_as)
 
     x2, y2 = find_curve_front(curve2,
                               level=level2,
-                              polarity='auto',
+                              front=front2,
                               save_plot=save,
                               plot_name=save_as)
 
