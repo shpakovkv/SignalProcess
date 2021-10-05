@@ -202,6 +202,7 @@ def get_input_files_args_parser():
         '--time-units',
         action='store',
         metavar='UNIT',
+        default='n/a',
         dest='time_units',
         help='specify the unit of time scale (uniform for all \n'
              'curves). Needed for correct graph labels.\n\n')

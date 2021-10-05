@@ -664,8 +664,10 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
             save_curve_as = "{}.csv".format(save_as)
             save_signals_csv(save_curve_as, signals_data, curves_list=[0])
         else:
-            for curve in sorted(signals_data.idx_to_label.keys()):
+            for curve in range(signals_data.cnt_curves):
                 save_curve_as = "{}.curve{}.csv".format(save_as, curve)
+                if verbose:
+                    print("Saving {}".format(save_curve_as))
                 save_signals_csv(save_curve_as, signals_data, curves_list=[curve])
         # restore extension
         save_as = "{}.csv".format(save_as)
@@ -673,7 +675,7 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
     else:
         save_signals_csv(save_as, signals_data)
 
-    #TODO: logging with separate_files==True
+    # TODO: logging with separate_files==True
     if verbose:
         max_rows = signals_data.max_points
         if verbose:
@@ -703,7 +705,7 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
     # turn row-oriented array to column-oriented
     table = table.transpose()
     if DEBUG:
-        print("Save columns count = {}".format(table.shape[1]))
+        print("Saved columns count = {}".format(table.shape[1]))
     if not isinstance(precision, int):
         raise ValueError("Precision must be integer")
     if precision > 18:

@@ -145,6 +145,9 @@ def multiplier_and_delay(signals, multiplier, delay):
     :return: signals with modified data
     :rtype: SignalsData or np.ndarray
     """
+    if multiplier is None and delay is None:
+        return signals
+
     if isinstance(signals, SignalsData):
         signals.data = multiplier_and_delay_ndarray(signals.data, multiplier, delay)
     elif isinstance(signals, np.ndarray):

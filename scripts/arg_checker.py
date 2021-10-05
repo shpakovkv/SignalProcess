@@ -465,6 +465,9 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         mult = mult.reshape(len(mult) // data_axes, data_axes)
         # options.multiplier = mult.reshape(data_axes, len(mult) // data_axes)
         options.multiplier = mult
+    elif delay is not None:
+        shape = (len(delay) // data_axes, data_axes)
+        options.multiplier = np.ones(shape=shape, dtype=dtype)
 
     if delay is not None:
         assert len(delay) % data_axes == 0, \
@@ -474,7 +477,7 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         assert isinstance(delay, list), \
             "The delay argument must be of type list. " \
             "Got {} instead.".format(type(delay))
-    else:
+    elif mult is not None:
         options.delay = np.zeros(shape=mult.shape, dtype=dtype)
 
     # multiplier's & delay's elements are of type float (checked by arg_parser)
