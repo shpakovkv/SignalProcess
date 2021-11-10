@@ -26,8 +26,8 @@ from data_types import SinglePeak
 
 CSV_DELIMITER_LIST = [',', ';', ' ', ':', '\t']
 LOGDIRECTORY = "LOG_SignalProcess"
-VERBOSE = 1
-DEBUG = 1
+VERBOSE = 0
+DEBUG = 0
 
 
 # =======================================================================
@@ -649,6 +649,12 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
     """
     if verbose:
         print('Saving data...')
+        max_rows = signals_data.max_points
+        print("Curves count = {};    "
+              "Rows count = {} "
+              "".format(signals_data.cnt_curves,
+                        signals_data.max_points))
+
     if save_as is None:
         save_name = ("{pref}{number}{postf}.csv"
                      "".format(pref=cl_args.prefix, number=shot_name,
@@ -665,25 +671,20 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
             save_signals_csv(save_curve_as, signals_data, curves_list=[0])
         else:
             for curve in range(signals_data.cnt_curves):
-                save_curve_as = "{}.curve{}.csv".format(save_as, curve)
+                save_curve_as = "{}_curve{:03d}.csv".format(save_as, curve)
                 if verbose:
-                    print("Saving {}".format(save_curve_as))
+                    print("Saving '{}'".format(save_curve_as))
                 save_signals_csv(save_curve_as, signals_data, curves_list=[curve])
         # restore extension
         save_as = "{}.csv".format(save_as)
 
     else:
         save_signals_csv(save_as, signals_data)
+        if verbose:
+            print("Saved as {}".format(save_as))
 
     # TODO: logging with separate_files==True
-    if verbose:
-        max_rows = signals_data.max_points
-        if verbose:
-            print("Curves count = {};    "
-                  "Rows count = {} "
-                  "".format(signals_data.cnt_curves,
-                            signals_data.max_points))
-        print("Saved as {}".format(save_as))
+
     return save_as
 
 
@@ -702,10 +703,10 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
     # check precision value
     table = signals.get_array_to_print(curves_list)
 
-    # turn row-oriented array to column-oriented
     table = table.transpose()
+    # turn row-oriented array to column-oriented
     if DEBUG:
-        print("Saved columns count = {}".format(table.shape[1]))
+        print(" Columns count = {}".format(table.shape[1]))
     if not isinstance(precision, int):
         raise ValueError("Precision must be integer")
     if precision > 18:

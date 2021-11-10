@@ -23,7 +23,7 @@ from numba import vectorize, float64
 
 from multiplier_and_delay import *
 
-from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, print_front_delay
+from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, print_front_delay, print_pulse_duration
 
 verbose = True
 global_log = ""
@@ -691,12 +691,25 @@ if __name__ == "__main__":
                 plotter.do_plots(data, args, shot_name, verbose=verbose, hide=args.p_hide)
 
             # plot and save multi-plots
-            if args.multiplot is not None:
-                plotter.do_multiplots(data, args, shot_name, verbose=verbose)
+            # if args.multiplot is not None:
+            #     plotter.do_multiplots(data, args, shot_name, verbose=verbose)
 
-            # print_front_delay(data.get_single_curve(0), 1.5, "fall",
-            #                   data.get_single_curve(1), 1.25, "rise",
-            #                   save=True, prefix="voltage_front"+shot_name)
+            # ========================================================================
+            # ------   GET FRONT DELAY   ---------------------------------------------
+            # ========================================================================
+            # front_points = print_front_delay(data.get_single_curve(0), 2.0, "fall",
+            #                                  data.get_single_curve(1), 1.0, "rise",
+            #                                  save=True, prefix="fronts_"+shot_name)
+            # pulse_front = print_pulse_duration(data.get_single_curve(1), 1.0, "rise",
+            #                                    save=True, prefix="pulse_")
+            # front_points[1] = pulse_front[0]
+            # print()
+            # if args.multiplot is not None:
+            #     plotter.do_multiplots(data, args, shot_name,
+            #                           peaks=front_points,
+            #                           verbose=verbose)
+
+            # ========================================================================
 
             # save data
             if args.save:

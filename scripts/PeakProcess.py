@@ -1040,12 +1040,55 @@ def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False
                               front=front2,
                               save_plot=save,
                               plot_name=save_as)
-
-    print("Delay between {} {} front (at {}) and {} {} front (at {}) == {}"
+    front_points = list()
+    front_points.append([SinglePeak(x1, y1, 0)])
+    front_points.append([SinglePeak(x2, y2, 0)])
+    print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
           "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
                     curve2.label, "negative" if level2 < 0 else "positive", level2,
                     x2 - x1))
-    print()
+    return front_points
+
+
+def print_pulse_duration(curve1, level1, front1, save=False, prefix="pulse_"):
+    save_as = prefix + ".png"
+    front_points = list()
+    x1, y1 = find_curve_front(curve1,
+                              level=level1,
+                              front=front1,
+                              save_plot=save,
+                              plot_name=save_as)
+
+    if front1 == 'auto':
+        polarity = check_polarity(curve1)
+        front1 = "rise" if is_pos(polarity) else "fall"
+    is_rising1 = True if front1 == "rise" else False
+    is_rising1 = not is_rising1
+
+    start_idx = 0
+    for idx in range(curve1.data.shape[1]):
+        if is_rising1:
+            if curve1.data[1, idx] >= level1:
+                start_idx += 1
+            else:
+                break
+        else:
+            if curve1.data[1, idx] <= level1:
+                start_idx += 1
+            else:
+                break
+    start_idx += 3
+
+    # find pulse end
+    fact, idx = level_excess(curve1.data[0], curve1.data[1], level1, start=start_idx, rising_front=is_rising1)
+    x2 = curve1.data[0, idx]
+    y2 = curve1.data[1, idx]
+    front_points.append([SinglePeak(x1, y1, 0), SinglePeak(x2, y2, 1)])
+
+    print("Delay between {}ing front (at {}) and {}ing front (at {}) == {:.4f}"
+          "".format(front1, level1, "rise" if front1 == "fall" else "fall", level1,
+                    x2 - x1))
+    return front_points
 
 
 if __name__ == '__main__':

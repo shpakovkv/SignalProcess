@@ -262,24 +262,26 @@ class SignalsData:
     def get_array_to_print(self, curves_list=None):
         # DOTO: test SignalsData save
         list_of_2d_arr = list()
-        for curve in self.data:
-            list_of_2d_arr.append(curve)
+        if curves_list is None:
+            curves_list = list(range(self.cnt_curves))
+        for curve in curves_list:
+            list_of_2d_arr.append(self.get_curve_2d_arr(curve))
         return align_and_append_ndarray(*list_of_2d_arr)
 
-    def get_x(self, curve_idx=-1, curve_label=None):
-        curve_idx = self._check_and_get_index(curve_idx, curve_label)
+    def get_x(self, idx_or_label):
+        curve_idx = self._check_and_get_index(idx_or_label)
         return self.data[curve_idx][0]
 
-    def get_y(self, curve_idx=-1, curve_label=None):
-        curve_idx = self._check_and_get_index(curve_idx, curve_label)
+    def get_y(self, idx_or_label):
+        curve_idx = self._check_and_get_index(idx_or_label)
         return self.data[curve_idx][1]
 
-    def get_curve_2d_arr(self, idx=-1, label=None):
-        idx = self._check_and_get_index(idx, label)
+    def get_curve_2d_arr(self, idx_or_label):
+        idx = self._check_and_get_index(idx_or_label)
         return self.data[idx]
 
-    def get_single_curve(self, idx=-1, label=None):
-        idx = self._check_and_get_index(idx, label)
+    def get_single_curve(self, idx_or_label):
+        idx = self._check_and_get_index(idx_or_label)
         return SingleCurve(self.data[idx],
                            label=self.labels[idx],
                            units=self.units[idx],
@@ -303,12 +305,12 @@ class SignalsData:
         """
         return list(self.units)
 
-    def get_curve_units(self, idx=-1, label=None):
-        idx = self._check_and_get_index(idx, label)
+    def get_curve_units(self, idx_or_label):
+        idx = self._check_and_get_index(idx_or_label)
         return self.units[idx]
 
     def get_curve_label(self, idx):
-        idx = self._check_and_get_index(idx=idx)
+        idx = self._check_and_get_index(idx)
         return self.labels[idx]
 
     def get_curve_idx(self, label):
@@ -316,11 +318,12 @@ class SignalsData:
             return self.labels.index(label)
         return None
 
-    def _check_and_get_index(self, idx=-1, label=None):
-        if label is not None:
-            assert label in self.labels, \
-                "No curve with label '{}' found.".format(label)
-            idx = self.get_curve_idx(label)
+    def _check_and_get_index(self, idx_or_label):
+        idx = idx_or_label
+        if isinstance(idx_or_label, str):
+            assert idx_or_label in self.labels, \
+                "No curve with label '{}' found.".format(idx_or_label)
+            idx = self.get_curve_idx(idx_or_label)
         assert 0 <= idx < self.cnt_curves, \
             "Curve index [{}] is out of bounds.".format(idx)
         return idx
@@ -818,11 +821,19 @@ def fill_2d_array(source, res):
 
 
 def align_and_append_ndarray(*args):
-    """Returns 2D numpy.ndarray containing all input 2D numpy.ndarrays.
+    """
+    Returns 2D numpy.ndarray containing all input 2D numpy.ndarrays.
     If input arrays have different number of rows,
     fills missing values with 'nan'.
 
-    args -- 2d ndarrays
+    If all input arrays have rows filled with only 'nan's
+    deletes that rows in output data.
+
+    :param args: one or more 2d ndarrays with data[x/y][point]
+    :type args: np.ndarray
+
+    :return: 2d ndarray with data from input ndarrays[x1/y1/x2/y2...][points]
+    :rtype: np.ndarray
     """
     # CHECK TYPE & LENGTH
     for arr in args:
@@ -832,19 +843,52 @@ def align_and_append_ndarray(*args):
         if np.ndim(arr) != 2:
             raise ValueError("Input arrays must have 2 dimensions.")
 
-    # ALIGN & APPEND
-    col_len_list = [arr.shape[0] for arr in args]
-    max_rows = max(col_len_list)
-    data = np.empty(shape=(max_rows, 0), dtype=float, order='F')
-    for arr in args:
-        miss_rows = max_rows - arr.shape[0]
-        nan_arr = np.empty(shape=(miss_rows, arr.shape[1]),
-                           dtype=float, order='F')
-        nan_arr[:] = np.nan
-        # nan_arr[:] = np.NAN
+    dtype = args[0].dtype
+    assert all(arr.dtype == dtype for arr in args), \
+        "All input arrays must have the same dtype."
 
-        aligned_arr = np.append(arr, nan_arr, axis=0)
-        data = np.append(data, aligned_arr, axis=1)
+    # ALIGN & APPEND
+    col_len_list = [get_2d_arr_real_len(arr) for arr in args]
+    max_rows = max(col_len_list)
+    data = np.empty(shape=(0, max_rows), dtype=dtype, order='F')
+    for arr in args:
+        miss_rows = max_rows - arr.shape[1]
+        last_row = arr.shape[1] - 1
+        if miss_rows < 0:
+            last_row += miss_rows
+            miss_rows = 0
+        nan_arr = np.empty(shape=(arr.shape[0], miss_rows),
+                           dtype=dtype, order='F')
+        nan_arr[:] = np.nan
+
+        # last_row: '+1' because last value is not included
+        aligned_arr = np.append(arr[:, : last_row + 1], nan_arr, axis=1)
+        data = np.append(data, aligned_arr, axis=0)
     if DEBUG:
         print("aligned array shape = {}".format(data.shape))
     return data
+
+
+def get_2d_arr_real_len(arr):
+    """ Returns the length of the longest array's column without 'nan's.
+
+    :param arr: 2D ndarray with data[axis][point]
+    :type arr: np.ndarray
+
+    :return: length of array without NaN values
+    :rtype: int
+    """
+    assert isinstance(arr, np.ndarray), \
+        "Array must be an instance of numpy ndarray."
+
+    assert arr.ndim == 2, \
+        "Wrong number of dims. " \
+        "Expected 2, got {} instead.".format(arr.ndim)
+
+    real_len = arr.shape[1]
+    for idx in range(arr.shape[1] - 1, 0, -1):
+        if all(np.isnan(data[idx]) for data in arr):
+            real_len -= 1
+        else:
+            return real_len
+    return 0

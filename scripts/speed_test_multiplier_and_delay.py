@@ -361,9 +361,9 @@ class SignalsDataEnhanced:
             self.labels.extend(new_labels)
             self.units.extend(new_units)
 
-    def get_array_to_print(self, curves_list=None):
+    def get_array_to_print_new(self, curves_list=None):
         # return align_and_append_ndarray(*list_of_2d_arr)
-        pass
+        raise NotImplementedError("get_array_to_print is not inplemented in SignalsDataEnhanced")
 
     def get_x(self, curve_idx):
         return self.data[curve_idx][0]
