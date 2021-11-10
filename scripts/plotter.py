@@ -104,7 +104,7 @@ def do_multiplots(signals_data, cl_args, plot_name,
     """
 
     for curve_list in cl_args.multiplot:
-        check_plot_param(curve_list, signals_data.count)
+        check_plot_param(curve_list, signals_data.cnt_curves)
 
     for curve_list in cl_args.multiplot:
         plot_multiplot(signals_data, peaks, curve_list,
@@ -212,26 +212,26 @@ def plot_multiplot(data, peak_data, curves_list,
                              data.value(curves_list[wf]),
                              '-', color='#9999aa', linewidth=0.5)
         else:
-            axes[wf, 0].plot(data.time(curves_list[wf]),
-                             data.value(curves_list[wf]),
+            axes[wf, 0].plot(data.get_x(curves_list[wf]),
+                             data.get_y(curves_list[wf]),
                              '-', color='#9999aa', linewidth=0.5)
         axes[wf, 0].tick_params(direction='in', top=True, right=True)
 
         # set bounds
         if xlim is not None and xlim[0] is not None and xlim[1] is not None:
             axes[wf, 0].set_xlim(xlim)
-            axes[wf, 0].set_ylim(calc_y_lim(data.time(curves_list[wf]),
-                                            data.value(curves_list[wf]),
+            axes[wf, 0].set_ylim(calc_y_lim(data.get_x(curves_list[wf]),
+                                            data.get_y(curves_list[wf]),
                                             xlim, reserve=0.1))
         # y label (units only)
         if amp_unit is None:
-            axes[wf, 0].set_ylabel(data.curves[curves_list[wf]].unit,
+            axes[wf, 0].set_ylabel(data.get_curve_units(curves_list[wf]),
                                    size=10, rotation='horizontal')
         else:
             axes[wf, 0].set_ylabel(amp_unit, size=10, rotation='horizontal')
 
         # subplot title
-        amp_label = data.curves[curves_list[wf]].label
+        amp_label = data.get_curve_label(curves_list[wf])
         # if data.curves[curves_list[wf]].unit:
         #     amp_label += ", " + data.curves[curves_list[wf]].unit
         axes[wf, 0].text(0.99, 0.01, amp_label, verticalalignment='bottom',
@@ -244,7 +244,7 @@ def plot_multiplot(data, peak_data, curves_list,
             if time_units:
                 time_label += ", " + time_units
             else:
-                time_label += ", " + data.curves[curves_list[wf]].time_units
+                time_label += ", " + data.time_units
             axes[wf, 0].set_xlabel(time_label, size=10)
             if unixtime:
                 dt_fmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
