@@ -691,8 +691,8 @@ if __name__ == "__main__":
                 plotter.do_plots(data, args, shot_name, verbose=verbose, hide=args.p_hide)
 
             # plot and save multi-plots
-            # if args.multiplot is not None:
-            #     plotter.do_multiplots(data, args, shot_name, verbose=verbose)
+            if args.multiplot is not None:
+                plotter.do_multiplots(data, args, shot_name, verbose=verbose)
 
             # ========================================================================
             # ------   GET FRONT DELAY   ---------------------------------------------
