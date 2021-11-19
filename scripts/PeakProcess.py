@@ -145,6 +145,8 @@ def level_excess(x, y, level, start=0, step=1,
             if y[idx] < level:
                 return True, idx
         idx += step
+    if idx == len(y):
+        idx -= 1
     return False, idx
 
 
@@ -1080,14 +1082,19 @@ def print_pulse_duration(curve1, level1, front1, save=False, prefix="pulse_"):
     start_idx += 3
 
     # find pulse end
-    fact, idx = level_excess(curve1.data[0], curve1.data[1], level1, start=start_idx, rising_front=is_rising1)
+    fall_found, idx = level_excess(curve1.data[0], curve1.data[1], level1, start=start_idx, rising_front=is_rising1)
     x2 = curve1.data[0, idx]
     y2 = curve1.data[1, idx]
     front_points.append([SinglePeak(x1, y1, 0), SinglePeak(x2, y2, 1)])
 
-    print("Delay between {}ing front (at {}) and {}ing front (at {}) == {:.4f}"
-          "".format(front1, level1, "rise" if front1 == "fall" else "fall", level1,
-                    x2 - x1))
+    print("Delay between {}ing front (at {}) and {}ing front (at {}) == "
+          "".format(front1, level1, "ris" if front1 == "fall" else "fall",
+                    level1,
+                    ), end="")
+    if fall_found:
+        print("{:.4f}".format(x2 - x1))
+    else:
+        print("OVF")
     return front_points
 
 
