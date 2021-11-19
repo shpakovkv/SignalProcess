@@ -86,10 +86,15 @@ OPTIONS
 from __future__ import print_function, with_statement
 import re
 import numpy
+from numba import njit
 
 import datetime
 
 PRINT_TIME = False
+PRINT_STEP = 500000
+PRECOMPILED_TYPES = set()
+INT_TYPES = {"int16", "int32", "int64", "uint16", "uint32", "uint64"}
+TIME_COL_TYPE = '<f8'
 
 
 def _printif(msg, condition):
@@ -157,6 +162,8 @@ def fread(file_obj, count, data_type, b_order, skip=0):
     """
     # TODO: fix slow reading of big files for other data types
 
+    result = None
+
     # print("bytes to read = {0}".format(type_len[data_type] * count))
     if skip < 0:  # check input parameters
         skip = 0
@@ -169,9 +176,13 @@ def fread(file_obj, count, data_type, b_order, skip=0):
     numpy_type = (b_order + numpy_type_char(data_type) +
                   str(numpy_type_len(data_type)))
     # print("numpy dtype = " + numpy_type)
-    if data_type == "int16":
-        _printif("Alt. reading function", PRINT_TIME)
+    type_is_int = False
+    if data_type in INT_TYPES:
+        type_is_int = True
+        _printif("{} FREAD - Using alt. reading function".format(datetime.datetime.now()), PRINT_TIME)
         result = numpy.ndarray(shape=(count,), dtype=numpy_type)
+
+    _printif("{} FREAD - File data type = {}".format(datetime.datetime.now(), data_type), PRINT_TIME)
 
     bytes_read = bytes()
     b_order_str = "big"
@@ -179,29 +190,42 @@ def fread(file_obj, count, data_type, b_order, skip=0):
         b_order_str = "little"
     _printif("{} FREAD - reading values. Count = {}".format(datetime.datetime.now(), count), PRINT_TIME)
     idx = 0
-    for _ in range(0, count):
-        if idx % 100000 == 0:
-            _printif("{} FREAD - reading value[{}]".format(datetime.datetime.now(), idx), PRINT_TIME)
-        if data_type == "int16":
-            result[idx] = int.from_bytes(file_obj.read(numpy_type_len(data_type)), byteorder=b_order_str, signed=True)
-        else:
-            bytes_read += file_obj.read(numpy_type_len(data_type))
-        file_obj.seek(numpy_type_len(data_type) * skip, 1)
-        idx += 1
 
-    # print("bytes read = {0}".format(bytes_read))
-    # check end of file
-    # if len(bytes_read) != numpy_type_len(data_type) * count:
-    if idx != count:
-        raise BinaryReadEOFException
+    # continuous reading without gaps
+    if skip == 0:
+        y_size = numpy_type_len(data_type) * count
+        raw_data = file_obj.read(y_size)
+        if len(raw_data) != y_size:
+            print("y_size = {}\nlen(raw_data) = {}".format(y_size, len(raw_data)))
+            raise EOFError("Not enough bytes in file. EOF reached while reading.")
+        result = numpy.ndarray(shape=(count,), dtype=numpy_type, buffer=raw_data)
+    # reading with gaps
+    else:
+        for _ in range(0, count):
+            if idx % PRINT_STEP == 0:
+                _printif("{} FREAD - reading value[{}]; Left to read: {}"
+                         "".format(datetime.datetime.now(), idx, (count - idx) // PRINT_STEP), PRINT_TIME)
+            if type_is_int:
+                result[idx] = int.from_bytes(file_obj.read(numpy_type_len(data_type)), byteorder=b_order_str, signed=True)
+            else:
+                bytes_read += file_obj.read(numpy_type_len(data_type))
+            file_obj.seek(numpy_type_len(data_type) * skip, 1)
+            idx += 1
 
-    # print("{} FREAD - making array".format(datetime.datetime.now()))
-    # numpy_type = (b_order + numpy_type_char(data_type) +
-    #               str(numpy_type_len(data_type)))
-    # # print("numpy dtype = " + numpy_type)
-    if data_type != "int16":
-        result = numpy.ndarray(shape=(count,), dtype=numpy_type,
-                               buffer=bytes_read)
+        # print("bytes read = {0}".format(bytes_read))
+        # check end of file
+        # if len(bytes_read) != numpy_type_len(data_type) * count:
+        if idx != count:
+            raise BinaryReadEOFException
+
+        # print("{} FREAD - making array".format(datetime.datetime.now()))
+        # numpy_type = (b_order + numpy_type_char(data_type) +
+        #               str(numpy_type_len(data_type)))
+        # # print("numpy dtype = " + numpy_type)
+        if not type_is_int:
+            result = numpy.ndarray(shape=(count,), dtype=numpy_type,
+                                   buffer=bytes_read)
+
     # string output:
     if data_type == 'str':
         result_str = ''
@@ -392,12 +416,20 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
 
         # READ DATA values from curve buffer
         # t - Time array (continuous uniform increasing sequence)
+
+        if curve_data_format not in PRECOMPILED_TYPES:
+            precompile(TIME_COL_TYPE)
+            _printif("{} Precompiled fill_time_array for '{}' data type."
+                     "".format(datetime.datetime.now(), curve_data_format), PRINT_TIME)
+
         _printif("{} Start making time column".format(datetime.datetime.now()), PRINT_TIME)
-        data_t = numpy.zeros((data_points_to_read, 1), dtype='<f8')
-        for i in range(0, data_points_to_read):
-            tic = (i + 1) * read_step
-            data_t[i] = (file_info['id1_dim_offset'] +
-                         file_info['id1_dim_scale'] * (tic + start_index))
+        data_t = numpy.ndarray((data_points_to_read, 1), dtype=TIME_COL_TYPE)
+        data_t = fill_time_array(data_t,
+                                 data_len=data_points_to_read,
+                                 start_idx=start_index,
+                                 read_step=read_step,
+                                 time_offset=file_info['id1_dim_offset'],
+                                 time_scale=file_info['id1_dim_scale'])
 
         _printif("{} Start reading raw data".format(datetime.datetime.now()), PRINT_TIME)
         raw_data = fread(fid, data_points_to_read,
@@ -672,3 +704,16 @@ if __name__ == "__main__":
         data = read_wfm_group(group, start[idx], count[idx], step[idx])
         numpy.savetxt(save_as[idx], data, delimiter=",")
         print('Saved as: {}'.format(save_as[idx]))
+
+
+@njit()
+def fill_time_array(data, data_len, start_idx, read_step, time_offset, time_scale):
+    for i in range(0, data_len):
+        tic = (i + 1) * read_step
+        data[i] = time_offset + time_scale * (tic + start_idx)
+    return data
+
+
+def precompile(np_type):
+    temp = numpy.ones(shape=(10, ), dtype=np_type)
+    temp = fill_time_array(temp, 10, 0, 1, 0.1, 1.1)
