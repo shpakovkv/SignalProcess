@@ -299,6 +299,7 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False, hide=F
     for curve_idx in cl_args.plot:
         curve_peaks = peaks[curve_idx] if peaks is not None else None
         fig = plot_multiple_curve(signals_data, curve_idx, curve_peaks,
+                                  xlim=cl_args.t_bounds,
                                   unixtime=cl_args.unixtime, hide=hide)
         if cl_args.plot_dir is not None:
             plot_name = (
@@ -385,7 +386,6 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
         time_label += ", " + time_units
     elif signals.time_units is not None:
         time_label += ", " + signals.time_units
-    print("signals time_units = {}".format(signals.time_units))
 
     if amp_unit is not None:
         amp_label += ", " + amp_unit
