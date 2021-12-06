@@ -351,7 +351,7 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
 
     fig = plt.figure()
 
-    if xlim is not None:
+    if xlim is not None and xlim[0] is not None and xlim[1] is not None:
         plt.xlim(xlim)
     color_iter = iter(ColorRange())
 
