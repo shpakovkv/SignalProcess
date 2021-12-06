@@ -125,7 +125,7 @@ def do_multiplots(signals_data, cl_args, plot_name,
                 print("Multiplot is saved {}"
                       "".format(mplot_path))
         if not cl_args.mp_hide:
-            plt.show()
+            plt.show(block=True)
         else:
             # draw plot, but don't pause the process
             # the plot will be closed as soon as drawn

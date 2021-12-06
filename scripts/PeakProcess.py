@@ -10,7 +10,7 @@ Link: https://github.com/shpakovkv/SignalProcess
 from __future__ import print_function
 
 import matplotlib
-import matplotlib.pyplot as pyplot
+import matplotlib.pyplot as plt
 
 import os
 import sys
@@ -267,15 +267,15 @@ def find_curve_front(curve,
                                       rising_front=is_rising)
     if front_checked:
         if save_plot:
-            pyplot.close('all')
-            pyplot.plot(curve.time, curve.val, '-b')
-            pyplot.plot([curve.time[idx]], [curve.val[idx]], '*r')
-            # pyplot.show()
+            plt.close('all')
+            plt.plot(curve.time, curve.val, '-b')
+            plt.plot([curve.time[idx]], [curve.val[idx]], '*r')
+            # plt.show()
             folder = os.path.dirname(plot_name)
             if folder != "" and not os.path.isdir(folder):
                 os.makedirs(folder)
-            pyplot.savefig(plot_name)
-            pyplot.close('all')
+            plt.savefig(plot_name)
+            plt.close('all')
         return curve.time[idx], curve.val[idx]
     return None, None
 
@@ -476,20 +476,20 @@ def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
             peak_list[i].invert()
     if graph:
         # plotting curve
-        pyplot.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-',
+        plt.plot(x[start_idx:stop_idx], y[start_idx:stop_idx], '-',
                     color='#8888bb')
-        pyplot.xlim(time_bounds)
+        plt.xlim(time_bounds)
         # plotting level line
-        pyplot.plot([x[0], x[len(x) - 1]], [level, level], ':',
+        plt.plot([x[0], x[len(x) - 1]], [level, level], ':',
                     color='#80ff80')
         # marking overall peaks
         peaks_x = [p.time for p in peak_list]
         peaks_y = [p.val for p in peak_list]
-        pyplot.scatter(peaks_x, peaks_y, s=50, edgecolors='#ff7f0e',
+        plt.scatter(peaks_x, peaks_y, s=50, edgecolors='#ff7f0e',
                        facecolors='none', linewidths=2)
-        pyplot.scatter(peaks_x, peaks_y, s=80, edgecolors='#dd3328',
+        plt.scatter(peaks_x, peaks_y, s=80, edgecolors='#dd3328',
                        facecolors='none', linewidths=2)
-        pyplot.show()
+        plt.show()
 
     return peak_list, peak_log
 
@@ -943,12 +943,12 @@ def do_job(args, shot_idx):
             print("Saving all peaks as " + multiplot_name)
         fig = plotter.plot_multiplot(data, peaks_data, args.curves,
                                      xlim=args.t_bounds, hide=args.peak_hide)
-        pyplot.savefig(multiplot_name, dpi=300)
+        plt.savefig(multiplot_name, dpi=300)
         if args.peak_hide:
-            pyplot.close(fig)
+            plt.close(fig)
 
         else:
-            pyplot.show()
+            plt.show()
 
     if args.read:
         if verbose:
@@ -992,7 +992,7 @@ def main():
 
     '''
     num_mask (tuple) - contains the first and last index
-    of substring of filenamepyplot.show
+    of substring of filenameplt.show
     That substring contains the shot number.
     The last idx is excluded: [first, last).
     Read numbering_parser docstring for more info.

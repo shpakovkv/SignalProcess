@@ -613,7 +613,6 @@ if __name__ == "__main__":
     The last idx is excluded: [first, last).
     Read numbering_parser docstring for more info.
     '''
-
     if args.hide_all:
         # by default backend == Qt5Agg
         # savefig() time for Qt5Agg == 0.926 s
@@ -622,6 +621,8 @@ if __name__ == "__main__":
         # run on Intel Core i5-4460 (average for 100 runs)
         # measured by cProfile
         matplotlib.use("Agg")
+    else:
+        matplotlib.use("Qt5Agg")
 
     if args.convert_only:
         for shot_idx, file_list in enumerate(args.gr_files):
@@ -687,27 +688,34 @@ if __name__ == "__main__":
 
             # plot preview and save
             if args.plot is not None:
-                print("PLOT HIDE == {} ".format(args.p_hide))
                 plotter.do_plots(data, args, shot_name, verbose=verbose, hide=args.p_hide)
 
             # plot and save multi-plots
-            if args.multiplot is not None:
-                plotter.do_multiplots(data, args, shot_name, verbose=verbose)
+            # if args.multiplot is not None:
+            #     plotter.do_multiplots(data, args, shot_name, verbose=verbose)
 
             # ========================================================================
             # ------   GET FRONT DELAY   ---------------------------------------------
             # ========================================================================
-            # front_points = print_front_delay(data.get_single_curve(0), 2.0, "fall",
-            #                                  data.get_single_curve(1), 1.0, "rise",
-            #                                  save=True, prefix="fronts_"+shot_name)
+            peaks = [None] * data.cnt_curves
+            front_points = print_front_delay(data.get_single_curve(1), -1.4, "fall",
+                                             data.get_single_curve(0), -1.0, "fall",
+                                             save=True, prefix="fronts_"+shot_name)
+            # front_points = [None] * 3
             # pulse_front = print_pulse_duration(data.get_single_curve(1), 1.0, "rise",
             #                                    save=True, prefix="pulse_")
             # front_points[1] = pulse_front[0]
-            # print()
-            # if args.multiplot is not None:
-            #     plotter.do_multiplots(data, args, shot_name,
-            #                           peaks=front_points,
-            #                           verbose=verbose)
+            # pulse_front = print_pulse_duration(data.get_single_curve(2), 1.0, "rise",
+            #                                    save=True, prefix="pulse_")
+            # front_points[2] = pulse_front[0]
+            peaks[1] = front_points[0]
+            peaks[0] = front_points[1]
+
+            if args.multiplot is not None:
+                plotter.do_multiplots(data, args, shot_name,
+                                      peaks=peaks,
+                                      hide=False,
+                                      verbose=verbose)
 
             # ========================================================================
 
