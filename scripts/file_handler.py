@@ -349,6 +349,16 @@ def read_log(file_list, start=0, step=1, points=-1,
     return data
 
 
+def is_time_col(col):
+    assert isinstance(col, numpy.ndarray), \
+        "Wrong input type. Expected {}, got {}." \
+        "".format(numpy.ndarray, type(col))
+    assert col.ndim == 1, "Expected array shape {}, got {}.".format("(1,)", col.shape)
+    stdev = np.std(col)
+    dt = col[1] - col[0]
+    return dt > 100 * stdev
+
+
 def read_signals(file_list, start=0, step=1, points=-1,
                  labels=None, units=None, time_units=None):
     """Function returns one SignalsData object filled with
@@ -386,6 +396,12 @@ def read_signals(file_list, start=0, step=1, points=-1,
             # multiple_X_columns = False
             single_time_column = True
             add_count = new_data.shape[1] - 1
+        elif new_data.shape[1] > 2:
+            if is_time_col(new_data[:, 2]):
+                add_count = new_data.shape[1] // 2
+            else:
+                single_time_column = True
+                add_count = new_data.shape[1] - 1
         else:
             # multiple_X_columns = True
             add_count = new_data.shape[1] // 2
