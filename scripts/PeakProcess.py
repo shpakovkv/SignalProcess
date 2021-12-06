@@ -132,10 +132,20 @@ def level_excess(x, y, level, start=0, step=1,
     :rtype:             tuple ''(bool, int)''
     """
 
-    idx = start          # zero-based index
     if window == 0:      # window default value
-        window = x[-1] - x[start]
+        datalen = x.shape[0] - 1
+        while (start < datalen) and (np.isnan(x[start])):
+            start += 1
+        stop = -1
+        if isinstance(x, np.ndarray):
+            stop = x.shape[0] - 1
+        else:
+            stop = len(x) - 1
+        while (stop > start) and (np.isnan(x[stop])):
+            stop -= 1
+        window = x[stop] - x[start]
 
+    idx = start  # zero-based index
     while ((idx >= 0) and (idx < len(y)) and
            (abs(x[idx] - x[start]) <= window)):
         if rising_front:
@@ -1045,6 +1055,8 @@ def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False
     front_points = list()
     front_points.append([SinglePeak(x1, y1, 0)])
     front_points.append([SinglePeak(x2, y2, 0)])
+    print("First curve front time = {}".format(x1))
+    print("Second curve front time = {}".format(x2))
     print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
           "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
                     curve2.label, "negative" if level2 < 0 else "positive", level2,
@@ -1086,7 +1098,8 @@ def print_pulse_duration(curve1, level1, front1, save=False, prefix="pulse_"):
     x2 = curve1.data[0, idx]
     y2 = curve1.data[1, idx]
     front_points.append([SinglePeak(x1, y1, 0), SinglePeak(x2, y2, 1)])
-
+    print("First curve front time = {}".format(x1))
+    print("Second curve front time = {}".format(x2))
     print("Delay between {}ing front (at {}) and {}ing front (at {}) == "
           "".format(front1, level1, "ris" if front1 == "fall" else "fall",
                     level1,
