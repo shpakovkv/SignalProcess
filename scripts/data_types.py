@@ -569,27 +569,27 @@ def multiply_time_column_2d(arr_2d, axes_number):
     points = arr_2d.shape[1]
     data = np.ndarray(shape=(curves * axes_number, points), dtype=arr_2d.dtype, order='C')
 
-    print()
-    print("EMPTY DATA")
-    print(data)
+    # print()
+    # print("EMPTY DATA")
+    # print(data)
     for cur in range(curves):
         cur_row = cur * axes_number
         fill_2d_array(arr_2d[0: 1, :], data[cur_row: cur_row + 1, :])
 
-    print()
-    print("DATA WITH TIME")
-    print(data)
+    # print()
+    # print("DATA WITH TIME")
+    # print(data)
 
     time_rows = 0
     for row in range(1, arr_2d.shape[0]):
         fill_2d_array(arr_2d[row: row + 1, :], data[row + time_rows: row + time_rows + 1, :])
-        print("Copy from [{} : {}]  to  [{} : {}]".format(row, row + 1, row + time_rows, row + time_rows + 1))
+        # print("Copy from [{} : {}]  to  [{} : {}]".format(row, row + 1, row + time_rows, row + time_rows + 1))
         if row % (axes_number - 1) == 0:
             time_rows += 1
 
-    print()
-    print("DATA FILLED")
-    print(data)
+    # print()
+    # print("DATA FILLED")
+    # print(data)
 
     # fill_2d_array_and_multiply_time_jit(time, arr_2d[1:], axes_number, data)
     return data
