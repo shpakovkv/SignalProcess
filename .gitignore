@@ -10,7 +10,13 @@
 *.wfm
 *.dat
 *.png
-scripts/test.py
+scripts/test_01.py
 *.xml
 untracked/
 scripts/new_test.py
+scripts/getMaxBits.py
+/scripts/test.py
+/scripts/test11.py
+/scripts/test_02.py
+/scripts/testdora.py
+/scripts/tests.py
