@@ -380,6 +380,17 @@ class SignalsData:
         """
         return True if self.cnt_curves == 0 else False
 
+    def delete_curve(self, idx):
+        assert idx < self.cnt_curves, "Not enough curves ({})".format(self.cnt_curves)
+        assert idx > 0, "Cannot delete last curve."
+        assert idx == self.cnt_curves - 1, "Only last curve can be deleted"
+        if idx == self.cnt_curves - 1:
+            self.labels = self.labels[:idx]
+            self.units = self.units[:idx]
+            self.data = self.data[:idx]
+            self.cnt_curves = self.cnt_curves - 1
+
+
 
 class SingleCurve:
 
@@ -479,6 +490,24 @@ class SingleCurve:
         else:
             self.t_units = self.__class__._t_units_default
 
+    def get_copy(self):
+        """Copy SingleCurve instance
+
+        :return: full copy of SingleCurve instance
+        """
+        label = None
+        if self.label is not None:
+            label = self.label[:]
+        units = None
+        if self.units is not None:
+            units = self.units[:]
+        t_units = None
+        if self.t_units is not None:
+            t_units = self.t_units[:]
+
+        new_curve = SingleCurve(np.copy(self.data), label=label, units=units, t_units=t_units)
+        return new_curve
+
 
 class SinglePeak:
     """Peak object. Contains information on one peak point.
@@ -541,6 +570,7 @@ class SinglePeak:
     data_full = property(get_data_full, set_data_full,
                          doc="Get/set [time, value, index, "
                              "sqr_l, sqr_r] of peak.")
+
 
 
 # =======================================================================
@@ -713,7 +743,6 @@ def align_and_append_2d_arrays(base_3d_array, *arrays, dtype=np.float64, axes_nu
     # first row is time row
     # and 2nd row is amplitude row
     slices_2d = list()
-
     for arr in (*(arr_2d for arr_2d in base_3d_array), *arrays):
         new_curves = arr.shape[0] // axes_number
         for idx in range(0, arr.shape[0], axes_number):
@@ -722,7 +751,6 @@ def align_and_append_2d_arrays(base_3d_array, *arrays, dtype=np.float64, axes_nu
     for idx in range(curves_count):
         points = slices_2d[idx].shape[1]
         fill_2d_array(slices_2d[idx], data[idx, :, 0: points])
-
     return data
 
 

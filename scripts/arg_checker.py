@@ -331,7 +331,7 @@ def check_idx_list(idx_list, max_idx, arg_name):
     if isinstance(idx_list, (int, bool)):
         idx_list = [idx_list]
     for idx in idx_list:
-        assert idx < max_idx, \
+        assert idx <= max_idx, \
             "Index ({idx}) is out of range in {name} " \
             "parameters.\nMaximum index = {max}" \
             "".format(idx=idx, name=arg_name, max=max_idx)
@@ -465,9 +465,6 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         mult = mult.reshape(len(mult) // data_axes, data_axes)
         # options.multiplier = mult.reshape(data_axes, len(mult) // data_axes)
         options.multiplier = mult
-    elif delay is not None:
-        shape = (len(delay) // data_axes, data_axes)
-        options.multiplier = np.ones(shape=shape, dtype=dtype)
 
     if delay is not None:
         assert len(delay) % data_axes == 0, \
@@ -477,12 +474,26 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         assert isinstance(delay, list), \
             "The delay argument must be of type list. " \
             "Got {} instead.".format(type(delay))
-    elif mult is not None:
+
+        shape = (len(delay) // data_axes, data_axes)
+        delay = np.array(delay, dtype=dtype)
+
+        # input structure: cur0_x_delay, cur0_y_delay, cur1_x_delay, cur1_y_delay, etc.
+        # first convert list to 'table' with x_column and y_column:
+        # cur0_x_delay, cur0_y_delay
+        # cur1_x_delay, cur1_y_delay
+        # cur2_x_delay, cur2_y_delay
+        # -- etc.
+
+        delay = delay.reshape(shape)
+        # options.delay = delay.reshape(data_axes, len(delay) // data_axes)
+        options.delay = delay
+
+    if delay is None and mult is not None:
         options.delay = np.zeros(shape=mult.shape, dtype=dtype)
 
-    # multiplier's & delay's elements are of type float (checked by arg_parser)
-
-    #
+    if mult is None and delay is not None:
+        options.multiplier = np.ones(shape=mult.shape, dtype=dtype)
 
 
 def check_multiplier(m, count=1):
@@ -587,6 +598,8 @@ def plot_arg_check(options):
     options.plot_dir = check_param_path(options.plot_dir, '--p_save')
     options.multiplot_dir = check_param_path(options.multiplot_dir,
                                              '--mp-save')
+    options.multicurve_dir = check_param_path(options.multicurve_dir,
+                                              '--multicurve-plot-save')
     # check and convert plot and multiplot options
     if options.plot:
         options.plot = global_check_idx_list(options.plot, '--plot',
@@ -595,6 +608,12 @@ def plot_arg_check(options):
         for idx, m_param in enumerate(options.multiplot):
             options.multiplot[idx] = global_check_idx_list(m_param,
                                                            '--multiplot')
+
+    if options.multicurve:
+        for idx, mc_param in enumerate(options.multicurve):
+            options.multicurve[idx] = global_check_idx_list(mc_param,
+                                                           '--multicurve-plot')
+
     return options
 
 
@@ -659,8 +678,7 @@ def data_corr_arg_check(options):
              "".format(arg_name="--offset-by-curve_level"))
         if len(options.offset_by_front) < 4:
             options.it_offset = True
-        options.offset_by_front = \
-            global_check_front_params(options.offset_by_front)
+        options.offset_by_front = global_check_front_params(options.offset_by_front)
 
     # # raw check labels (not used)
     # # instead: the forbidden symbols are replaced during CSV saving
@@ -755,4 +773,7 @@ def check_utility_args(options):
         options.p_hide = True
         options.mp_hide = True
         options.peak_hide = True
+
+        # select non-interactive offset by curve front process
+        options.it_offset = False
     return options

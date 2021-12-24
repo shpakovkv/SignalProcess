@@ -26,7 +26,7 @@ from data_types import SinglePeak
 
 CSV_DELIMITER_LIST = [',', ';', ' ', ':', '\t']
 LOGDIRECTORY = "LOG_SignalProcess"
-VERBOSE = 0
+VERBOSE = 1
 DEBUG = 0
 
 
@@ -350,13 +350,12 @@ def read_log(file_list, start=0, step=1, points=-1,
 
 
 def is_time_col(col):
-    assert isinstance(col, numpy.ndarray), \
+    assert isinstance(col, np.ndarray), \
         "Wrong input type. Expected {}, got {}." \
-        "".format(numpy.ndarray, type(col))
+        "".format(np.ndarray, type(col))
     assert col.ndim == 1, "Expected array shape {}, got {}.".format("(1,)", col.shape)
-    stdev = np.std(col)
-    dt = col[1] - col[0]
-    return dt > 100 * stdev
+    np.all(np.diff(col) > 0)
+    return np.all(np.diff(col) > 0)
 
 
 def read_signals(file_list, start=0, step=1, points=-1,
@@ -844,29 +843,29 @@ def create_log(src, saved_as, labels, multiplier=None, delays=None,
     lines.append("Partial import: " + partial_str + "\n")
     lines.append("\n")
 
-    if multiplier:
+    if multiplier is not None:
         lines.append("Applied multipliers:\n")
         lines.append("Time            Amplitude     Labels\n")
-        for idx, pair in enumerate(zip(multiplier[0:len(multiplier):2],
-                                       multiplier[1:len(multiplier):2])):
-            lines.append("{: <15.5e} {:.5e}   {}\n".format(pair[0], pair[1],
+        for idx, mult in enumerate(multiplier):
+            lines.append("{: <15.5e} {:.5e}   {}\n".format(mult[0],
+                                                           mult[1],
                                                            labels[idx]))
         lines.append("\n")
     else:
         lines.append("No multipliers were applied.\n")
 
-    if delays:
+    if delays is not None:
         lines.append("Applied delays:\n")
         lines.append("Time            Amplitude     Labels\n")
-        for idx, pair in enumerate(zip(delays[0:len(delays):2],
-                                       delays[1:len(delays):2])):
-            lines.append("{: <15.5e} {:.5e}   {}\n".format(pair[0], pair[1],
+        for idx, val in enumerate(delays):
+            lines.append("{: <15.5e} {:.5e}   {}\n".format(val[0],
+                                                           val[1],
                                                            labels[idx]))
         lines.append("\n")
     else:
         lines.append("No delays were applied.\n")
 
-    if offset_by_front:
+    if offset_by_front is not None:
         lines.append("Delays was modified by --offset-by-curve-front "
                      "option with values:\n")
         lines.append("Curve idx = {}   ({})\n"
@@ -879,7 +878,7 @@ def create_log(src, saved_as, labels, multiplier=None, delays=None,
                      "".format(offset_by_front[3]))
         lines.append("\n")
 
-    if y_auto_offset:
+    if y_auto_offset is not None:
         lines.append("Delays was modified by --y-auto-zero "
                      "option with values:\n")
         for args in y_auto_offset:

@@ -126,10 +126,67 @@ def do_multiplots(signals_data, cl_args, plot_name,
                       "".format(mplot_path))
         if not cl_args.mp_hide:
             plt.show(block=True)
-        else:
-            # draw plot, but don't pause the process
-            # the plot will be closed as soon as drawn
-            plt.show(block=False)
+        # else:
+        #     # draw plot, but don't pause the process
+        #     # the plot will be closed as soon as drawn
+        #     plt.show(block=False)
+        plt.close('all')
+
+
+def do_multicurve_plots(signals_data, cl_args, plot_name,
+                        peaks=None, verbose=False, hide=False):
+    """Plots all the multicurve graphs specified by the user.
+    Saves the graphs that the user specified to save.
+
+    :param signals_data: SignalsData instance
+    :param cl_args: user-entered arguments (namespace from parser)
+    :param plot_name: shot number, needed for saving
+    :param peaks: the list of list of peaks (SinglePeak instance)
+                    peak_data[0] == list of peaks for data.curves[curves_list[0]]
+                    peak_data[1] == list of peaks for data.curves[curves_list[1]]
+                    etc.
+    :param verbose: show additional information or no
+
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+    :type plot_name: str
+    :type peaks: list of lists of SinglePeak
+    :type verbose: bool
+
+    :return: None
+
+    """
+
+    for curve_list in cl_args.multicurve:
+        check_plot_param(curve_list, signals_data.cnt_curves)
+
+    for curve_list in cl_args.multicurve:
+        plot_multiple_curve(signals_data, curve_list,
+                            peaks=peaks,
+                            xlim=cl_args.t_bounds,
+                            amp_unit=signals_data.get_curve_label(curve_list[0]),
+                            time_units=signals_data.time_units,
+                            unixtime=cl_args.unixtime,
+                            hide=hide)
+        if cl_args.multicurve_dir is not None:
+            idx_list = "_".join(str(i) for
+                                i in sorted(curve_list))
+            mplot_name = ("{shot}_curves_"
+                          "{idx_list}.multicurve.png"
+                          "".format(shot=plot_name,
+                                    idx_list=idx_list))
+            mplot_path = os.path.join(cl_args.multicurve_dir,
+                                      mplot_name)
+            plt.savefig(mplot_path, dpi=400)
+            if verbose:
+                print("Multicurve plot is saved {}"
+                      "".format(mplot_path))
+        if not cl_args.mp_hide:
+            plt.show(block=True)
+        # else:
+        #     # draw plot, but don't pause the process
+        #     # the plot will be closed as soon as drawn
+        #     plt.show(block=False)
         plt.close('all')
 
 
@@ -320,6 +377,7 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
                         xlim=None, amp_unit=None,
                         time_units=None, title=None,
                         unixtime=False, hide=False):
+
     """Draws one or more curves on one graph.
     Additionally draws peaks on the underlying layer
     of the same graph, if the peaks exists.
@@ -436,8 +494,16 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
         time_bounds = (time[0], time_bounds[1])
     if time_bounds[1] is None:
         time_bounds = (time_bounds[0], time[-1])
+    if y[-1] == np.nan:
+        last = y.shape[0] - 1
+        while y[last] == np.nan:
+            last -= 1
+        y = np.copy(y[0:last])
     start = find_nearest_idx(time, time_bounds[0], side='right')
     stop = find_nearest_idx(time, time_bounds[1], side='left')
+
+    if stop - start < 1:
+        return -1, 1
     y_max = np.amax(y[start:stop])
     y_min = np.amin(y[start:stop])
     y_range = y_max - y_min

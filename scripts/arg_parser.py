@@ -448,6 +448,35 @@ def get_plot_args_parser():
              'to this directory.\n\n')
 
     plot_args_parser.add_argument(
+        '--multicurve-plot',
+        action='append',
+        dest='multicurve',
+        metavar='CURVE_IDX',
+        nargs='+',
+        help='specify the indexes of the curves you want to plot\n'
+             'at one graph (with the same amplityde scale and time scale\n'
+             'You may use as many \'--multicurve-plot\' flags (with different lists\n'
+             'of curves) as you want. One flag for one graph.\n\n')
+
+    plot_args_parser.add_argument(
+        '--mcp-hide', '--multicurve-plot-hide',
+        action='store_true',
+        dest='mcp_hide',
+        help='if the --multicurve-plot, --mcp-save and this flag is specified\n'
+             'the multicurve plots will be saved but not shown.\n'
+             'This option can reduce the running time of the program.\n\n')
+
+    plot_args_parser.add_argument(
+        '--mcp-save', '--save-multicurve-plot-to',
+        action='store',
+        dest='multicurve_dir',
+        metavar='MULTICURVE_DIR',
+        help='specify the directory.\n'
+             'Each multicurve plot, entered via --multicurve-plot flag(s)\n'
+             'will be plotted and saved separately as .png file\n'
+             'to this directory.\n\n')
+
+    plot_args_parser.add_argument(
         '--plot-bounds',
         action='store',
         dest='t_bounds',

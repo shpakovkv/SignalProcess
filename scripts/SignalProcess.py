@@ -373,9 +373,20 @@ def get_front_point(signals_data, args, multiplier, delay,
     window = args[2]
     poly_order = args[3]
 
-    curve = data_types.SingleCurve(signals_data.get_single_curve(curve_idx))
-    polarity = check_polarity(curve)
-    front = "rise" if is_pos(polarity) else "fall"
+    # curve = data_types.SingleCurve(signals_data.get_single_curve(curve_idx))
+    # curve = signals_data.get_single_curve(curve_idx).copy()
+
+    # make local copy of target curve
+    curve = SignalsData(np.copy(signals_data.get_curve_2d_arr(curve_idx)),
+                        labels=[signals_data.get_curve_label(0)],
+                        units=[signals_data.get_curve_units(0)],
+                        time_units=signals_data.time_units)
+
+    # polarity = check_polarity(curve.get_single_curve(0))
+    front = "fall" if level < 0 else "rise"
+
+    # TODO: user enter front type
+
     # if is_pos(polarity):
     #     level = abs(level)
     # else:
@@ -384,18 +395,15 @@ def get_front_point(signals_data, args, multiplier, delay,
     cur_mult = multiplier[curve_idx: curve_idx + 1]
     cur_del = delay[curve_idx: curve_idx + 1]
 
-    # make local copy of target curve
-    curve = curve.copy()
-
     # apply multiplier and delay to local copy
     curve.data = multiplier_and_delay(curve.data, cur_mult, cur_del)
     # get x and y columns
-    data_x = curve.time
-    data_y = curve.val
+    data_x = curve.get_x(0)
+    data_y = curve.get_y(0)
 
     print("Time offset by curve front process.")
     print("Searching curve[{idx}] \"{label}\" front at level = {level}"
-          "".format(idx=curve_idx, label=curve.label, level=level))
+          "".format(idx=curve_idx, label=curve.get_curve_label(0), level=level))
 
     plot_title = None
     smoothed_curve = None
@@ -419,14 +427,18 @@ def get_front_point(signals_data, args, multiplier, delay,
     while not cancel:
         # smooth curve
         data_y_smooth = smooth_voltage(data_y, window, poly_order)
-        smoothed_curve = data_types.SingleCurve(data_x, data_y_smooth,
-                                                curve.label, curve.unit,
-                                                curve.t_unit)
+        smooth_data = np.stack((data_x, data_y_smooth))
+
+        smoothed_curve = data_types.SingleCurve(smooth_data,
+                                                curve.get_curve_label(0),
+                                                curve.get_curve_units(0),
+                                                curve.time_units)
         # find front
         front_x, front_y = find_curve_front(smoothed_curve,
                                             level, front)
+
         plot_title = ("Curve[{idx}] \"{label}\"\n"
-                      "".format(idx=curve_idx, label=curve.label))
+                      "".format(idx=curve_idx, label=curve.get_curve_label(0)))
         if front_x is not None:
             front_point = data_types.SinglePeak(front_x, front_y, 0)
             plot_title += "Found front at [{},  {}]".format(front_x, front_y)
@@ -436,15 +448,25 @@ def get_front_point(signals_data, args, multiplier, delay,
 
         if interactive:
             # visualize for user
-            plotter.plot_multiple_curve([curve, smoothed_curve],
-                                        [front_point], title=plot_title)
+            # curve.append_2d_array(smoothed_curve.data,
+            #                       labels=[curve.get_curve_label(0)],
+            #                       units=[curve.get_curve_units(0)])
+            curve.add_from_array(smoothed_curve.data,
+                                 labels=[curve.get_curve_label(0) + "_sm"],
+                                 units=[curve.get_curve_units(0)],
+                                 time_units=curve.time_units)
+            plotter.plot_multiple_curve(curve,
+                                        curve_list=[0, 1],
+                                        peaks=[front_point],
+                                        title=plot_title)
 
             print("\nPrevious values:  {win}  {ord}\n"
                   "".format(win=window, ord=poly_order))
-            plt.show()
-            print("Press enter, without entering a value "
+            print("Close plot and press enter, without entering a value "
                   "to exit the interactive mode. "
                   "The previously entered values will be used.")
+            plt.show(block=True)
+
             while True:
                 # get user input
                 try:
@@ -468,12 +490,22 @@ def get_front_point(signals_data, args, multiplier, delay,
                     window = new_win
                     poly_order = new_ord
                     break
+            curve.delete_curve(1)
         else:
-            break
+            cancel = True
+
 
     # save final version of the plot
-    plotter.plot_multiple_curve([curve, smoothed_curve],
-                                [front_point], title=plot_title)
+    curve.add_from_array(smoothed_curve.data,
+                         labels=[curve.get_curve_label(0) + "_sm"],
+                         units=[curve.get_curve_units(0)],
+                         time_units=curve.time_units)
+
+    plotter.plot_multiple_curve(curve,
+                                curve_list=[0, 1],
+                                peaks=[front_point],
+                                title=plot_title)
+
     plt.savefig(front_plot_name, dpi=400)
     # show plot to avoid tkinter warning "can't invoke "event" command..."
     plt.show(block=False)
@@ -502,8 +534,8 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
     :type cl_args: argparse.Namespace
     :type shot_name: str
 
-    :return: changed cl_args
-    :rtype: argparse.Namespace
+    :return: new delay structure
+    :rtype: np.ndarray
     """
 
     arg_checker.check_idx_list(cl_args.offset_by_front[0], signals_data.cnt_curves - 1,
@@ -518,10 +550,10 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
     # update delays
     new_delay = cl_args.delay[:]
     if front_point is not None:
-        for idx in range(0, len(cl_args.delay), 2):
-            new_delay[idx] += front_point.time
-    cl_args.delay = new_delay
-    return cl_args
+        for idx in range(0, cl_args.delay.shape[0]):
+            new_delay[idx, 0] += front_point.time
+        return new_delay
+    return None
 
 
 def zero_curves(signals, curve_indexes, verbose=False):
@@ -675,47 +707,58 @@ if __name__ == "__main__":
             if args.y_auto_zero is not None:
                 args = do_y_zero_offset(data, args)
 
-            # check offset_by_voltage parameters (if idx is out of range)
-            if args.offset_by_front is not None:
-                args = do_offset_by_front(data, args, shot_name)
-
             # reset to zero
             if args.zero is not None:
                 data = zero_curves(data, args.zero, verbose)
 
-            # multiplier and delay
-            data = multiplier_and_delay(data, args.multiplier, args.delay)
+            # check offset_by_voltage parameters (if idx is out of range)
+            new_delay = None
+            if args.offset_by_front is not None:
+                new_delay = do_offset_by_front(data, args, shot_name)
+
+            # mu
+            # ltiplier and delay
+            if new_delay is None:
+                data = multiplier_and_delay(data, args.multiplier, args.delay)
+            else:
+                data = multiplier_and_delay(data, args.multiplier, new_delay)
 
             # plot preview and save
             if args.plot is not None:
                 plotter.do_plots(data, args, shot_name, verbose=verbose, hide=args.p_hide)
 
             # plot and save multi-plots
-            # if args.multiplot is not None:
-            #     plotter.do_multiplots(data, args, shot_name, verbose=verbose)
+            if args.multiplot is not None:
+                plotter.do_multiplots(data, args, shot_name, verbose=verbose)
+
+            # plot and save multicurve plots
+            if args.multicurve is not None:
+                plotter.do_multicurve_plots(data, args, shot_name, verbose=verbose)
 
             # ========================================================================
             # ------   GET FRONT DELAY   ---------------------------------------------
             # ========================================================================
-            peaks = [None] * data.cnt_curves
-            front_points = print_front_delay(data.get_single_curve(1), -1.4, "fall",
-                                             data.get_single_curve(0), -1.0, "fall",
-                                             save=True, prefix="fronts_"+shot_name)
-            # front_points = [None] * 3
-            # pulse_front = print_pulse_duration(data.get_single_curve(1), 1.0, "rise",
-            #                                    save=True, prefix="pulse_")
-            # front_points[1] = pulse_front[0]
-            # pulse_front = print_pulse_duration(data.get_single_curve(2), 1.0, "rise",
-            #                                    save=True, prefix="pulse_")
-            # front_points[2] = pulse_front[0]
-            peaks[1] = front_points[0]
-            peaks[0] = front_points[1]
-
-            if args.multiplot is not None:
-                plotter.do_multiplots(data, args, shot_name,
-                                      peaks=peaks,
-                                      hide=False,
-                                      verbose=verbose)
+            # peaks = [None] * data.cnt_curves
+            # front_points = print_front_delay(data.get_single_curve(1), 1.0, "rise",
+            #                                  data.get_single_curve(2), -0.1, "fall",
+            #                                  save=True, prefix="fronts_"+shot_name)
+            # # front_points = [None] * 3
+            # # pulse_front = print_pulse_duration(data.get_single_curve(1), 1.0, "rise",
+            # #                                    save=True, prefix="pulse_")
+            # # front_points[1] = pulse_front[0]
+            # # pulse_front = print_pulse_duration(data.get_single_curve(2), 1.0, "rise",
+            # #                                    save=True, prefix="pulse_")
+            # # front_points[2] = pulse_front[0]
+            #
+            # peaks[1] = front_points[0]
+            #
+            # peaks[2] = front_points[1]
+            #
+            # if args.multiplot is not None:
+            #     plotter.do_multiplots(data, args, shot_name,
+            #                           peaks=peaks,
+            #                           hide=False,
+            #                           verbose=verbose)
 
             # ========================================================================
 
@@ -726,9 +769,9 @@ if __name__ == "__main__":
                                                 save_as=args.out_names[shot_idx],
                                                 verbose=verbose,
                                                 separate_files=args.separate_save)
-                labels = [data.labels(cr) for cr in data.idx_to_label.keys()]
+                # labels = [data.labels(cr) for cr in data.idx_to_label.keys()]
 
-                file_handler.save_m_log(file_list, saved_as, labels, args.multiplier,
+                file_handler.save_m_log(file_list, saved_as, data.get_labels(), args.multiplier,
                                         args.delay, args.offset_by_front,
                                         args.y_auto_zero, args.partial)
 
