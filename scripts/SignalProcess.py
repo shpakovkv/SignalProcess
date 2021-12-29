@@ -401,13 +401,7 @@ def get_front_point(signals_data, args, multiplier, delay,
     data_x = curve.get_x(0)
     data_y = curve.get_y(0)
 
-    first_num = 0
-    while np.isnan(data_y[first_num]):
-        first_num += 1
-
-    last_num = data_y.shape[0] - 1
-    while np.isnan(data_y[last_num]):
-        last_num -= 1
+    first_num, last_num = file_handler.get_real_num_bounds_1d(data_y)
 
     data_y = data_y[first_num:last_num + 1]
     data_x = data_x[first_num:last_num + 1]

@@ -48,6 +48,31 @@ def check_header_label(s, count):
     return None
 
 
+def get_real_num_bounds_1d(data):
+    """Checks if the input array starts with nan's or ends with nan's.
+    Returns two indices - the boundaries of a subarray of real numbers.
+
+    Note: the first bound is included, the last bound is not included [first, last).
+
+    :param data: numpy ndarray with ndim == 1
+
+    :type data: np.ndarray
+
+    :return: tuple with two indexes (first, last)
+    :rtype: tuple
+    """
+    first_num = 0
+    while np.isnan(data[first_num]):
+        first_num += 1
+
+    last_num = data.shape[0] - 1
+    while np.isnan(data[last_num]):
+        last_num -= 1
+
+    # first bound is included, last bound is not included [first, last)
+    return first_num, last_num + 1
+
+
 # =======================================================================
 # -----    FILES HANDLING     -------------------------------------------
 # =======================================================================
@@ -354,8 +379,10 @@ def is_time_col(col):
         "Wrong input type. Expected {}, got {}." \
         "".format(np.ndarray, type(col))
     assert col.ndim == 1, "Expected array shape {}, got {}.".format("(1,)", col.shape)
-    np.all(np.diff(col) > 0)
-    return np.all(np.diff(col) > 0)
+    first_num, last_num = get_real_num_bounds_1d(col)
+
+    res = np.all(np.diff(col[first_num:last_num]) > 0)
+    return res
 
 
 def read_signals(file_list, start=0, step=1, points=-1,
