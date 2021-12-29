@@ -401,6 +401,17 @@ def get_front_point(signals_data, args, multiplier, delay,
     data_x = curve.get_x(0)
     data_y = curve.get_y(0)
 
+    first_num = 0
+    while np.isnan(data_y[first_num]):
+        first_num += 1
+
+    last_num = data_y.shape[0] - 1
+    while np.isnan(data_y[last_num]):
+        last_num -= 1
+
+    data_y = data_y[first_num:last_num + 1]
+    data_x = data_x[first_num:last_num + 1]
+
     print("Time offset by curve front process.")
     print("Searching curve[{idx}] \"{label}\" front at level = {level}"
           "".format(idx=curve_idx, label=curve.get_curve_label(0), level=level))
