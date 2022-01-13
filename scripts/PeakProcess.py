@@ -1057,10 +1057,16 @@ def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False
     front_points.append([SinglePeak(x2, y2, 0)])
     print("First curve front time = {}".format(x1))
     print("Second curve front time = {}".format(x2))
-    print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
-          "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
-                    curve2.label, "negative" if level2 < 0 else "positive", level2,
-                    x2 - x1))
+    if x1 is not None and x2 is not None:
+        print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
+              "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
+                        curve2.label, "negative" if level2 < 0 else "positive", level2,
+                        x2 - x1))
+    else:
+        print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
+              "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
+                        curve2.label, "negative" if level2 < 0 else "positive", level2,
+                        0))
     return front_points
 
 

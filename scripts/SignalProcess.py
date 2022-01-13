@@ -102,7 +102,7 @@ def smooth_voltage(y_data, window=101, poly_order=3):
     if len(y_data) >= 5:
         # print("WINDOW LEN = {}  |  POLY ORDER = {}"
         #       "".format(window, poly_order))
-        y_smoothed = savgol_filter(y_data, window, poly_order)
+        y_smoothed = savgol_filter(y_data, window, poly_order, mode='nearest')
         return y_smoothed
 
     # too short array to be processed
@@ -684,6 +684,7 @@ if __name__ == "__main__":
     elif (args.save or
             args.plot or
             args.multiplot or
+            args.multicurve or
             args.offset_by_front):
 
         num_mask = file_handler.numbering_parser([files[0] for
@@ -744,8 +745,8 @@ if __name__ == "__main__":
             # ------   GET FRONT DELAY   ---------------------------------------------
             # ========================================================================
             # peaks = [None] * data.cnt_curves
-            # front_points = print_front_delay(data.get_single_curve(1), 1.0, "rise",
-            #                                  data.get_single_curve(2), -0.1, "fall",
+            # front_points = print_front_delay(data.get_single_curve(2), -0.2, "fall",
+            #                                  data.get_single_curve(1), 1.5, "rise",
             #                                  save=True, prefix="fronts_"+shot_name)
             # # front_points = [None] * 3
             # # pulse_front = print_pulse_duration(data.get_single_curve(1), 1.0, "rise",
@@ -755,9 +756,9 @@ if __name__ == "__main__":
             # #                                    save=True, prefix="pulse_")
             # # front_points[2] = pulse_front[0]
             #
-            # peaks[1] = front_points[0]
+            # peaks[2] = front_points[0]
             #
-            # peaks[2] = front_points[1]
+            # peaks[1] = front_points[1]
             #
             # if args.multiplot is not None:
             #     plotter.do_multiplots(data, args, shot_name,

@@ -493,7 +493,7 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         options.delay = np.zeros(shape=mult.shape, dtype=dtype)
 
     if mult is None and delay is not None:
-        options.multiplier = np.ones(shape=mult.shape, dtype=dtype)
+        options.multiplier = np.ones(shape=delay.shape, dtype=dtype)
 
 
 def check_multiplier(m, count=1):

@@ -501,6 +501,8 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
         y = np.copy(y[0:last])
     start = find_nearest_idx(time, time_bounds[0], side='right')
     stop = find_nearest_idx(time, time_bounds[1], side='left')
+    if start is None or stop is None:
+        return -1, 1
 
     if stop - start < 1:
         return -1, 1
@@ -535,6 +537,7 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
     """
 
     idx = bisect.bisect_left(sorted_arr, value)
+    # print("IDX = {};  SIDE = {}; max = {};   min = {}".format(idx, side, np.nanmax(sorted_arr), np.nanmin(sorted_arr)))
     if idx == 0:
         return idx if side == 'auto' or side == 'right' else None
 
