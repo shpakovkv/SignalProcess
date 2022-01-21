@@ -168,6 +168,13 @@ def do_multicurve_plots(signals_data, cl_args, plot_name,
                             time_units=signals_data.time_units,
                             unixtime=cl_args.unixtime,
                             hide=hide)
+        # ax_list = fig.axes
+        # # print("AXIS LIST = {}".format(ax_list))
+        # ax = ax_list[0]
+        # # print("AXIS 0 = {}".format(ax))
+        # ax.legend()
+        # plt.legend()
+
         if cl_args.multicurve_dir is not None:
             idx_list = "_".join(str(i) for
                                 i in sorted(curve_list))
@@ -425,11 +432,15 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
         if unixtime:
             plt.plot(md.epoch2num(signals.get_x(curve_idx)),
                      signals.get_y(curve_idx),
-                     '-', color=color, linewidth=1)
+                     '-',
+                     label=signals.get_curve_label(curve_idx),
+                     color=color, linewidth=1)
         else:
             plt.plot(signals.get_x(curve_idx),
                      signals.get_y(curve_idx),
-                     '-', color=color, linewidth=1)
+                     '-',
+                     label=signals.get_curve_label(curve_idx),
+                     color=color, linewidth=1)
         axes_obj = plt.gca()
         axes_obj.tick_params(direction='in', top=True, right=True)
         if unixtime:
@@ -454,8 +465,7 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
     if title is not None:
         plt.title(title)
     elif len(curve_list) > 1:
-        # TODO: LEGEND
-        pass
+        plt.legend()
     else:
         plt.title(signals.get_curve_label(curve_list[0]))
     plt.xlabel(time_label)

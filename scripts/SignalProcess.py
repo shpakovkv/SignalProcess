@@ -722,8 +722,7 @@ if __name__ == "__main__":
             if args.offset_by_front is not None:
                 new_delay = do_offset_by_front(data, args, shot_name)
 
-            # mu
-            # ltiplier and delay
+            # multiplier and delay
             if new_delay is None:
                 data = multiplier_and_delay(data, args.multiplier, args.delay)
             else:

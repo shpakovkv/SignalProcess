@@ -651,10 +651,16 @@ def get_csv_headers(read_lines, delimiter=',', except_list=('', 'nan'), verbose=
         # column number difference check
         if len(read_lines[idx].strip().split(delimiter)) == cols_count:
 
-            # non numeric values check
             try:
-                [float(val) for val in read_lines[idx].strip().split(delimiter) if
-                 val not in except_list]
+                # mark non numeric values as header
+                tmp = [float(val) for val in read_lines[idx].strip().split(delimiter) if
+                       val not in except_list]
+
+                # mark NaN-only rows as header
+                if not tmp:
+                    headers += 1
+                    continue
+
             except ValueError:
                 headers += 1
             else:
