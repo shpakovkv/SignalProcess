@@ -441,6 +441,51 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
                      '-',
                      label=signals.get_curve_label(curve_idx),
                      color=color, linewidth=1)
+        # if peaks is not None:
+        #     if peaks[curve_idx] is not None:
+        #         peak_x = [peak.time for peak in peaks[curve_idx] if peak is not None]
+        #         peak_y = [peak.val for peak in peaks[curve_idx] if peak is not None]
+        #         if unixtime:
+        #             plt.scatter(md.epoch2num(peak_x), peak_y, s=50, edgecolors='#ff7f0e',
+        #                         facecolors='none', linewidths=2)
+        #             plt.scatter(md.epoch2num(peak_x), peak_y, s=90, edgecolors='#dd3328',
+        #                         facecolors='none', linewidths=2)
+        #         else:
+        #             plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e',
+        #                         facecolors='none', linewidths=2)
+        #             plt.scatter(peak_x, peak_y, s=90, edgecolors='#dd3328',
+        #                         facecolors='none', linewidths=2)
+
+        # plot peaks scatter
+        if peaks is not None:
+            pk_color_iter = iter(ColorRange())
+            for pk in peaks[curve_idx]:
+                pk_color = next(pk_color_iter)
+                if pk is not None:
+                    if unixtime:
+                        plt.scatter(md.epoch2num([pk.time]), [pk.val], s=30,
+                                    edgecolors=color, facecolors='none',
+                                    linewidths=1.5)
+                        plt.scatter(md.epoch2num([pk.time]), [pk.val], s=60,
+                                    edgecolors='none', facecolors=pk_color,
+                                    linewidths=1.5, marker='x')
+                        # plt.scatter(md.epoch2num([pk.time]), [pk.val], s=50, edgecolors='#ff7f0e',
+                        #                     facecolors='none', linewidths=2)
+                        # plt.scatter(md.epoch2num([pk.time]), [pk.val], s=90, edgecolors='#dd3328',
+                        #             facecolors='none', linewidths=2)
+                    else:
+                        # plt.scatter([pk.time], [pk.val], s=50,
+                        #             edgecolors=color, facecolors='none',
+                        #             linewidths=1.5)
+                        # plt.scatter([pk.time], [pk.val], s=90,
+                        #             edgecolors='none', facecolors=pk_color,
+                        #             linewidths=1, marker='x')
+                        plt.scatter([pk.time], [pk.val], s=30, edgecolors='#ff7f0e',
+                                    facecolors='none', linewidths=2)
+                        plt.scatter([pk.time], [pk.val], s=60, edgecolors='#dd3328',
+                                    facecolors='none', linewidths=2)
+
+
         axes_obj = plt.gca()
         axes_obj.tick_params(direction='in', top=True, right=True)
         if unixtime:
@@ -471,15 +516,6 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
     plt.xlabel(time_label)
     plt.ylabel(amp_label)
 
-    if peaks is not None:
-        peak_x = [peak.time for peak in peaks if peak is not None]
-        peak_y = [peak.val for peak in peaks if peak is not None]
-        plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e',
-                    facecolors='none', linewidths=2)
-        plt.scatter(peak_x, peak_y, s=90, edgecolors='#dd3328',
-                    facecolors='none', linewidths=2)
-        # plt.scatter(peak_x, peak_y, s=150, edgecolors='none',
-        #             facecolors='#133cac', linewidths=1.5, marker='x')
     return fig
 
 
