@@ -318,7 +318,7 @@ def plot_multiplot(data, peak_data, curves_list,
         axes[wf, 0].tick_params(labelsize=8)
 
         # plot peaks scatter
-        if peak_data is not None:
+        if peak_data is not None and peak_data[curves_list[wf]] is not None:
             color_iter = iter(ColorRange())
             for pk in peak_data[curves_list[wf]]:
                 color = next(color_iter)
@@ -457,7 +457,7 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
         #                         facecolors='none', linewidths=2)
 
         # plot peaks scatter
-        if peaks is not None:
+        if peaks is not None and peaks[curve_idx] is not None:
             pk_color_iter = iter(ColorRange())
             for pk in peaks[curve_idx]:
                 pk_color = next(pk_color_iter)
