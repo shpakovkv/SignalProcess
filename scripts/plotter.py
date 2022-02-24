@@ -79,6 +79,28 @@ class ColorRange:
                     yield self.hsl_to_rgb_code(new_hue, sat, lumi)
 
 
+def get_curve_indexes_for_name_str(curve_list):
+    sorted_list = sorted(curve_list)
+    res = str(sorted_list[0])
+    prev = sorted_list[0]
+    sequence = False
+    for idx in sorted_list[1:]:
+        if idx == prev + 1:
+            if not sequence:
+                res += '-'
+                sequence = True
+        else:
+            if sequence:
+                res += str(prev)
+                sequence = False
+            res += "_"
+            res += str(idx)
+        prev = idx
+    if sequence:
+        res += str(prev)
+    return res
+
+
 def do_multiplots(signals_data, cl_args, plot_name,
                   peaks=None, verbose=False, hide=False):
     """Plots all the multiplot graphs specified by the user.
@@ -112,10 +134,9 @@ def do_multiplots(signals_data, cl_args, plot_name,
                        unixtime=cl_args.unixtime,
                        hide=hide)
         if cl_args.multiplot_dir is not None:
-            idx_list = "_".join(str(i) for
-                                i in sorted(curve_list))
-            mplot_name = ("{shot}_curves_"
-                          "{idx_list}.multiplot.png"
+            idx_list = get_curve_indexes_for_name_str(curve_list)
+            mplot_name = ("{shot}_cur_"
+                          "{idx_list}.mp.png"
                           "".format(shot=plot_name,
                                     idx_list=idx_list))
             mplot_path = os.path.join(cl_args.multiplot_dir,
@@ -176,10 +197,9 @@ def do_multicurve_plots(signals_data, cl_args, plot_name,
         # plt.legend()
 
         if cl_args.multicurve_dir is not None:
-            idx_list = "_".join(str(i) for
-                                i in sorted(curve_list))
-            mplot_name = ("{shot}_curves_"
-                          "{idx_list}.multicurve.png"
+            idx_list = get_curve_indexes_for_name_str(curve_list)
+            mplot_name = ("{shot}_cur_"
+                          "{idx_list}.mc.png"
                           "".format(shot=plot_name,
                                     idx_list=idx_list))
             mplot_path = os.path.join(cl_args.multicurve_dir,
@@ -367,7 +387,7 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False, hide=F
                                   unixtime=cl_args.unixtime, hide=hide)
         if cl_args.plot_dir is not None:
             plot_name = (
-                "{shot}_curve_{idx}_{label}.plot.png"
+                "{shot}_curve_{idx}_{label}.sp.png"
                 "".format(shot=shot_name, idx=curve_idx,
                           label=signals_data.get_curve_label(curve_idx)))
             plot_path = os.path.join(cl_args.plot_dir, plot_name)
