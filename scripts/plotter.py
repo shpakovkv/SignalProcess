@@ -400,6 +400,56 @@ def do_plots(signals_data, cl_args, shot_name, peaks=None, verbose=False, hide=F
             plt.close(fig)
 
 
+def plot_single_curves(signals_data, curve_list, xbounds=None, unixtime=False, save_as=None, peaks=None, verbose=False, hide=False):
+    """
+    Plots all the single curve graphs for curve in curve_list.
+    Add peaks to graph if specified.
+    Saves the graphs that the user specified to save.
+
+    TODO: plot description
+    :param signals_data: SignalsData instance
+    :type signals_data: SignalsData
+    :param curve_list:
+    :type curve_list:
+    :param xbounds:
+    :type xbounds:
+    :param unixtime:
+    :type unixtime:
+    :param save_as:
+    :type save_as:
+    :param peaks: peaks: the list of list of peaks (SinglePeak instance)
+                  peak_data[0] == list of peaks for data.curves[curves_list[0]]
+                  peak_data[1] == list of peaks for data.curves[curves_list[1]]
+                  etc.
+    :type peaks: list
+    :param verbose: show additional information or no
+    :type verbose: bool
+    :param hide: truth turns interactive graph mode off (time save option)
+    :type hide:
+    :return:
+    :rtype:
+    """
+
+    if curve_list == -1:  # 'all'
+        curve_list = list(range(0, signals_data.cnt_curves))
+    else:
+        check_plot_param(curve_list, signals_data.cnt_curves)
+
+    for curve_idx in curve_list:
+        curve_peaks = peaks[curve_idx] if peaks is not None else None
+        fig = plot_multiple_curve(signals_data, curve_idx, curve_peaks,
+                                  xlim=xbounds,
+                                  unixtime=unixtime, hide=hide)
+        if save_as is not None:
+            plt.savefig(save_as, dpi=400)
+            if verbose:
+                print("Plot is saved as {}".format(save_as))
+        if not hide:
+            plt.show(block=True)
+        else:
+            plt.close(fig)
+
+
 def plot_multiple_curve(signals, curve_list, peaks=None,
                         xlim=None, amp_unit=None,
                         time_units=None, title=None,

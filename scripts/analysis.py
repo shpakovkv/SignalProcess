@@ -12,6 +12,7 @@ import numpy as np
 from numba import njit
 import time
 from data_types import SignalsData, SinglePeak, SingleCurve
+from arg_checker import check_plot_param
 
 
 def correlation_func_2d(curve1, curve2):
@@ -188,6 +189,42 @@ def test_correlation_2d_jit():
     signal = np.sin(2 * np.pi * f * samples)
     data = np.stack((samples, signal), axis=0)
     correlation = correlation_func_2d_jit(data, data)
+
+
+def do_correlate(signals_data, cl_args):
+    """
+    TODO: do_correlate description
+    :param signals_data: signals data
+    :type signals_data: SignalsData
+    :param cl_args: namespace with command line arguments
+    :type cl_args: argparse.Namespace
+    :return: list of correlation curves data (SignalsData)
+    :rtype: list
+    """
+
+    for correlate_set in cl_args.correlate:
+        check_plot_param(correlate_set[:2], signals_data.cnt_curves, param_name="correlate")
+
+    corr_data = list()
+
+    for idx, correlate_set in enumerate(cl_args.correlate):
+        curve1, curve2, add_to_signals = correlate_set
+        corr = correlation_func_2d(signals_data.get_curve_2d_arr(curve1),
+                                   signals_data.get_curve_2d_arr(curve2))
+        label = "Correlate_{}to{}".format(curve1, curve2)
+        if add_to_signals:
+            signals_data.add_from_array(corr,
+                                        labels=[label],
+                                        units=["a.u."],
+                                        time_units=signals_data.time_units
+                                        )
+        corr_data.append(SignalsData(corr,
+                                     labels=[label],
+                                     units=["a.u."],
+                                     time_units=signals_data.time_units
+                                     )
+                         )
+    return corr_data
 
 
 if __name__ == "__main__":

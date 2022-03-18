@@ -24,6 +24,7 @@ from numba import vectorize, float64
 from multiplier_and_delay import *
 
 from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, print_front_delay, print_pulse_duration
+from analysis import do_correlate
 
 verbose = True
 global_log = ""
@@ -47,6 +48,7 @@ def get_parser():
         parents=[arg_parser.get_input_files_args_parser(),
                  arg_parser.get_mult_del_args_parser(),
                  arg_parser.get_data_corr_args_parser(),
+                 arg_parser.get_analysis_args_parser(),
                  arg_parser.get_plot_args_parser(),
                  arg_parser.get_output_args_parser(),
                  arg_parser.get_utility_args_parser()],
@@ -625,8 +627,11 @@ def global_check(options):
     # convert_only arg check
     options = arg_checker.convert_only_arg_check(options)
 
-    # other args
+    # other args check
     options = arg_checker.check_utility_args(options)
+
+    # analysis args check
+    options = arg_checker.check_analysis_args(options)
 
     return options
 
@@ -685,7 +690,8 @@ if __name__ == "__main__":
             args.plot or
             args.multiplot or
             args.multicurve or
-            args.offset_by_front):
+            args.offset_by_front or
+            args.correlate):
 
         num_mask = file_handler.numbering_parser([files[0] for
                                                  files in args.gr_files])
@@ -728,6 +734,10 @@ if __name__ == "__main__":
             else:
                 data = multiplier_and_delay(data, args.multiplier, new_delay)
 
+            correlate_data = None
+            if args.correlate is not None:
+                correlate_data = do_correlate(data, args)
+
             # plot preview and save
             if args.plot is not None:
                 plotter.do_plots(data, args, shot_name, verbose=verbose, hide=args.p_hide)
@@ -744,26 +754,37 @@ if __name__ == "__main__":
             # ------   GET FRONT DELAY   ---------------------------------------------
             # ========================================================================
             # peaks = [None] * data.cnt_curves
-            # front_points = print_front_delay(data.get_single_curve(2), -0.2, "fall",
-            #                                  data.get_single_curve(1), 1.5, "rise",
-            #                                  save=True, prefix="fronts_"+shot_name)
+            # # front_points = print_front_delay(data.get_single_curve(1), 1.0, "rise",
+            # #                                  data.get_single_curve(2), 1.0, "rise",
+            # #                                  save=True, prefix="fronts_"+shot_name)
+            # # peaks[6] = front_points[0]
+            # # peaks[4] = front_points[1]
+            # #
+            # # front_points = print_front_delay(data.get_single_curve(1), -6.0, "fall",
+            # #                                  data.get_single_curve(4), -6.0, "fall",
+            # #                                  save=True, prefix="fronts_" + shot_name)
+            # # peaks[1] = front_points[0]
+            #
             # # front_points = [None] * 3
-            # # pulse_front = print_pulse_duration(data.get_single_curve(1), 1.0, "rise",
-            # #                                    save=True, prefix="pulse_")
-            # # front_points[1] = pulse_front[0]
-            # # pulse_front = print_pulse_duration(data.get_single_curve(2), 1.0, "rise",
-            # #                                    save=True, prefix="pulse_")
-            # # front_points[2] = pulse_front[0]
+            # pulse_front = print_pulse_duration(data.get_single_curve(1), 1.0, "rise",
+            #                                    save=True, prefix="pulse_")
+            # peaks[1] = pulse_front[0]
+            # pulse_front = print_pulse_duration(data.get_single_curve(2), 0.4, "rise",
+            #                                    save=True, prefix="pulse_")
+            # peaks[2] = pulse_front[0]
             #
-            # peaks[2] = front_points[0]
+            # # if args.multiplot is not None:
+            # #     plotter.do_multiplots(data, args, shot_name,
+            # #                           peaks=peaks,
+            # #                           verbose=verbose)
             #
-            # peaks[1] = front_points[1]
+            # print("DELAY between CamExp left and laser right = {:.3f}".format(peaks[1][0].time - peaks[2][1].time))
+            # print("DELAY between CamExp right and laser left = {:.3f}".format(peaks[2][0].time - peaks[1][1].time))
             #
-            # if args.multiplot is not None:
-            #     plotter.do_multiplots(data, args, shot_name,
-            #                           peaks=peaks,
-            #                           hide=False,
-            #                           verbose=verbose)
+            # if args.multicurve is not None:
+            #     plotter.do_multicurve_plots(data, args, shot_name,
+            #                                 peaks=peaks,
+            #                                 verbose=verbose)
 
             # ========================================================================
 
@@ -779,6 +800,23 @@ if __name__ == "__main__":
                 file_handler.save_m_log(file_list, saved_as, data.get_labels(), args.multiplier,
                                         args.delay, args.offset_by_front,
                                         args.y_auto_zero, args.partial)
+
+            if args.correlate_dir is not None:
+                for idx, correlate_curve in enumerate(correlate_data):
+                    name = "{:04d}_correlate_{}to{}.csv" \
+                           "".format(shot_idx, args.correlate[idx][0], args.correlate[idx][1])
+                    save_as = os.path.join(args.correlate_dir, name)
+                    saved_as = file_handler.do_save(correlate_curve, args, name,
+                                                    save_as=save_as,
+                                                    verbose=verbose)
+
+            if args.correlate_plot_dir is not None:
+                for idx, correlate_curve in enumerate(correlate_data):
+                    name = "{:04d}_correlate_{}to{}.png" \
+                           "".format(shot_idx, args.correlate[idx][0], args.correlate[idx][1])
+                    save_as = os.path.join(args.correlate_plot_dir, name)
+                    plotter.plot_single_curves(correlate_curve, -1, save_as=save_as, verbose=False, hide=True)
+
 
     # if verbose:
     #     arg_checker.print_duplicates(args.gr_files, 30)

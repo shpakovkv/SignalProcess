@@ -136,6 +136,7 @@ def get_utility_args_parser():
     return utility_params_parser
 
 
+
 def get_input_files_args_parser():
     """Returns the parser of parameters of read data.
 
@@ -372,6 +373,51 @@ def get_data_corr_args_parser():
              'Enter \'all\' or \'-1\' (without the quotes) to set all curves\n'
              'values to zero.\n\n')
     return data_corr_args_parser
+
+
+def get_analysis_args_parser():
+    """Returns multiplier and delay options parser.
+
+    :return: multiplier and delay arguments parser
+    :rtype: argparse.ArgumentParser
+    """
+    analysis_parser = argparse.ArgumentParser(add_help=False)
+
+    analysis_parser.add_argument(
+        '--correlate',
+        action='append',
+        metavar=('CURVE_1', 'CURVE_2', 'ADD?'),
+        nargs=3,
+        type=int,
+        dest='correlate',
+        default=None,
+        help='Calculates correlation function for two selected curves. \n'
+             'Specify first curve index and second curve index. \n'
+             'Then enter 1 to add the correlation function \n'
+             'to the signals data as a new curve, or enter'
+             'OR enter 0 to not add the calculated data to signals.\n\n')
+
+    analysis_parser.add_argument(
+        '--save-correlate-data-to',
+        action='store',
+        dest='correlate_dir',
+        metavar='CORRELATE_DIR',
+        default=None,
+        help='Specify the directory.\n'
+             'Each correlation function data \n'
+             'will be saved to this directory.\n\n')
+
+    analysis_parser.add_argument(
+        '--save-correlate-plot-to',
+        action='store',
+        dest='correlate_plot_dir',
+        metavar='CORR_PLOT_DIR',
+        default=None,
+        help='Specify the directory.\n'
+             'Each correlation function plot \n'
+             'will be saved to this directory.\n\n')
+
+    return analysis_parser
 
 
 # =======================================================================
