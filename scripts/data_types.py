@@ -71,9 +71,9 @@ class SignalsData:
             raise TypeError("Wrong data inpyt option type ({})"
                             "".format(type(from_array)))
 
-    def append_2d_array(self, input_data, labels=None, units=None,
-                        force_single_time_row=False,
-                        column_oriented=False):
+    def _append_curves_from_2d_array(self, input_data, labels=None, units=None,
+                                     force_single_time_row=False,
+                                     column_oriented=False):
         """
         Appends new points from ndarray to existing curves in self.
         Rise exception if the number of curves in the self
@@ -162,8 +162,8 @@ class SignalsData:
         new_min_points = 0
         if input_data.ndim == 2:
             new_min_points = input_data.shape[1]
-            new_curves = self.append_2d_array(input_data, labels=labels, units=units,
-                                              force_single_time_row=force_single_time_row)
+            new_curves = self._append_curves_from_2d_array(input_data, labels=labels, units=units,
+                                                           force_single_time_row=force_single_time_row)
         elif input_data.ndim == 3:
             new_curves = input_data.shape[0]
             new_min_points = input_data.shape[2]
