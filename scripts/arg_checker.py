@@ -793,5 +793,10 @@ def check_analysis_args(options):
             "but no correlate parameters was specified!"
         if not os.path.isdir(options.correlate_plot_dir):
             os.makedirs(options.correlate_plot_dir)
+
+    if options.correlate_part is not None:
+        options.correlate_part[0] = int(options.correlate_part[0])  # curve_1 index
+        options.correlate_part[4] = int(options.correlate_part[4])  # curve_2 index
+        options.correlate_part[7] = int(options.correlate_part[7])  # add to signals_data or no
     return options
 

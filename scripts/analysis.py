@@ -13,6 +13,7 @@ from numba import njit
 import time
 from data_types import SignalsData, SinglePeak, SingleCurve
 from arg_checker import check_plot_param
+from plotter import find_nearest_idx
 
 
 def correlation_func_2d(curve1, curve2):
@@ -67,6 +68,26 @@ def correlation_func_2d(curve1, curve2):
     # make 2D array [time/val][point]
     res = np.stack((time_col, res), axis=0)
     return res
+
+
+def correlate_single(curve1, curve2):
+    """ Returns the correlation function of two input curves.
+
+    :param curve1: first SingleCurve
+    :type curve1: SingleCurve
+    :param curve2: second SingleCurve
+    :type curve2: SingleCurve
+    :return: new SingleCurve with correlation function
+    :rtype: SingleCurve
+    """
+    corr = correlation_func_2d(curve1.data, curve2.data)
+
+    label = "Correlate_{}_to_{}".format(curve1.label, curve2.label)
+    return SignalsData(corr,
+                       labels=[label],
+                       units=["a.u."],
+                       time_units=curve1.t_units
+                       )
 
 
 def correlation_func_2d_jit(curve1, curve2):
@@ -191,9 +212,49 @@ def test_correlation_2d_jit():
     correlation = correlation_func_2d_jit(data, data)
 
 
-def do_correlate(signals_data, cl_args):
+def correlate_multiple(signals_data, list_of_parameter_sets):
+    """ Calculates correlation function for one or more
+    curve pairs.
+    Return a list of SingleCurves with correlation functions.
+
+    :param signals_data:
+    :type signals_data: SignalsData
+    :param list_of_parameter_sets:
+    :type list_of_parameter_sets:
+    :return: list of SingleCurves with correlation functions
+    :rtype: list
     """
-    TODO: do_correlate description
+    corr_data = list()
+
+    for idx, correlate_set in enumerate(list_of_parameter_sets):
+        curve1_idx, curve2_idx, add_to_signals = correlate_set
+
+        corr_curve = correlate_single(signals_data.get_single_curve(curve1_idx),
+                                      signals_data.get_single_curve(curve2_idx)
+                                      )
+        corr_data.append(corr_curve)
+        if add_to_signals:
+            signals_data.add_from_array(corr_curve.data,
+                                        labels=[corr_curve.label],
+                                        units=["a.u."],
+                                        time_units=signals_data.time_units
+                                        )
+    return corr_data
+
+
+def do_correlate(signals_data, cl_args):
+    """ Calculates correlation function for one or more
+    curve pairs. Curve indices are taken from cl_args namespace.
+
+    cl_args.correlate is a list, each element of which contains
+    the parameters necessary for the correlation analysis
+    of two curves from sigals_data : (Curve1_idx, Curve2_idx, AddToSignals?)
+    Where the 'AddToSignals?' parameter indicates whether
+    the resulting correlation curve should be added
+    to the signals_data.
+
+    Return a list of SingleCurves with correlation functions.
+
     :param signals_data: signals data
     :type signals_data: SignalsData
     :param cl_args: namespace with command line arguments
@@ -205,25 +266,90 @@ def do_correlate(signals_data, cl_args):
     for correlate_set in cl_args.correlate:
         check_plot_param(correlate_set[:2], signals_data.cnt_curves, param_name="correlate")
 
+    correlate_data = correlate_multiple(signals_data, cl_args.correlate)
+
+    return correlate_data
+
+
+def do_correlate_part(signals_data, cl_args):
+    """ Calculates correlation function for one or more
+    curve segment pairs. Curve indices and segment borders
+    are taken from cl_args namespace.
+
+    cl_args.correlate_part is a list, each element of which contains
+    the parameters necessary for the correlation analysis
+    of two curve segments from sigals_data :
+    (Curve1_idx, left1, right1, Curve2_idx, left2, right2, AddToSignals?)
+
+    Where:
+
+    left and right define the boundaries of the section
+    of the corresponding curve to be processed;
+
+    the 'AddToSignals?' parameter indicates whether
+    the resulting correlation curve should be added
+    to the signals_data.
+
+    Return a list of SingleCurves with correlation functions.
+    :param signals_data:
+    :type signals_data:
+    :param cl_args:
+    :type cl_args:
+    :return: list of correlation curves data (SignalsData)
+    :rtype: list
+    """
+    for correlate_set in cl_args.correlate_part:
+        check_plot_param(correlate_set[:2], signals_data.cnt_curves, param_name="correlate_part")
+
+    correlate_data = correlate_part_multiple(signals_data, cl_args.correlate_part)
+
+    return correlate_data
+
+
+def correlate_part_multiple(signals_data, list_of_parameter_sets):
+    """ Calculates correlation function for one or more
+    curve pairs.
+    Return a list of SingleCurves with correlation functions.
+
+    :param signals_data:
+    :type signals_data: SignalsData
+    :param list_of_parameter_sets:
+    :type list_of_parameter_sets:
+    :return: list of SingleCurves with correlation functions
+    :rtype: list
+    """
     corr_data = list()
 
-    for idx, correlate_set in enumerate(cl_args.correlate):
-        curve1, curve2, add_to_signals = correlate_set
-        corr = correlation_func_2d(signals_data.get_curve_2d_arr(curve1),
-                                   signals_data.get_curve_2d_arr(curve2))
-        label = "Correlate_{}to{}".format(curve1, curve2)
+    for idx, correlate_set in enumerate(list_of_parameter_sets):
+        curve1_idx, left1, right1, curve2_idx, left2, right2, add_to_signals = correlate_set
+        curve1 = signals_data.get_single_curve(curve1_idx)
+        if left1 != right1:
+            start = find_nearest_idx(time, left1, side='right')
+            stop = find_nearest_idx(time, right1, side='left')
+            curve1 = SingleCurve(curve1.data[:, start: stop],
+                                 label=curve1.label,
+                                 units=curve1.units,
+                                 t_units=curve1.t_units
+                                 )
+
+        curve2 = signals_data.get_single_curve(curve2_idx)
+        if left2 != right2:
+            start = find_nearest_idx(time, left2, side='right')
+            stop = find_nearest_idx(time, right2, side='left')
+            curve2 = SingleCurve(curve1.data[:, start: stop],
+                                 label=curve2.label,
+                                 units=curve2.units,
+                                 t_units=curve2.t_units)
+
+        corr_curve = correlate_single(curve1, curve2)
+        corr_data.append(corr_curve)
+
         if add_to_signals:
-            signals_data.add_from_array(corr,
-                                        labels=[label],
+            signals_data.add_from_array(corr_curve.data,
+                                        labels=[corr_curve.label],
                                         units=["a.u."],
                                         time_units=signals_data.time_units
                                         )
-        corr_data.append(SignalsData(corr,
-                                     labels=[label],
-                                     units=["a.u."],
-                                     time_units=signals_data.time_units
-                                     )
-                         )
     return corr_data
 
 

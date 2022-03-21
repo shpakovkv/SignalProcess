@@ -24,7 +24,7 @@ from numba import vectorize, float64
 from multiplier_and_delay import *
 
 from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, print_front_delay, print_pulse_duration
-from analysis import do_correlate
+from analysis import do_correlate, do_correlate_part
 
 verbose = True
 global_log = ""
@@ -734,9 +734,12 @@ if __name__ == "__main__":
             else:
                 data = multiplier_and_delay(data, args.multiplier, new_delay)
 
-            correlate_data = None
+            correlate_data = list()
             if args.correlate is not None:
-                correlate_data = do_correlate(data, args)
+                correlate_data.extend(do_correlate(data, args))
+
+            if args.correlate_part is not None:
+                correlate_data.extend(do_correlate_part(data, args))
 
             # plot preview and save
             if args.plot is not None:
