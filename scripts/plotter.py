@@ -667,5 +667,38 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
     else:
         return idx if side == 'right' else idx - 1
 
+
+def do_plot_correlate_all(args, shot_idx, correlate_data, correlate_part_data):
+    for idx, correlate_args in enumerate(args.correlate):
+        name = "{:04d}_correlate_{}to{}.png" \
+               "".format(shot_idx, correlate_args[0], correlate_args[1])
+        save_as = os.path.join(args.correlate_plot_dir, name)
+        plot_single_curves(correlate_data[idx], -1, save_as=save_as, verbose=False, hide=True)
+
+    for idx, correlate_args in enumerate(args.correlate_part):
+        name = get_correlate_part_plot_name(shot_idx, correlate_args)
+        save_as = os.path.join(args.correlate_plot_dir, name)
+        plot_single_curves(correlate_part_data[idx], -1, save_as=save_as, verbose=False, hide=True)
+
+
+def get_correlate_part_plot_name(shot_idx, correlate_part_args):
+    curve1 = 0
+    left1 = 1
+    right1 = 2
+    curve2 = 3
+    left2 = 4
+    right2 = 5
+
+    name = "{:04d}_correlate_{}[{}-{}]to{}[{}-{}].png" \
+           "".format(shot_idx,
+                     correlate_part_args[curve1],
+                     correlate_part_args[left1],
+                     correlate_part_args[right1],
+                     correlate_part_args[curve2],
+                     correlate_part_args[left2],
+                     correlate_part_args[right2]
+                     )
+    return name
+
 # TODO: add save option to plot_multiplot()
 # TODO: unify do_plots() and plot_multiplot()

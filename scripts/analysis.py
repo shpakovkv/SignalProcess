@@ -45,9 +45,9 @@ def correlation_func_2d(curve1, curve2):
     assert curve2.ndim == 2, \
         "The curve2 has the number of dimensions ({}) not as expected ({})." \
         "".format(curve2.ndim, 2)
-    assert curve1.shape[1] == curve2.shape[1], \
-        "The curves have different number of points: {} and {}" \
-        "".format(curve1.shape[1], curve2.shape[1])
+    # assert curve1.shape[1] == curve2.shape[1], \
+    #     "The curves have different number of points: {} and {}" \
+    #     "".format(curve1.shape[1], curve2.shape[1])
 
     time_step = np.ndarray(shape=(2,), dtype=np.float64)
     time_step[0] = (curve1[0, -1] - curve1[0, 0]) / (curve1.shape[1] - 1)
@@ -62,8 +62,16 @@ def correlation_func_2d(curve1, curve2):
     res = np.correlate(curve1[1], curve2[1], mode='full')
 
     # add time column
-    time_col = np.arange(- curve1.shape[1] + 1, curve1.shape[1], dtype=np.float64)
+    # always symmetric, always odd length
+    time_col = None
+    if res.shape[0] % 2 == 0:
+        time_col = np.arange(1 - (res.shape[0] // 2), res.shape[0] // 2 + 1, dtype=np.float64)
+    else:
+        time_col = np.arange(- (res.shape[0] // 2), res.shape[0] // 2 + 1, dtype=np.float64)
     time_col *= time_step[0]
+
+    print("result shape = {}".format(res.shape))
+    print("time_col shape = {}".format(time_col.shape))
 
     # make 2D array [time/val][point]
     res = np.stack((time_col, res), axis=0)
@@ -324,8 +332,8 @@ def correlate_part_multiple(signals_data, list_of_parameter_sets):
         curve1_idx, left1, right1, curve2_idx, left2, right2, add_to_signals = correlate_set
         curve1 = signals_data.get_single_curve(curve1_idx)
         if left1 != right1:
-            start = find_nearest_idx(time, left1, side='right')
-            stop = find_nearest_idx(time, right1, side='left')
+            start = find_nearest_idx(curve1.get_x(), left1, side='right')
+            stop = find_nearest_idx(curve1.get_x, right1, side='left')
             curve1 = SingleCurve(curve1.data[:, start: stop],
                                  label=curve1.label,
                                  units=curve1.units,
@@ -334,9 +342,9 @@ def correlate_part_multiple(signals_data, list_of_parameter_sets):
 
         curve2 = signals_data.get_single_curve(curve2_idx)
         if left2 != right2:
-            start = find_nearest_idx(time, left2, side='right')
-            stop = find_nearest_idx(time, right2, side='left')
-            curve2 = SingleCurve(curve1.data[:, start: stop],
+            start = find_nearest_idx(curve2.get_x, left2, side='right')
+            stop = find_nearest_idx(curve2.get_x, right2, side='left')
+            curve2 = SingleCurve(curve2.data[:, start: stop],
                                  label=curve2.label,
                                  units=curve2.units,
                                  t_units=curve2.t_units)

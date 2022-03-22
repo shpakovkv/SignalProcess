@@ -18,6 +18,7 @@ import arg_parser
 import arg_checker
 import file_handler
 import plotter
+import itertools
 
 from numba import vectorize, float64
 
@@ -691,7 +692,8 @@ if __name__ == "__main__":
             args.multiplot or
             args.multicurve or
             args.offset_by_front or
-            args.correlate):
+            args.correlate or
+            args.correlate_part):
 
         num_mask = file_handler.numbering_parser([files[0] for
                                                  files in args.gr_files])
@@ -738,8 +740,9 @@ if __name__ == "__main__":
             if args.correlate is not None:
                 correlate_data.extend(do_correlate(data, args))
 
+            correlate_part_data = list
             if args.correlate_part is not None:
-                correlate_data.extend(do_correlate_part(data, args))
+                correlate_part_data.extend(do_correlate_part(data, args))
 
             # plot preview and save
             if args.plot is not None:
@@ -805,7 +808,7 @@ if __name__ == "__main__":
                                         args.y_auto_zero, args.partial)
 
             if args.correlate_dir is not None:
-                for idx, correlate_curve in enumerate(correlate_data):
+                for idx, correlate_curve in enumerate(itertools.chain(correlate_data, correlate_part_data)):
                     name = "{:04d}_correlate_{}to{}.csv" \
                            "".format(shot_idx, args.correlate[idx][0], args.correlate[idx][1])
                     save_as = os.path.join(args.correlate_dir, name)
@@ -814,11 +817,15 @@ if __name__ == "__main__":
                                                     verbose=verbose)
 
             if args.correlate_plot_dir is not None:
-                for idx, correlate_curve in enumerate(correlate_data):
+                for idx, correlate_args in enumerate(args.correlate):
                     name = "{:04d}_correlate_{}to{}.png" \
-                           "".format(shot_idx, args.correlate[idx][0], args.correlate[idx][1])
+                           "".format(shot_idx, correlate_args[0], correlate_args[1])
                     save_as = os.path.join(args.correlate_plot_dir, name)
-                    plotter.plot_single_curves(correlate_curve, -1, save_as=save_as, verbose=False, hide=True)
+                    plotter.plot_single_curves(correlate_data[idx], -1, save_as=save_as, verbose=False, hide=True)
+                for idx, correlate_args in enumerate(args.correlate_part):
+                    name = plotter.get_correlate_part_plot_name(shot_idx, correlate_args)
+                    save_as = os.path.join(args.correlate_plot_dir, name)
+                    plotter.plot_single_curves(correlate_part_data[idx], -1, save_as=save_as, verbose=False, hide=True)
 
 
     # if verbose:
