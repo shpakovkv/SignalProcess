@@ -669,16 +669,18 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
 
 
 def do_plot_correlate_all(args, shot_idx, correlate_data, correlate_part_data):
-    for idx, correlate_args in enumerate(args.correlate):
-        name = "{:04d}_correlate_{}to{}.png" \
-               "".format(shot_idx, correlate_args[0], correlate_args[1])
-        save_as = os.path.join(args.correlate_plot_dir, name)
-        plot_single_curves(correlate_data[idx], -1, save_as=save_as, verbose=False, hide=True)
-
-    for idx, correlate_args in enumerate(args.correlate_part):
-        name = get_correlate_part_plot_name(shot_idx, correlate_args)
-        save_as = os.path.join(args.correlate_plot_dir, name)
-        plot_single_curves(correlate_part_data[idx], -1, save_as=save_as, verbose=False, hide=True)
+    if args.correlate is not None:
+        for idx, correlate_args in enumerate(args.correlate):
+            name = "{:04d}_correlate_{}to{}.png" \
+                   "".format(shot_idx, correlate_args[0], correlate_args[1])
+            save_as = os.path.join(args.correlate_plot_dir, name)
+            plot_single_curves(correlate_data[idx], -1, save_as=save_as, verbose=False, hide=True)
+    if args.correlate_part is not None:
+        for idx, correlate_args in enumerate(args.correlate_part):
+            name = get_correlate_part_plot_name(shot_idx, correlate_args)
+            name += ".png"
+            save_as = os.path.join(args.correlate_plot_dir, name)
+            plot_single_curves(correlate_part_data[idx], -1, save_as=save_as, verbose=False, hide=True)
 
 
 def get_correlate_part_plot_name(shot_idx, correlate_part_args):
@@ -689,7 +691,7 @@ def get_correlate_part_plot_name(shot_idx, correlate_part_args):
     left2 = 4
     right2 = 5
 
-    name = "{:04d}_correlate_{}[{}-{}]to{}[{}-{}].png" \
+    name = "{:04d}_correlate_{}[{}-{}]to{}[{}-{}]" \
            "".format(shot_idx,
                      correlate_part_args[curve1],
                      correlate_part_args[left1],

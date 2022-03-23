@@ -7,6 +7,8 @@ Link: https://github.com/shpakovkv/SignalProcess
 import os
 import sys
 import argparse
+import psutil
+import signal
 
 import numpy as np
 from scipy.signal import savgol_filter
@@ -723,7 +725,7 @@ def full_process(args, shot_idx, num_mask):
     if args.correlate is not None:
         correlate_data.extend(do_correlate(data, args))
 
-    correlate_part_data = list
+    correlate_part_data = list()
     if args.correlate_part is not None:
         correlate_part_data.extend(do_correlate_part(data, args))
 
@@ -791,13 +793,22 @@ def full_process(args, shot_idx, num_mask):
                                 args.y_auto_zero, args.partial)
 
     if args.correlate_dir is not None:
-        for idx, correlate_curve in enumerate(itertools.chain(correlate_data, correlate_part_data)):
-            name = "{:04d}_correlate_{}to{}.csv" \
-                   "".format(shot_idx, args.correlate[idx][0], args.correlate[idx][1])
-            save_as = os.path.join(args.correlate_dir, name)
-            saved_as = file_handler.do_save(correlate_curve, args, name,
-                                            save_as=save_as,
-                                            verbose=verbose)
+        if args.correlate is not None:
+            for idx in range(len(args.correlate)):
+                name = "{:04d}_correlate_{}to{}.csv" \
+                       "".format(shot_idx, args.correlate[idx][0], args.correlate[idx][1])
+                save_as = os.path.join(args.correlate_dir, name)
+                saved_as = file_handler.do_save(correlate_data[idx], args, name,
+                                                save_as=save_as,
+                                                verbose=verbose)
+        if args.correlate_part is not None:
+            for idx in range(len(args.correlate_part)):
+                name = plotter.get_correlate_part_plot_name(shot_idx, args.correlate_part[idx])
+                name += ".csv"
+                save_as = os.path.join(args.correlate_dir, name)
+                saved_as = file_handler.do_save(correlate_part_data[idx], args, name,
+                                                save_as=save_as,
+                                                verbose=verbose)
 
     if args.correlate_plot_dir is not None:
         plotter.do_plot_correlate_all(args, shot_idx, correlate_data, correlate_part_data)

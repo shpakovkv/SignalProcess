@@ -307,10 +307,9 @@ def do_correlate_part(signals_data, cl_args):
     :rtype: list
     """
     for correlate_set in cl_args.correlate_part:
-        check_plot_param(correlate_set[:2], signals_data.cnt_curves, param_name="correlate_part")
+        check_plot_param(correlate_set[0:4:3], signals_data.cnt_curves, param_name="correlate_part")
 
     correlate_data = correlate_part_multiple(signals_data, cl_args.correlate_part)
-
     return correlate_data
 
 
@@ -333,7 +332,7 @@ def correlate_part_multiple(signals_data, list_of_parameter_sets):
         curve1 = signals_data.get_single_curve(curve1_idx)
         if left1 != right1:
             start = find_nearest_idx(curve1.get_x(), left1, side='right')
-            stop = find_nearest_idx(curve1.get_x, right1, side='left')
+            stop = find_nearest_idx(curve1.get_x(), right1, side='left')
             curve1 = SingleCurve(curve1.data[:, start: stop],
                                  label=curve1.label,
                                  units=curve1.units,
@@ -342,8 +341,8 @@ def correlate_part_multiple(signals_data, list_of_parameter_sets):
 
         curve2 = signals_data.get_single_curve(curve2_idx)
         if left2 != right2:
-            start = find_nearest_idx(curve2.get_x, left2, side='right')
-            stop = find_nearest_idx(curve2.get_x, right2, side='left')
+            start = find_nearest_idx(curve2.get_x(), left2, side='right')
+            stop = find_nearest_idx(curve2.get_x(), right2, side='left')
             curve2 = SingleCurve(curve2.data[:, start: stop],
                                  label=curve2.label,
                                  units=curve2.units,
