@@ -811,7 +811,7 @@ def full_process(args, shot_idx, num_mask):
                                                 verbose=verbose)
 
     if args.correlate_plot_dir is not None:
-        plotter.do_plot_correlate_all(args, shot_idx, correlate_data, correlate_part_data)
+        plotter.do_plot_correlate_all(data, args, shot_idx, correlate_data, correlate_part_data)
 
 
 # ============================================================================

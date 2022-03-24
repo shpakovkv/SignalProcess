@@ -233,7 +233,8 @@ def check_plot_param(idx_list, curves_count):
 def plot_multiplot(data, peak_data, curves_list,
                    xlim=None, amp_unit=None,
                    time_units=None, title=None,
-                   unixtime=False, hide=False):
+                   unixtime=False, hide=False,
+                   share_x=True):
     """Plots subplots for all curves with index in curve_list.
     Optional: plots peaks.
     Subplots are located one under the other.
@@ -257,6 +258,7 @@ def plot_multiplot(data, peak_data, curves_list,
                    the first curve in curves_list will be used
     title       -- the main title of the figure.
     hide        -- truth turns interactive graph mode off (time save option)
+    share_x     -- share x (time axis) scale between all plots
     """
     # TODO: new args description
 
@@ -281,7 +283,10 @@ def plot_multiplot(data, peak_data, curves_list,
     else:
         plt.ion()
 
-    fig, axes = plt.subplots(len(curves_list), 1, sharex='all', squeeze=False)
+    if share_x:
+        fig, axes = plt.subplots(len(curves_list), 1, sharex='all', squeeze=False)
+    else:
+        fig, axes = plt.subplots(len(curves_list), 1, squeeze=False)
     # # an old color scheme
     # colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
     #           '#8c564b', '#17becf', '#bcbd22', '#e377c2']
@@ -668,7 +673,22 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
         return idx if side == 'right' else idx - 1
 
 
-def do_plot_correlate_all(args, shot_idx, correlate_data, correlate_part_data):
+def do_plot_correlate_all(signals_data, args, shot_idx, correlate_data, correlate_part_data):
+    """
+
+    :param signals_data:
+    :type signals_data: SignalsData
+    :param args:
+    :type args:
+    :param shot_idx:
+    :type shot_idx:
+    :param correlate_data:
+    :type correlate_data:
+    :param correlate_part_data:
+    :type correlate_part_data:
+    :return:
+    :rtype:
+    """
     if args.correlate is not None:
         for idx, correlate_args in enumerate(args.correlate):
             name = "{:04d}_correlate_{}to{}.png" \
@@ -680,7 +700,46 @@ def do_plot_correlate_all(args, shot_idx, correlate_data, correlate_part_data):
             name = get_correlate_part_plot_name(shot_idx, correlate_args)
             name += ".png"
             save_as = os.path.join(args.correlate_plot_dir, name)
-            plot_single_curves(correlate_part_data[idx], -1, save_as=save_as, verbose=False, hide=True)
+            signals_data.add_from_array(correlate_part_data[idx].data,
+                                        labels=[correlate_part_data[idx].get_curve_label(0)],
+                                        units=["a.u."],
+                                        time_units=signals_data.time_units
+                                        )
+
+            ndarrays_to_plot = list()
+            ndarrays_to_plot.append(signals_data.data[correlate_args[0]])
+            ndarrays_to_plot.append(signals_data.data[correlate_args[3]])
+            ndarrays_to_plot.append(correlate_part_data[idx].data[0])
+            list_of_xlim = list()
+            list_of_xlim.append([correlate_args[1], correlate_args[2]])
+            list_of_xlim.append([correlate_args[4], correlate_args[5]])
+            list_of_xlim.append([np.nanmin(correlate_part_data[idx].data[0]),
+                                 np.nanmax(correlate_part_data[idx].data[0])]
+                                )
+            labels = [signals_data.get_curve_label(correlate_args[0]),
+                      signals_data.get_curve_label(correlate_args[3]),
+                      correlate_part_data[idx].get_curve_label(0)]
+
+            list_of_amp_units = [signals_data.get_curve_units(correlate_args[0]),
+                                 signals_data.get_curve_units(correlate_args[3]),
+                                 correlate_part_data[idx].get_curve_units(0)]
+            list_of_time_units = [signals_data.time_units,
+                                  signals_data.time_units,
+                                  signals_data.time_units]
+
+            plot_multiplot_independent(ndarrays_to_plot,
+                                       peak_data=None,
+                                       xlim=list_of_xlim,
+                                       labels=labels,
+                                       amp_units=list_of_amp_units,
+                                       time_units=list_of_time_units,
+                                       title=None,
+                                       unixtime=False,
+                                       hide=True,
+                                       share_x=False)
+
+            plt.savefig(save_as, dpi=400)
+            # plot_single_curves(correlate_part_data[idx], -1, save_as=save_as, verbose=False, hide=True)
 
 
 def get_correlate_part_plot_name(shot_idx, correlate_part_args):
@@ -702,5 +761,139 @@ def get_correlate_part_plot_name(shot_idx, correlate_part_args):
                      )
     return name
 
+
+def plot_multiplot_independent(list_of_2d_arrays,
+                               peak_data=None,
+                               xlim=None,
+                               labels=None,
+                               amp_units=None,
+                               time_units=None,
+                               title=None,
+                               unixtime=False,
+                               hide=False,
+                               share_x=True):
+    """Plots subplots for all curves with index in curve_list.
+    Optional: plots peaks.
+    Subplots are located one under the other.
+
+    data -- the SignalsData instance
+    peak_data -- the list of list of peaks (SinglePeak instance)
+                 of curves with index in curve_list
+                 peak_data[0] == list of peaks for first curve data.curves[curves_list[0]]
+                 peak_data[1] == list of peaks for second curve data.curves[curves_list[1]]
+                 etc.
+    curves_list -- the list of curve indexes in data to be plotted
+    xlim        -- the tuple/list with the left and
+                   the right X bounds in X units.
+    show        -- (bool) show/hide the graph window
+    save_as     -- filename (full path) to save the plot as .png
+                   Does not save by default.
+    amp_unit    -- the unit of Y scale for all subplots.
+                   If not specified, the curve.unit parameter will be used
+    time_units   -- the unit of time scale for all subplots.
+                   If not specified, the time_units parameter of
+                   the first curve in curves_list will be used
+    title       -- the main title of the figure.
+    hide        -- truth turns interactive graph mode off (time save option)
+    share_x     -- share x (time axis) scale between all plots
+    """
+    # TODO: new args description
+
+    plt.close('all')
+    if hide is True:
+        plt.ioff()
+    else:
+        plt.ion()
+
+    if share_x:
+        fig, axes = plt.subplots(len(list_of_2d_arrays), 1, sharex='all', squeeze=False)
+    else:
+        fig, axes = plt.subplots(len(list_of_2d_arrays), 1, squeeze=False)
+    # # an old color scheme
+    # colors = ['#1f22dd', '#ff7f0e', '#9467bd', '#d62728', '#2ca02c',
+    #           '#8c564b', '#17becf', '#bcbd22', '#e377c2']
+    if title is not None:
+        fig.suptitle(title)
+
+    if amp_units is not None:
+        assert len(amp_units) == len(list_of_2d_arrays), "len(amp_units) != len(list_of_2d_arrays)"
+    if time_units is not None:
+        assert len(time_units) == len(list_of_2d_arrays), "len(time_units) != len(list_of_2d_arrays)"
+    if peak_data is not None:
+        assert len(peak_data) == len(list_of_2d_arrays), "len(peak_data) != len(list_of_2d_arrays)"
+    if xlim is not None:
+        assert len(xlim) == len(list_of_2d_arrays), "len(xlim) != len(list_of_2d_arrays)"
+        for bounds in xlim:
+            assert len(bounds) == 2, "len(bounds) != 2"
+
+    for icurve, data in enumerate(list_of_2d_arrays):
+        # plot curve
+        # print("ICURVE = {};   LABEL = {};  DATA.SHAPE = {};  ============================"
+        #       "".format(icurve, labels[icurve], data.shape))
+        if unixtime:
+            axes[icurve, 0].plot(md.epoch2num(data[0]),
+                                 data[1],
+                                 '-', color='#9999aa', linewidth=0.5)
+        else:
+            axes[icurve, 0].plot(data[0],
+                                 data[1],
+                                 '-', color='#9999aa', linewidth=0.5)
+        axes[icurve, 0].tick_params(direction='in', top=True, right=True)
+
+        # set bounds
+        if xlim is not None:
+            axes[icurve, 0].set_xlim(xlim[icurve])
+            axes[icurve, 0].set_ylim(calc_y_lim(data[0],
+                                     data[1],
+                                     xlim[icurve], reserve=0.1))
+        # y label (units only)
+        if amp_units is None:
+            axes[icurve, 0].set_ylabel('a.u.', size=10, rotation='horizontal')
+        else:
+            axes[icurve, 0].set_ylabel(amp_units[icurve], size=10, rotation='horizontal')
+
+        # subplot title
+        if labels is not None:
+            amp_label = labels[icurve]
+        else:
+            amp_label = "Curve{}".format(icurve)
+
+        # if data.curves[curves_list[icurve]].unit:
+        #     amp_label += ", " + data.curves[curves_list[icurve]].unit
+        axes[icurve, 0].text(0.99, 0.01, amp_label, verticalalignment='bottom',
+                             horizontalalignment='right',
+                             transform=axes[icurve, 0].transAxes, size=8)
+
+        # Time axis label
+        time_label = "Time"
+        if time_units is not None:
+            time_label += ", " + time_units[icurve]
+        else:
+            time_label += ", " + "a.u."
+        axes[icurve, 0].set_xlabel(time_label, size=10)
+        if unixtime:
+            dt_fmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
+            axes[icurve, 0].xaxis.set_major_formatter(dt_fmt)  # set format
+            plt.subplots_adjust(bottom=0.22)  # make more space for datetime values
+            plt.xticks(rotation=25)  # rotate long datetime values to avoid overlapping
+        axes[icurve, 0].tick_params(labelsize=8)
+
+        # plot peaks scatter
+        if peak_data is not None and peak_data[icurve] is not None:
+            color_iter = iter(ColorRange())
+            for pk in peak_data[icurve]:
+                color = next(color_iter)
+                if pk is not None:
+                    axes[icurve, 0].scatter([pk.time], [pk.val], s=20,
+                                            edgecolors=color, facecolors='none',
+                                            linewidths=1.5)
+                    # axes[wf, 0].scatter([pk.time], [pk.val], s=50,
+                    #                     edgecolors='none', facecolors=color,
+                    #                     linewidths=1, marker='x')
+    # fig.subplots_adjust(hspace=0)
+    return fig
+
+
 # TODO: add save option to plot_multiplot()
 # TODO: unify do_plots() and plot_multiplot()
+
