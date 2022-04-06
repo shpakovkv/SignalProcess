@@ -62,16 +62,11 @@ def correlation_func_2d(curve1, curve2):
     res = np.correlate(curve1[1], curve2[1], mode='full')
 
     # add time column
-    # always symmetric, always odd length
-    time_col = None
-    if res.shape[0] % 2 == 0:
-        time_col = np.arange(1 - (res.shape[0] // 2), res.shape[0] // 2 + 1, dtype=np.float64)
-    else:
-        time_col = np.arange(- (res.shape[0] // 2), res.shape[0] // 2 + 1, dtype=np.float64)
-    time_col *= time_step[0]
-
-    print("result shape = {}".format(res.shape))
-    print("time_col shape = {}".format(time_col.shape))
+    # np.arange(first, last, step)  == [first, last)  last point is not included
+    time_col = np.arange(curve1[0, 0] - curve2[0, -1],
+                         curve1[0, -1] - curve2[0, 0] + time_step[0],
+                         time_step[0],
+                         dtype=np.float64)
 
     # make 2D array [time/val][point]
     res = np.stack((time_col, res), axis=0)
@@ -136,8 +131,11 @@ def correlation_func_2d_jit(curve1, curve2):
     fill_correlation_arr(curve1[1], curve2[1], res)
 
     # add time column
-    time_col = np.arange(- curve1.shape[1] + 1, curve1.shape[1], dtype=np.float64)
-    time_col *= time_step[0]
+    # np.arange(first, last, step)  == [first, last)  last point is not included
+    time_col = np.arange(curve1[0, 0] - curve2[0, -1],
+                         curve1[0, -1] - curve2[0, 0] + time_step[0],
+                         time_step[0],
+                         dtype=np.float64)
 
     # make 2D array [time/val][point]
     res = np.stack((time_col, res), axis=0)
