@@ -20,15 +20,17 @@ from scipy.signal import correlate as scipy_correlate
 def correlation_func_2d(curve1, curve2):
     """ Returns the correlation of a signal (curve1) with
     another signal (curve2) as a function of delay (2D ndarray).
+
+    Output values are normalized to the autocorrelation value
+    of the smallest of the input curves at t=0.
+
     The input array structure:
     [type][point]
-    where type is the type of column - time (0) or value (1)
-    point is the index of time-value pair in the array.
+    where type is the type of column - time (0) or amplitude (1)
+    point is the index of time/amplitude value in the array.
 
     The number of signal points may not match.
     The time step of both signals must be the same !!
-
-    The length of output signal is curve1.shape[1]
 
     :param curve1: 2D ndarray with time column and value column
     :type curve1: np.ndarray
@@ -70,9 +72,15 @@ def correlation_func_2d(curve1, curve2):
                          time_step[0],
                          dtype=np.float64)
 
+    # take the autocorrelation of the smallest curve as a reference
+    smaller_curve = curve1
+    if curve1.shape[1] > curve2.shape[1]:
+        smaller_curve = curve2
+
+    auto_corr = scipy_correlate(smaller_curve[1], smaller_curve[1], mode='full')
+    auto_corr_center = smaller_curve.shape[1] - 1
+
     # auto_corr_0 is the auto-correlation of curve_1 at shift=0
-    auto_corr = scipy_correlate(curve1[1], curve1[1], mode='full')
-    auto_corr_center = curve1.shape[1] - 1
     auto_corr_0 = auto_corr[auto_corr_center]
 
     # normalization
