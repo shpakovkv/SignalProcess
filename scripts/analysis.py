@@ -14,6 +14,7 @@ import time
 from data_types import SignalsData, SinglePeak, SingleCurve
 from arg_checker import check_plot_param
 from plotter import find_nearest_idx
+from scipy.signal import correlate as scipy_correlate
 
 
 def correlation_func_2d(curve1, curve2):
@@ -24,8 +25,8 @@ def correlation_func_2d(curve1, curve2):
     where type is the type of column - time (0) or value (1)
     point is the index of time-value pair in the array.
 
-    The signals shape must be equal.
-    The time step of both signals must be the same.
+    The number of signal points may not match.
+    The time step of both signals must be the same !!
 
     The length of output signal is curve1.shape[1]
 
@@ -59,7 +60,8 @@ def correlation_func_2d(curve1, curve2):
         "".format(time_step[0], time_step[1], tolerance)
 
     # get correlation
-    res = np.correlate(curve1[1], curve2[1], mode='full')
+    # res = np.correlate(curve1[1], curve2[1], mode='full')
+    res = scipy_correlate(curve1[1], curve2[1], mode='full')
 
     # add time column
     # np.arange(first, last, step)  == [first, last)  last point is not included
@@ -67,6 +69,14 @@ def correlation_func_2d(curve1, curve2):
                          curve1[0, -1] - curve2[0, 0] + time_step[0],
                          time_step[0],
                          dtype=np.float64)
+
+    # auto_corr_0 is the auto-correlation of curve_1 at shift=0
+    auto_corr = scipy_correlate(curve1[1], curve1[1], mode='full')
+    auto_corr_center = curve1.shape[1] - 1
+    auto_corr_0 = auto_corr[auto_corr_center]
+
+    # normalization
+    res /= auto_corr_0
 
     # make 2D array [time/val][point]
     res = np.stack((time_col, res), axis=0)
