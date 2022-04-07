@@ -390,14 +390,14 @@ def get_test_signal_3(show=False):
         obj_to_plot -= 1
         gap *= 2
 
-    # big triangles
+    # narrow squares
     start += gap_base * 10
     obj_to_plot = num
     gap = gap_base
-    height = height_base * 2
+    height = height_base * 1.8576812488
     while obj_to_plot > 0:
-        for idx in range(width):
-            y_axis[idx + start] = height * (1 - idx / width)
+        for idx in range(width // 5):
+            y_axis[idx + start] = height
         start += width
         start += gap
         obj_to_plot -= 1
@@ -437,6 +437,7 @@ def test_signal_1_and_3():
     print("Signal 2 shape = {},  [{} to {}]".format(signal3.shape, signal3[0, 0], signal3[0, -1]))
     print("Correlate curve shape = {},  [{} to {}]".format(correlate_curve.shape, correlate_curve[0, 0], correlate_curve[0, -1]))
 
+    print("ABOUT ONE = {}".format(correlate_curve[1, 2999]))
     plot_correlate_plot((signal3, signal1),
                         (correlate_curve,),
                         curves_labels=("Signal2", "Signal1"),
