@@ -142,7 +142,7 @@ def check_coeffs_number(need_count, coeff_names, *coeffs):
                                            need_count, coeffs_count))
 
 
-def global_check_front_params(params, window=101, polyorder=3):
+def global_check_offset_by_front_params(params, window=101, polyorder=3):
     """ Parses user input of offset_by_curve_level parameter.
 
     Returns (idx, level, window, order), where:
@@ -496,34 +496,36 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         options.multiplier = np.ones(shape=delay.shape, dtype=dtype)
 
 
-def check_multiplier(m, count=1):
+def check_multiplier(m, curves_count=1):
     """Checks 'multiplier' argument, return it's copy
      or generates a list of ones.
 
     :param m:     the list of multipliers
-    :param count: the number of data curves
+    :param curves_count: the number of data curves
     :return:      the list of multipliers (copy)
     """
     if m is None:
         # need two multipliers for each curve (for X and Y columns)
-        return [1 for _ in range(count * 2)]
-    check_coeffs_number(count * 2, ["multiplier"], m)
-    return list(m)
+        m_shape = (curves_count, 2)
+        return np.ones(shape=m_shape, dtype=np.float64)
+    check_coeffs_number(curves_count * 2, ["multiplier"], m)
+    return m
 
 
-def check_delay(d, count=1):
+def check_delay(d, curves_count=1):
     """Checks 'delay' argument, return it's copy
      or generates a list of zeros.
 
     :param d:     the list of delays
-    :param count: the number of data curves
+    :param curves_count: the number of data curves
     :return:      the list of delays (copy)
     """
     if d is None:
         # need two delays for each curve (for X and Y columns)
-        return [0 for _ in range(count * 2)]
-    check_coeffs_number(count * 2, ["delay"], d)
-    return list(d)
+        m_shape = (curves_count, 2)
+        return np.zeros(shape=m_shape, dtype=np.float64)
+    check_coeffs_number(curves_count * 2, ["delay"], d)
+    return d
 
 
 def file_arg_check(options):
@@ -678,7 +680,7 @@ def data_corr_arg_check(options):
              "".format(arg_name="--offset-by-curve_level"))
         if len(options.offset_by_front) < 4:
             options.it_offset = True
-        options.offset_by_front = global_check_front_params(options.offset_by_front)
+        options.offset_by_front = global_check_offset_by_front_params(options.offset_by_front)
 
     # # raw check labels (not used)
     # # instead: the forbidden symbols are replaced during CSV saving
@@ -803,3 +805,51 @@ def check_analysis_args(options):
             options.correlate_part[idx][6] = int(options.correlate_part[idx][6])  # add to signals_data or no
     return options
 
+
+def front_delay_check(options):
+    """Needed for front delay calculation process.
+
+    Check data manipulation arguments:
+    --front-delay
+    --front-delay-save-plot-to
+
+    :param options: namespace with args
+    :type options: argparse.Namespace
+
+    :return: changed options
+    :rtype: argparse.Namespace
+    """
+
+    front_delay_count = 0
+    save_to_count = 0
+    if options.front_delay is not None:
+        front_delay_count = len(options.front_delay)
+
+        if options.front_delay_save_to is not None:
+            save_to_count = len(options.front_delay_save_to)
+            assert save_to_count == front_delay_count, \
+                "You entered {} --front-delay flag(s). " \
+                "Expected the same number (or none) of " \
+                "--front-delay-save-plot-to flags, but found {}" \
+                "".format(front_delay_count, save_to_count)
+
+        for idx in range(front_delay_count):
+            front_dict = dict()
+            front_dict["cur1"] = int(options.front_delay[idx][0])
+            front_dict["level1"] = options.front_delay[idx][1]
+            front_dict["slope1"] = "fall" if options.front_delay[idx][2] < 0 else "rise"
+            front_dict["cur2"] = int(options.front_delay[idx][3])
+            front_dict["level2"] = options.front_delay[idx][4]
+            front_dict["slope2"] = "fall" if options.front_delay[idx][5] < 0 else "rise"
+            save_to = None
+            if options.front_delay_save_to is not None:
+                if options.front_delay_save_to[idx] and not options.front_delay_save_to[idx].lower() == "none":
+                    save_to = options.front_delay_save_to[idx]
+            front_dict["save_to"] = save_to
+            options.front_delay[idx] = front_dict
+
+    else:
+        if options.front_delay_save_to is not None:
+            raise ValueError("--front-delay-save-plot-to flag was specified "
+                             "but no --front-delay flag were entered!")
+    return options

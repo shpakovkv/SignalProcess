@@ -689,3 +689,56 @@ def get_peak_args_parser():
              ''.format(folder=os.path.join(SAVETODIR, PEAKDATADIR)))
 
     return peak_args_parser
+
+
+# =======================================================================
+# -----     PEAK SEARCH PARSERS     -------------------------------------
+# =======================================================================
+def get_front_args_parser():
+    """Returns peak search options parser.
+    Special for PeakProcess.py.
+
+    :return: peak process arguments parser
+    :rtype: argparse.ArgumentParser
+    """
+    front_args_parser = argparse.ArgumentParser(add_help=False)
+
+    front_args_parser.add_argument(
+        '--front-delay',
+        action='append',
+        metavar=('CURVE1', 'LEVEL1', 'SLOPE1', 'CURVE2', 'LEVEL2', 'SLOPE2'),
+        nargs=6,
+        type=float,
+        dest='front_delay',
+        default=None,
+        help='Calculates the delay between two fronts \n'
+             'of the selected curves. \n'
+             'You may select different front of the same curve.\n'
+             '1. Specify curve1 zero-based index.\n'
+             '2. Specify the level of the first front.\n'
+             '   and it\'s slope.\n'
+             '   The front will be detected only if \n'
+             '   if the signal\'s amplitude exceeds this level\'s value\n'
+             '   (for rising front) or falls below it (for falling front). \n'
+             '3. Specify the front slope. Enter any positive number for \n'
+             '   rising slope or any negative number for falling slope.\n'
+             '4. Repeat steps 1-3 for second front.\n'
+             'NOTE: You may enter as many --front-delay flag as you want.\n\n')
+
+    front_args_parser.add_argument(
+        '--front-delay-save-plot-to',
+        action='append',
+        dest='front_delay_save_to',
+        metavar='PLOT_DIR',
+        help='specify the directory.\n'
+             'Each curve from the list, entered via --front-delay flag\n'
+             'will be plotted and saved separately as .png file\n'
+             'to this directory.\n'
+             'NOTE: If you want to enter at least one \n'
+             '      --front-delay-save-plot-to flag then\n'
+             '      you must enter as many --front-delay-save-plot-to flags\n'
+             '      as the --front-delay flags were entered!\n'
+             'NOTE: You may enter \'none\' to skip plotting '
+             '      some --front-delay instances.\n\n')
+
+    return front_args_parser

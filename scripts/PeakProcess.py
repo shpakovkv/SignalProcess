@@ -27,9 +27,10 @@ import arg_checker
 import file_handler
 import plotter
 from multiprocessing import Pool
+from itertools import repeat
 
 from multiplier_and_delay import multiplier_and_delay
-from data_types import SinglePeak
+from data_types import SinglePeak, SignalsData
 
 
 pos_polarity_labels = {'pos', 'positive', '+'}
@@ -42,6 +43,7 @@ MULTIPLOTDIR = 'MultiPlot'
 PEAKDATADIR = 'PeakData'
 DEBUG = False
 PEAKFINDERDEBUG = False
+FRONT_DELAY_DATA = np.zeros(shape=(1, 1), dtype=np.float64)
 
 
 def get_parser():
@@ -60,7 +62,8 @@ def get_parser():
                  arg_parser.get_plot_args_parser(),
                  arg_parser.get_peak_args_parser(),
                  arg_parser.get_output_args_parser(),
-                 arg_parser.get_utility_args_parser()],
+                 arg_parser.get_utility_args_parser(),
+                 arg_parser.get_front_args_parser()],
         prog='PeakProcess.py',
         description=p_desc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
@@ -723,6 +726,10 @@ def global_check(options):
     # partial import args check
     options = arg_checker.check_partial_args(options)
 
+    # multiplier and delay args check
+    arg_checker.check_and_prepare_multiplier_and_delay(options,
+                                                       data_axes=2,
+                                                       dtype=np.float64)
     # plot args check
     options = arg_checker.plot_arg_check(options)
 
@@ -731,17 +738,24 @@ def global_check(options):
 
     # # data manipulation args check
     # options = arg_checker.data_corr_arg_check(options)
-    #
-    # # save data args check
-    # options = arg_checker.save_arg_check(options)
-    #
-    # # convert_only arg check
-    # options = arg_checker.convert_only_arg_check(options)
+
+    # save data args check
+    options = arg_checker.save_arg_check(options)
+
+    # convert_only arg check
+    options = arg_checker.convert_only_arg_check(options)
+
+    # other args check
+    options = arg_checker.check_utility_args(options)
+
+    # # analysis args check
+    # options = arg_checker.check_analysis_args(options)
 
     # peak search args check
     options = arg_checker.peak_param_check(options)
 
-    options = arg_checker.check_utility_args(options)
+    # front delay args check
+    options = arg_checker.front_delay_check(options)
 
     return options
 
@@ -891,17 +905,18 @@ def do_job(args, shot_idx):
                                      points=args.partial[2],
                                      labels=args.labels,
                                      units=args.units,
-                                     time_unit=args.time_unit)
+                                     time_units=args.time_units,
+                                     verbose=verbose)
     if verbose:
-        print("The number of curves = {}".format(data.count))
+        print("The number of curves = {}".format(data.cnt_curves))
 
     # checks the number of columns with data,
     # and the number of multipliers, delays, labels
     args.multiplier = arg_checker.check_multiplier(args.multiplier,
-                                                   count=data.count)
+                                                   curves_count=data.cnt_curves)
     args.delay = arg_checker.check_delay(args.delay,
-                                         count=data.count)
-    arg_checker.check_coeffs_number(data.count, ["label", "unit"],
+                                         curves_count=data.cnt_curves)
+    arg_checker.check_coeffs_number(data.cnt_curves, ["label", "unit"],
                                     args.labels, args.units)
 
     # multiplier and delay
@@ -950,6 +965,10 @@ def do_job(args, shot_idx):
         else:
             plt.show()
 
+    delay_values = None
+    if args.front_delay:
+        delay_values = do_front_delay_all(data, args, shot_idx, verbose=True)
+
     if args.read:
         if verbose:
             print("Reading peak data...")
@@ -972,6 +991,7 @@ def do_job(args, shot_idx):
         plotter.do_multiplots(data, args, shot_name,
                               peaks=peaks_data, verbose=verbose,
                               hide=args.mp_hide)
+    return delay_values
 
 
 def main():
@@ -1012,15 +1032,19 @@ def main():
         # measured by cProfile
         matplotlib.use("Agg")
 
+    if args.front_delay is not None:
+        FRONT_DELAY_DATA.resize((len(args.front_delay), len(args.gr_files)), refcheck=False)
+
     # MAIN LOOP
     import time
     start_time = time.time()
-    if (args.level or
-            args.read):
-        # for shot_idx in range(len(args.gr_files)):
-        #     do_job(args, shot_idx)
+    if args.level or args.read or args.front_delay:
+
+        shot_list = [shot_idx for shot_idx in range(len(args.gr_files))]
         with Pool(args.threads) as p:
-            p.starmap(do_job, [(args, shot_idx) for shot_idx in range(len(args.gr_files))])
+            outputs = p.starmap(do_job, zip(repeat(args), shot_list))
+            # print("OUTPUTS = {}".format(outputs))
+
     stop_time = time.time()
 
     # arg_checker.print_duplicates(args.gr_files)
@@ -1037,9 +1061,10 @@ def main():
         units = "minutes"
 
     print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
+    print("FRONT_DELAY_DATA = {}".format(FRONT_DELAY_DATA))
 
 
-def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False, prefix="voltage_front"):
+def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False, prefix="voltage_front", verbose=True):
     save_as = prefix + ".png"
     x1, y1 = find_curve_front(curve1,
                               level=level1,
@@ -1055,18 +1080,19 @@ def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False
     front_points = list()
     front_points.append([SinglePeak(x1, y1, 0)])
     front_points.append([SinglePeak(x2, y2, 0)])
-    print("First curve front time = {}".format(x1))
-    print("Second curve front time = {}".format(x2))
-    if x1 is not None and x2 is not None:
-        print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
-              "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
-                        curve2.label, "negative" if level2 < 0 else "positive", level2,
-                        x2 - x1))
-    else:
-        print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
-              "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
-                        curve2.label, "negative" if level2 < 0 else "positive", level2,
-                        0))
+    if verbose:
+        print("First curve front time = {}".format(x1))
+        print("Second curve front time = {}".format(x2))
+        if x1 is not None and x2 is not None:
+            print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
+                  "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
+                            curve2.label, "negative" if level2 < 0 else "positive", level2,
+                            x2 - x1))
+        else:
+            print("Delay between {} {} front (at {}) and {} {} front (at {}) == {:.4f}"
+                  "".format(curve1.label, "negative" if level1 < 0 else "positive", level1,
+                            curve2.label, "negative" if level2 < 0 else "positive", level2,
+                            0))
     return front_points
 
 
@@ -1115,6 +1141,112 @@ def print_pulse_duration(curve1, level1, front1, save=False, prefix="pulse_"):
     else:
         print("OVF")
     return front_points
+
+
+def do_front_delay_all(data, args, shot_idx, verbose):
+    """ For all --front-delay flags:
+          1. Calculates delay between fronts of two signals.
+          2. Prints the value to console.
+          3. Saves graph of two curves with front points.
+
+        :param data: SignalsData instance
+        :type data: SignalsData
+
+        :param args: command line arguments, entered by the user
+        :type args: argparse.Namespace
+
+        :param shot_idx: the name of current shot
+        :type shot_idx: int
+
+        :param verbose: shows more info during the process
+        :type verbose: bool
+
+        :return: the list of delay values
+        :rtype: float
+        """
+    front_delay_data = list()
+    for idx, front_param in enumerate(args.front_delay):
+        new_delay = do_front_delay_single(data, args, front_param, shot_idx, verbose)
+        front_delay_data.append(new_delay)
+    return front_delay_data
+
+
+def do_front_delay_single(data, args, front_param, shot_idx, verbose):
+    """ Calculates delay between fronts of two signals.
+    Prints the value to console.
+    Saves graph of two curves with front points.
+
+    :param data: SignalsData instance
+    :type data: SignalsData
+
+    :param args: command line arguments, entered by the user
+    :type args: argparse.Namespace
+
+    :param front_param: the front delay parameters dict
+    :type front_param: dict
+
+    :param shot_idx: the name of current shot
+    :type shot_idx: int
+
+    :param verbose: shows more info during the process
+    :type verbose: bool
+
+    :return: the delay value
+    :rtype: float
+    """
+
+    peaks = [None] * data.cnt_curves
+    cur1 = front_param["cur1"]
+    level1 = front_param["level1"]
+    slope1 = front_param["slope1"]
+    cur2 = front_param["cur2"]
+    level2 = front_param["level2"]
+    slope2 = front_param["slope2"]
+    front_points = print_front_delay(data.get_single_curve(cur1),
+                                     level1,
+                                     slope1,
+                                     data.get_single_curve(cur2),
+                                     level2,
+                                     slope2,
+                                     save=False,
+                                     verbose=False)
+    # front_points is the list of list of SinglePeaks
+    # front_points[curve_idx][peak_idx]
+    peaks[front_param["cur1"]] = front_points[0]
+    peaks[front_param["cur2"]] = front_points[1]
+
+    the_delay = front_points[1][0].time - front_points[0][0].time
+
+    if verbose:
+        print("DELAY of the {}'s {} front relative to the {}'s {} front = {:.3f} {}"
+              "".format(data.get_curve_label(front_param["cur2"]),
+                        front_param["slope2"],
+                        data.get_curve_label(front_param["cur1"]),
+                        front_param["slope1"],
+                        the_delay,
+                        data.time_units))
+
+    if front_param["save_to"] is not None:
+        plot_name = "{shot}_cur{idx1}_{slope1}_and_cur{idx2}_{slope2}_fronts.png" \
+                    "".format(shot=shot_idx,
+                              idx1=front_param["cur1"],
+                              slope1=front_param["slope1"],
+                              idx2=front_param["cur2"],
+                              slope2=front_param["slope2"]
+                              )
+        save_as = os.path.join(front_param["save_to"], plot_name)
+
+        plotter.plot_multiplot(data,
+                               peaks,
+                               (front_param["cur1"], front_param["cur2"]),
+                               unixtime=args.unixtime,
+                               hide=True)
+        if not os.path.isdir(front_param["save_to"]):
+            os.makedirs(front_param["save_to"])
+        plt.savefig(save_as, dpi=400)
+        plt.close('all')
+
+    return the_delay
 
 
 if __name__ == '__main__':

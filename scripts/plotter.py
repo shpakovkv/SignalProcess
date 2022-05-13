@@ -122,36 +122,69 @@ def do_multiplots(signals_data, cl_args, plot_name,
     :type verbose: bool
 
     :return: None
-
     """
 
     for curve_list in cl_args.multiplot:
         check_plot_param(curve_list, signals_data.cnt_curves)
 
     for curve_list in cl_args.multiplot:
-        plot_multiplot(signals_data, peaks, curve_list,
-                       xlim=cl_args.t_bounds,
-                       unixtime=cl_args.unixtime,
-                       hide=hide)
-        if cl_args.multiplot_dir is not None:
-            idx_list = get_curve_indexes_for_name_str(curve_list)
-            mplot_name = ("{shot}_cur_"
-                          "{idx_list}.mp.png"
-                          "".format(shot=plot_name,
-                                    idx_list=idx_list))
-            mplot_path = os.path.join(cl_args.multiplot_dir,
-                                      mplot_name)
-            plt.savefig(mplot_path, dpi=400)
-            if verbose:
-                print("Multiplot is saved {}"
-                      "".format(mplot_path))
-        if not cl_args.mp_hide:
-            plt.show(block=True)
-        # else:
-        #     # draw plot, but don't pause the process
-        #     # the plot will be closed as soon as drawn
-        #     plt.show(block=False)
-        plt.close('all')
+        do_multiplot_single(signals_data=signals_data,
+                            curve_list=curve_list,
+                            cl_args=cl_args,
+                            plot_name=plot_name,
+                            peaks=peaks,
+                            verbose=verbose,
+                            hide=hide)
+
+
+def do_multiplot_single(signals_data, curve_list, cl_args, plot_name,
+                        peaks=None, verbose=False, hide=False):
+    """Plots all the multiplot graphs specified by the user.
+    Saves the graphs that the user specified to save.
+
+    :param signals_data: SignalsData instance
+    :param curve_list: the list of indexes of curves to plot
+    :param cl_args: user-entered arguments (namespace from parser)
+    :param plot_name: shot number, needed for saving
+    :param peaks: the list of list of peaks (SinglePeak instance)
+                    peak_data[0] == list of peaks for data.curves[curves_list[0]]
+                    peak_data[1] == list of peaks for data.curves[curves_list[1]]
+                    etc.
+    :param verbose: show additional information or no
+
+    :type signals_data: SignalsData
+    :type curve_list: list
+    :type cl_args: argparse.Namespace
+    :type plot_name: str
+    :type peaks: list of lists of SinglePeak
+    :type verbose: bool
+
+    :return: None
+    """
+
+    plot_multiplot(signals_data, peaks, curve_list,
+                   xlim=cl_args.t_bounds,
+                   unixtime=cl_args.unixtime,
+                   hide=hide)
+    if cl_args.multiplot_dir is not None:
+        idx_list = get_curve_indexes_for_name_str(curve_list)
+        mplot_name = ("{shot}_cur_"
+                      "{idx_list}.mp.png"
+                      "".format(shot=plot_name,
+                                idx_list=idx_list))
+        mplot_path = os.path.join(cl_args.multiplot_dir,
+                                  mplot_name)
+        plt.savefig(mplot_path, dpi=400)
+        if verbose:
+            print("Multiplot is saved {}"
+                  "".format(mplot_path))
+    if not cl_args.mp_hide:
+        plt.show(block=True)
+    # else:
+    #     # draw plot, but don't pause the process
+    #     # the plot will be closed as soon as drawn
+    #     plt.show(block=False)
+    plt.close('all')
 
 
 def do_multicurve_plots(signals_data, cl_args, plot_name,
@@ -208,13 +241,63 @@ def do_multicurve_plots(signals_data, cl_args, plot_name,
             if verbose:
                 print("Multicurve plot is saved {}"
                       "".format(mplot_path))
-        if not cl_args.mp_hide:
+        if not cl_args.mcp_hide:
             plt.show(block=True)
         # else:
         #     # draw plot, but don't pause the process
         #     # the plot will be closed as soon as drawn
         #     plt.show(block=False)
         plt.close('all')
+
+
+def do_multicurve_plot_single(signals_data, curve_list, cl_args, plot_name,
+                              peaks=None, verbose=False, hide=False):
+    """Plots all the multicurve graphs specified by the user.
+    Saves the graphs that the user specified to save.
+
+    :param signals_data: SignalsData instance
+    :param curve_list: the list of indexes of curves to plot
+    :param cl_args: user-entered arguments (namespace from parser)
+    :param plot_name: shot number, needed for saving
+    :param peaks: the list of list of peaks (SinglePeak instance)
+                    peak_data[0] == list of peaks for data.curves[curves_list[0]]
+                    peak_data[1] == list of peaks for data.curves[curves_list[1]]
+                    etc.
+    :param verbose: show additional information or no
+
+    :type signals_data: SignalsData
+    :type curve_list: list
+    :type cl_args: argparse.Namespace
+    :type plot_name: str
+    :type peaks: list of lists of SinglePeak
+    :type verbose: bool
+
+    :return: None
+
+    """
+    plot_multiple_curve(signals_data, curve_list,
+                        peaks=peaks,
+                        xlim=cl_args.t_bounds,
+                        amp_unit=signals_data.get_curve_label(curve_list[0]),
+                        time_units=signals_data.time_units,
+                        unixtime=cl_args.unixtime,
+                        hide=hide)
+
+    if cl_args.multicurve_dir is not None:
+        idx_list = get_curve_indexes_for_name_str(curve_list)
+        mplot_name = ("{shot}_cur_"
+                      "{idx_list}.mc.png"
+                      "".format(shot=plot_name,
+                                idx_list=idx_list))
+        mplot_path = os.path.join(cl_args.multicurve_dir,
+                                  mplot_name)
+        plt.savefig(mplot_path, dpi=400)
+        if verbose:
+            print("Multicurve plot is saved {}"
+                  "".format(mplot_path))
+    if not cl_args.mcp_hide:
+        plt.show(block=True)
+    plt.close('all')
 
 
 def check_plot_param(idx_list, curves_count):

@@ -386,7 +386,7 @@ def is_time_col(col):
 
 
 def read_signals(file_list, start=0, step=1, points=-1,
-                 labels=None, units=None, time_units=None):
+                 labels=None, units=None, time_units=None, verbose=False):
     """Function returns one SignalsData object filled with
     data from files in file_list.
     Do not forget to sort the list of files
@@ -413,7 +413,7 @@ def read_signals(file_list, start=0, step=1, points=-1,
     data = SignalsData()
     current_count = 0
     for filename in file_list:
-        if VERBOSE:
+        if verbose:
             print("Loading {}".format(filename))
         new_data, new_header = load_from_file(filename, start,
                                               step, points, h_lines=3)
@@ -459,13 +459,13 @@ def read_signals(file_list, start=0, step=1, points=-1,
         #     else:
         #         current_time_units = None
 
-        if VERBOSE:
+        if verbose:
             print(current_labels)
 
         data.add_from_array(new_data.transpose(), current_labels, current_units, current_time_units,
                             force_single_time_row=single_time_column)
 
-        if VERBOSE:
+        if verbose:
             print()
         current_count += add_count
     data.time_units = time_units
@@ -502,7 +502,7 @@ def get_dialect(filename):
     return dialect, datalines
 
 
-def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
+def load_from_file(filename, start=0, step=1, points=-1, h_lines=0, verbose=False):
     """
     Return ndarray instance filled with data
     read from csv or wfm file.
@@ -533,7 +533,7 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
     else:
         dialect, text_data = get_dialect(filename)
 
-        if VERBOSE:
+        if verbose:
             print("Delimiter = \"{}\"   |   ".format(dialect.delimiter),
                   end="")
 
@@ -553,13 +553,13 @@ def load_from_file(filename, start=0, step=1, points=-1, h_lines=0):
         assert len(text_data) >= 2, \
             "\nError! Not enough data lines in the file."
 
-        if VERBOSE:
+        if verbose:
             print("Valid columns = {}".format(usecols))
         data = np.genfromtxt(text_data,
                              delimiter=str(dialect.delimiter),
                              usecols=usecols)
 
-    if VERBOSE:
+    if verbose:
         columns = 1
         if data.ndim > 1:
             columns = data.shape[1]

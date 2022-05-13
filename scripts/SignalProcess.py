@@ -55,7 +55,8 @@ def get_parser():
                  arg_parser.get_analysis_args_parser(),
                  arg_parser.get_plot_args_parser(),
                  arg_parser.get_output_args_parser(),
-                 arg_parser.get_utility_args_parser()],
+                 arg_parser.get_utility_args_parser(),
+                 arg_parser.get_front_args_parser()],
         prog='SignalProcess.py',
         description=p_disc, epilog=p_ep, usage=p_use,
         fromfile_prefix_chars='@',
@@ -697,14 +698,17 @@ def full_process(args, shot_idx, num_mask):
 
     # checks the number of columns with data,
     # as well as the number of multipliers, delays, labels
+
+    # multiplier and delay are 2D ndarrays [curve][axis]
     arg_checker.check_coeffs_number(data.cnt_curves * 2, ["multiplier", "delay"],
                                     args.multiplier, args.delay)
     arg_checker.check_coeffs_number(data.cnt_curves, ["label", "unit"],
                                     args.labels, args.units)
 
     # check y_zero_offset parameters (if idx is out of range)
-    if args.y_auto_zero is not None:
-        args = do_y_zero_offset(data, args)
+    # NOT WORKING WITH MULTITHREADING
+    # if args.y_auto_zero is not None:
+    #     args = do_y_zero_offset(data, args)
 
     # reset to zero
     if args.zero is not None:
