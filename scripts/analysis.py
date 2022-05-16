@@ -17,6 +17,11 @@ from plotter import find_nearest_idx
 from scipy.signal import correlate as scipy_correlate
 
 
+# =======================================================================
+# ------   CORRELATION   ------------------------------------------------
+# =======================================================================
+
+
 def correlation_func_2d(curve1, curve2):
     """ Returns the correlation of a signal (curve1) with
     another signal (curve2) as a function of delay (2D ndarray).
@@ -374,6 +379,81 @@ def correlate_part_multiple(signals_data, list_of_parameter_sets):
                                         time_units=signals_data.time_units
                                         )
     return corr_data
+
+
+# =======================================================================
+# ------   STATISTICS   -------------------------------------------------
+# =======================================================================
+
+def get_2d_array_stat_by_columns(data):
+    """ Calculates the statistics (mean value, standard deviation,
+    maximum deviation and number of non-nan values)
+    of a two-dimensional array by columns.
+    Ignores nan values.
+
+    Input data structure: data[row][column]
+
+    Example:
+              col1  col2  col3   col4
+      data([
+    row1     [ 3,    10,   22,   104],
+    row2     [ 2,    15,   24,   108],
+    row3     [ 1,    20,   26,   107]])
+
+    result([ 2.0,  15.0,  24.0, 106,3333])
+
+    :param delay_list: list with delay values delay_list[shot_num][delay_num]
+    :type delay_list: list or np.ndarray
+    :return: two-dimensional ndarray: result[column][stat_type]
+    where stat_type are: mean, std deviation, max deviation, number of non-nan samples
+    :rtype: np.ndarray
+    """
+    stats_num = 4
+    if not isinstance(data, np.ndarray):
+        data = np.array(data, dtype=np.float64)
+
+    assert data.ndim == 2, \
+        "Data must be two-dimensional ndarray/list. " \
+        "Found {} dimension(s) instead.".format(data.ndim)
+
+    # number of columns
+    # shape[0] -> rows;   shape[1] -> columns
+    col_num = data.shape[1]
+    res = np.zeros(shape=(col_num, stats_num), dtype=np.float64)
+    for col in range(col_num):
+        col_mean, col_std, col_maxerr, col_sample_num = get_1d_array_stat(data[:, col])
+        res[col, 0] = col_mean
+        res[col, 1] = col_std
+        res[col, 2] = col_maxerr
+        res[col, 3] = col_sample_num
+
+    # # count non-nan values for all rows (along axis=0) separately for each column
+    # number_of_samples = np.count_nonzero(~np.isnan(data), axis=0)
+
+    return res
+
+
+def get_1d_array_stat(data):
+    """ Calculates statistics (mean value, standard deviation,
+     maximum deviation and number of non-nan values) for single-axis ndarray or list.
+     Ignores nan values.
+
+    :param data: list or 1D ndarray with delay values data[delay_num]
+    :type data: list or np.ndarray
+    :return: tuple of 4 values: mean, std deviation, max deviation, number of samples
+    :rtype: tuple
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data, dtype=np.float64)
+    assert data.ndim == 1, \
+        "Data must be one-dimensional ndarray/list. " \
+        "Found {} dimension(s) instead.".format(data.ndim)
+
+    arr_mean = np.nanmean(data)
+    arr_std = np.nanstd(data)
+    arr_maxerr = np.nanmax(np.abs(arr_mean - data))
+    arr_samples_num = np.count_nonzero(~np.isnan(data))
+    return arr_mean, arr_std, arr_maxerr, arr_samples_num
 
 
 if __name__ == "__main__":

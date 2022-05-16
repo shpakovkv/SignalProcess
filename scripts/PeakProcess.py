@@ -31,6 +31,7 @@ from itertools import repeat
 
 from multiplier_and_delay import multiplier_and_delay
 from data_types import SinglePeak, SignalsData
+from analysis import get_2d_array_stat_by_columns
 
 
 pos_polarity_labels = {'pos', 'positive', '+'}
@@ -43,7 +44,7 @@ MULTIPLOTDIR = 'MultiPlot'
 PEAKDATADIR = 'PeakData'
 DEBUG = False
 PEAKFINDERDEBUG = False
-FRONT_DELAY_DATA = np.zeros(shape=(1, 1), dtype=np.float64)
+STAT_NAME = {"front_delay": "Front delay"}
 
 
 def get_parser():
@@ -1032,9 +1033,6 @@ def main():
         # measured by cProfile
         matplotlib.use("Agg")
 
-    if args.front_delay is not None:
-        FRONT_DELAY_DATA.resize((len(args.front_delay), len(args.gr_files)), refcheck=False)
-
     # MAIN LOOP
     import time
     start_time = time.time()
@@ -1043,7 +1041,17 @@ def main():
         shot_list = [shot_idx for shot_idx in range(len(args.gr_files))]
         with Pool(args.threads) as p:
             outputs = p.starmap(do_job, zip(repeat(args), shot_list))
-            # print("OUTPUTS = {}".format(outputs))
+            if args.front_delay is not None:
+                delay_stats = get_2d_array_stat_by_columns(outputs)
+                for idx in range(delay_stats.shape[0]):
+                    print("Mean = {:.3f} {};   Std. Dev. = {:.3f} {};    "
+                          "Max. Dev. = {:.3f} {};   Number of samples = {}"
+                          "".format(delay_stats[idx, 0], args.time_units,
+                                    delay_stats[idx, 1], args.time_units,
+                                    delay_stats[idx, 2], args.time_units,
+                                    int(delay_stats[idx, 3])
+                                    )
+                          )
 
     stop_time = time.time()
 
@@ -1061,7 +1069,6 @@ def main():
         units = "minutes"
 
     print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
-    print("FRONT_DELAY_DATA = {}".format(FRONT_DELAY_DATA))
 
 
 def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False, prefix="voltage_front", verbose=True):
@@ -1078,8 +1085,14 @@ def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False
                               save_plot=save,
                               plot_name=save_as)
     front_points = list()
-    front_points.append([SinglePeak(x1, y1, 0)])
-    front_points.append([SinglePeak(x2, y2, 0)])
+    if x1 is not None:
+        front_points.append([SinglePeak(x1, y1, 0)])
+    else:
+        front_points.append([None])
+    if x2 is not None:
+        front_points.append([SinglePeak(x2, y2, 0)])
+    else:
+        front_points.append([None])
     if verbose:
         print("First curve front time = {}".format(x1))
         print("Second curve front time = {}".format(x2))
@@ -1215,14 +1228,22 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
     peaks[front_param["cur1"]] = front_points[0]
     peaks[front_param["cur2"]] = front_points[1]
 
-    the_delay = front_points[1][0].time - front_points[0][0].time
+    if all(val is not None for val in front_points):
+        the_delay = front_points[1][0].time - front_points[0][0].time
+    else:
+        the_delay = None
 
     if verbose:
-        print("DELAY of the {}'s {} front relative to the {}'s {} front = {:.3f} {}"
+        print("DELAY of the {}'s {} front at {} [{}] "
+              "relative to the {}'s {} front at {} [{}] = {:.3f} {}"
               "".format(data.get_curve_label(front_param["cur2"]),
                         front_param["slope2"],
+                        front_param["level2"],
+                        data.get_curve_units(front_param["cur2"]),
                         data.get_curve_label(front_param["cur1"]),
                         front_param["slope1"],
+                        front_param["level1"],
+                        data.get_curve_units(front_param["cur1"]),
                         the_delay,
                         data.time_units))
 
