@@ -394,7 +394,10 @@ def plot_multiplot(data, peak_data, curves_list,
             axes[wf, 0].set_xlim(xlim)
             axes[wf, 0].set_ylim(calc_y_lim(data.get_x(curves_list[wf]),
                                             data.get_y(curves_list[wf]),
-                                            xlim, reserve=0.1))
+                                            xlim, reserve=0.1
+                                            )
+                                 )
+
         # y label (units only)
         if amp_unit is None:
             axes[wf, 0].set_ylabel(data.get_curve_units(curves_list[wf]),
@@ -710,8 +713,9 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
 
     if stop - start < 1:
         return -1, 1
-    y_max = np.amax(y[start:stop])
-    y_min = np.amin(y[start:stop])
+    local_y = y[start:stop]
+    y_max = np.nanmax(local_y[local_y != np.inf])
+    y_min = np.nanmin(local_y[local_y != -np.inf])
     y_range = y_max - y_min
     reserve *= y_range
     if y_max == 0 and y_min == 0:
