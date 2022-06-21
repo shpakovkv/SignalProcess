@@ -304,7 +304,11 @@ def get_grouped_file_list(dir_list, ext_list, group_size, sorted_by_ch=False):
         for shot in range(shots_count):
             shot_files = list()
             for idx, file_list in enumerate(files_by_folder):
-                shot_files.extend(file_list[shot: shot + files_per_shot_list[idx]])
+                shot_files.extend(file_list[shot * files_per_shot_list[idx]:
+                                            shot * files_per_shot_list[idx]
+                                            + files_per_shot_list[idx]
+                                            ]
+                                  )
             # append a copy of list
             grouped_files.append(shot_files[:])
     return grouped_files

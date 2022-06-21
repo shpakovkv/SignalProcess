@@ -161,13 +161,10 @@ def get_input_files_args_parser():
         default='',
         help='specify the directory containing data files.\n'
              'You may enter several paths after this flag.\n'
-             'Each folder mast contain the same number of shots.\n'
+             'Each folder MUST contain the same number of shots.\n'
              'Each folder may contain more than 1 file per shot.\n'
-             'For example: 4 files per shot from 4 channels of \n'
-             'one oscilloscope in first folder;\n'
-             ' and 1 files per shot in second folder, where \n'
-             'each file contain 4 curves (8 columns) from another\n'
-             'oscilloscope. \n'
+             'Files in each folder MUST be sorted the same way: \n'
+             'by channel or by shot number.\n'
              'Default: the folder containing this code.\n\n')
 
     group = input_params_parser.add_mutually_exclusive_group(required=True)
