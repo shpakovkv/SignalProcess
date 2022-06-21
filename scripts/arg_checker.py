@@ -205,13 +205,18 @@ def global_check_offset_by_front_params(params, window=101, polyorder=3):
 
 
 def check_file_list(folder, grouped_files):
-    """Checks the list of file names, inputted by user.
+    """Checks if all files in the list of files
+    exists.
     The file names must be grouped by shots.
+    Each group must have the same number of files.
     Raises an exception if any test fails.
 
-    Returns the list of full paths, grouped by shots.
-
-    grouped_files -- the list of the files, grouped by shots
+    :param folder: the path to the files
+    :param grouped_files: the list of the filenames or fullpaths,
+                          grouped by shots
+    :type grouped_files: list
+    :return: the list of full paths, grouped by shots.
+    :rtype: list
     """
     group_size = len(grouped_files[0])
     for shot_idx, shot_files in enumerate(grouped_files):
@@ -531,8 +536,10 @@ def check_delay(d, curves_count=1):
 def file_arg_check(options):
     """Needed for data file import process.
 
-    Check import files args and gro
-    ps files by shot number.
+    Checks import files parameters.
+    Groups files by shots and makes
+    and makes shots list with
+    files sublists.
     gr_files == [
                   ['shot001_osc01.wfm', 'shot001_osc02.csv', ...],
                   ['shot002_osc01.wfm', 'shot002_osc02.csv', ...],
@@ -541,12 +548,10 @@ def file_arg_check(options):
 
     Checks:
     --input-files,
-
     --source-dir,
     --ext,
     --grouped-by,
     --sorted-by-channel,
-
     --partial-import
     --as-log-sequence
 
@@ -558,9 +563,11 @@ def file_arg_check(options):
     """
     # input directory and files check
     if options.src_dir:
-        options.src_dir = options.src_dir.strip()
-        assert os.path.isdir(options.src_dir), \
-            "Can not find directory {}".format(options.src_dir)
+        dir_list = list()
+        for value in options.src_dir:
+            dir_list.append(value.strip())
+            assert os.path.isdir(value), \
+                "Can not find directory {}".format(value)
     if options.files:
         gr_files = check_file_list(options.src_dir, options.files)
         if not options.src_dir:
@@ -576,7 +583,7 @@ def file_arg_check(options):
         assert (options.group_size == 1), ("When importing logger data "
                                            "files, all specified files "
                                            "must belong to one group "
-                                           "(logger).")
+                                           "(--groped-by 1).")
 
     assert len(options.gr_files) > 0, "No data files found!"
 

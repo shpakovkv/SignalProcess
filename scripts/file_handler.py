@@ -246,35 +246,67 @@ def parse_filename(name):
     return match_list
 
 
-def get_grouped_file_list(folder, ext_list, group_size, sorted_by_ch=False):
+def get_grouped_file_list(dir_list, ext_list, group_size, sorted_by_ch=False):
     """Return the list of files grouped by shots.
 
-    dir             -- the directory containing the target files
-    group_size      -- the size of the groups (number of
+    :param dir_list: the list of directories containing data files
+    :type dir_list: list
+    :param ext_list: list of target files extensions
+                     (ignores other files in folder)
+    :type ext_list: list
+    :param group_size: the size of the groups (number of
                        files for each shot)
-    sorted_by_ch    -- this options tells the program that the files
-                       are sorted by the oscilloscope/channel
-                       (firstly) and by the shot number (secondly).
-                       By default, the program considers that the
-                       files are sorted by the shot number (firstly)
-                       and by the oscilloscope/channel (secondly).
+    :type group_size: int
+    :param sorted_by_ch: this options tells the program that the files
+                        are sorted by the oscilloscope/channel
+                        firstly and by the shot number secondly.
+                        By default, the program considers that the
+                        files are sorted by the shot number firstly
+                        and by the oscilloscope/channel secondly.
+    :type sorted_by_ch: bool
+    :return: list of grouped (sublists) by shot files
+    :rtype: list
     """
-    assert folder, ("Specify the directory (-d) containing the "
-                    "data files. See help for more details.")
-    file_list = get_file_list_by_ext(folder, ext_list, sort=True)
-    assert len(file_list) % group_size == 0, \
-        ("The number of data files ({}) in the specified folder "
-         "is not a multiple of group size ({})."
-         "".format(len(file_list), group_size))
-    grouped_files = []
+    number_of_files = 0
+    files_by_folder = list()
+    # get lists of files and summary number of files
+    for idx, folder in enumerate(dir_list):
+        files_by_folder.append(get_file_list_by_ext(folder, ext_list, sort=True))
+        count = len(files_by_folder[idx])
+        number_of_files += count
+
+    # check summary number of files
+    shots_count = number_of_files // group_size
+    assert number_of_files % group_size == 0, \
+        "The summary number of data files ({}) in the " \
+        "specified folder(s) is not a multiple of group " \
+        "size ({}).".format(number_of_files, group_size)
+
+    # check number of files in each folder
+    files_per_shot_list = list()
+    for idx, file_list in enumerate(files_by_folder):
+        files_per_shot_list.append(len(file_list) // shots_count)
+        assert len(file_list) % shots_count == 0, \
+            "The number of data files ({}) in the folder '{}'" \
+            "is not a multiple of the number of shots ({})." \
+            "".format(len(file_list), dir_list[idx], shots_count)
+
+    grouped_files = list()
     if sorted_by_ch:
-        shots_count = len(file_list) // group_size
         for shot in range(shots_count):
-            grouped_files.append([file_list[idx] for idx in
+            shot_files = list()
+            for file_list in files_by_folder:
+                shot_files.extend([file_list[idx] for idx in
                                   range(shot, len(file_list), shots_count)])
+            # append a copy of list
+            grouped_files.append(shot_files[:])
     else:
-        for idx in range(0, len(file_list), group_size):
-            grouped_files.append(file_list[idx: idx + group_size])
+        for shot in range(shots_count):
+            shot_files = list()
+            for idx, file_list in enumerate(files_by_folder):
+                shot_files.extend(file_list[shot: shot + files_per_shot_list[idx]])
+            # append a copy of list
+            grouped_files.append(shot_files[:])
     return grouped_files
 
 
