@@ -578,6 +578,8 @@ def file_arg_check(options):
                                            "must belong to one group "
                                            "(logger).")
 
+    assert len(options.gr_files) > 0, "No data files found!"
+
     # Now we have the list of files, grouped by shots
     return options
 
