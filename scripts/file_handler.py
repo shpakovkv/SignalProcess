@@ -736,7 +736,7 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
     return save_as
 
 
-def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list=None):
+def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list=None, add_header=False):
     """Saves SignalsData to a CSV file.
     First three lines will be filled with header:
         1) the labels
@@ -770,20 +770,21 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
     with open(filename, 'w') as fid:
         lines = []
         # add headers
-        labels = [signals.curves[idx].label for
-                  idx in signals.idx_to_label.keys()]
+        if add_header:
+            labels = [signals.curves[idx].label for
+                      idx in signals.idx_to_label.keys()]
+            # replaces forbidden characters
+            labels = [re.sub(r'[^-.\w_]', '_', label) for label in labels]
+            labels = delimiter.join(labels) + "\n"
+            units = [signals.curves[idx].unit for
+                     idx in signals.idx_to_label.keys()]
+            units = [re.sub(r'[^-.\w_]', '_', unit) for unit in units]
+            units = delimiter.join(units) + "\n"
+            time_unit = "{}\n".format(signals.time_units)
+            lines.append(labels)
+            lines.append(units)
+            lines.append(time_unit)
 
-        # replaces forbidden characters
-        labels = [re.sub(r'[^-.\w_]', '_', label) for label in labels]
-        labels = delimiter.join(labels) + "\n"
-        units = [signals.curves[idx].unit for
-                 idx in signals.idx_to_label.keys()]
-        units = [re.sub(r'[^-.\w_]', '_', unit) for unit in units]
-        units = delimiter.join(units) + "\n"
-        time_unit = "{}\n".format(signals.time_units)
-        lines.append(labels)
-        lines.append(units)
-        lines.append(time_unit)
         # add data
         for row in range(table.shape[0]):
             s = delimiter.join([value_format % table[row, col] for

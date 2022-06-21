@@ -105,6 +105,14 @@ def get_output_args_parser():
              '        if this argument was specified.\n'
              'NOTE 2: this option can be used with --separate-save\n\n')
 
+    output_params_parser.add_argument(
+        '--add-header',
+        action='store_true',
+        default=False,
+        dest='add_header',
+        help='Adds header to output csv fuiles \n'
+             '<currently not working>\n\n')
+
     return output_params_parser
 
 
