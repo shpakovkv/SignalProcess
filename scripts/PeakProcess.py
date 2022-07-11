@@ -907,9 +907,10 @@ def do_job(args, shot_idx):
                                      labels=args.labels,
                                      units=args.units,
                                      time_units=args.time_units,
-                                     verbose=verbose)
-    if verbose:
-        print("The number of curves = {}".format(data.cnt_curves))
+                                     # verbose=verbose
+                                     )
+    # if verbose:
+    #     print("The number of curves = {}".format(data.cnt_curves))
 
     # checks the number of columns with data,
     # and the number of multipliers, delays, labels
@@ -1228,15 +1229,17 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
     peaks[front_param["cur1"]] = front_points[0]
     peaks[front_param["cur2"]] = front_points[1]
 
+    the_delay = None
     if all(val is not None for val in front_points):
-        the_delay = front_points[1][0].time - front_points[0][0].time
-    else:
-        the_delay = None
+        if front_points[1][0] is not None and front_points[0][0] is not None:
+            the_delay = front_points[1][0].time - front_points[0][0].time
 
     if verbose:
-        print("DELAY of the {}'s {} front at {} [{}] "
-              "relative to the {}'s {} front at {} [{}] = {:.3f} {}"
-              "".format(data.get_curve_label(front_param["cur2"]),
+        print()
+        print("{} DELAY of the {}'s {} front at {} [{}] "
+              "relative to the {}'s {} front at {} [{}] = {} {}"
+              "".format(shot_idx,
+                        data.get_curve_label(front_param["cur2"]),
                         front_param["slope2"],
                         front_param["level2"],
                         data.get_curve_units(front_param["cur2"]),
@@ -1244,7 +1247,7 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
                         front_param["slope1"],
                         front_param["level1"],
                         data.get_curve_units(front_param["cur1"]),
-                        the_delay,
+                        "{:.3f}".format(the_delay) if the_delay is not None else None,
                         data.time_units))
 
     if front_param["save_to"] is not None:

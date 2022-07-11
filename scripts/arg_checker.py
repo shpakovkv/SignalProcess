@@ -568,6 +568,7 @@ def file_arg_check(options):
             dir_list.append(value.strip())
             assert os.path.isdir(value), \
                 "Can not find directory {}".format(value)
+
     if options.files:
         gr_files = check_file_list(options.src_dir, options.files)
         if not options.src_dir:
@@ -783,6 +784,7 @@ def check_utility_args(options):
     if options.hide_all:
         options.p_hide = True
         options.mp_hide = True
+        options.mcp_hide = True
         options.peak_hide = True
 
         # select non-interactive offset by curve front process

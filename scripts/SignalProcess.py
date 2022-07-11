@@ -513,9 +513,17 @@ def get_front_point(signals_data, args, multiplier, delay,
                          units=[curve.get_curve_units(0)],
                          time_units=curve.time_units)
 
+    peaks = [None, None]
+    peaks[0] = [front_point]
+    """peaks is the list of single curve peaks (list)
+    peaks[curve_idx][peak_idx] == SinglePeak instance
+    
+    if curve has no peaks then peaks[curve] == None
+    """
+    # sent to plot only two curves
     plotter.plot_multiple_curve(curve,
                                 curve_list=[0, 1],
-                                peaks=[front_point],
+                                peaks=peaks,
                                 title=plot_title)
 
     plt.savefig(front_plot_name, dpi=400)
