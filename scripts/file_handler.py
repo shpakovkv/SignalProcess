@@ -984,8 +984,13 @@ def save_m_log(src, saved_as, labels, multiplier=None, delays=None,
     # log folder path
     save_log_as = os.path.join(os.path.dirname(saved_as),
                                LOGDIRECTORY)
+
     if not os.path.isdir(save_log_as):
-        os.makedirs(save_log_as)
+        # another thread may have already created the folder
+        try:
+            os.makedirs(save_log_as)
+        except FileExistsError as e:
+            assert os.path.isdir(save_log_as), e.strerror
 
     # log file path
     save_log_as = os.path.join(save_log_as,
