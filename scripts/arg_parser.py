@@ -724,8 +724,8 @@ def get_front_args_parser():
         type=float,
         dest='front_delay',
         default=None,
-        help='Calculates the delay between two fronts \n'
-             'of the selected curves. \n'
+        help='Calculates the delay between two edges \n'
+             'of two selected curves. \n'
              'You may select different front of the same curve.\n'
              '1. Specify curve1 zero-based index.\n'
              '2. Specify the level of the first front.\n'
@@ -733,6 +733,7 @@ def get_front_args_parser():
              '   The front will be detected only if \n'
              '   if the signal\'s amplitude exceeds this level\'s value\n'
              '   (for rising front) or falls below it (for falling front). \n'
+             '   Linear approximation are used to get the exact time.\n'
              '3. Specify the front slope. Enter any positive number for \n'
              '   rising slope or any negative number for falling slope.\n'
              '4. Repeat steps 1-3 for second front.\n'

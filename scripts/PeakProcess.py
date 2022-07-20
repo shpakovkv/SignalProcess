@@ -108,8 +108,13 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
         return idx if side == 'right' else idx - 1
 
 
-def level_excess(x, y, level, start=0, step=1,
-                 window=0, rising_front=True):
+def level_excess(x,
+                 y,
+                 level,
+                 start=0,
+                 step=1,
+                 window=0,
+                 rising_front=True):
     """Checks if 'Y' values excess 'level' value 
     for 'X' in range from X(start) to X(start) + window
     OR for x in range from X(start) - window to X(start)
@@ -123,6 +128,8 @@ def level_excess(x, y, level, start=0, step=1,
                         step < 0: checks elements to the LEFT from start idx
     :param window:      check window width
     :param rising_front:front type, rising (True) or falling (False)
+
+
     :type x:            array-like
     :type y:            array-like
     :type level:        float, int ''same as param y''
@@ -159,6 +166,7 @@ def level_excess(x, y, level, start=0, step=1,
             if y[idx] < level:
                 return True, idx
         idx += step
+
     if idx == len(y):
         idx -= 1
     return False, idx
@@ -223,6 +231,7 @@ def check_polarity(curve, time_bounds=(None, None)):
 def find_curve_front(curve,
                      level,
                      front="auto",
+                     interpolate=False,
                      save_plot=False,
                      plot_name="voltage_front.png"):
     """Find time point (x) of voltage curve edge at specific level
@@ -235,12 +244,15 @@ def find_curve_front(curve,
     :param curve: curve data
     :param level: amplitude value to find
     :param front: the polarity of the curve
+    :param interpolate: if false finds the nearest curve point,
+                        if true finds the exact time using a linear approximation
     :param save_plot: bool flag
     :param plot_name: plot full file name to save as
     
     :type curve: SingleCurve
     :type level: float
     :type front: str "rise"/"fall"/"auto"
+    :type interpolate: bool
     :type save_plot: bool
     :type plot_name: str
     
@@ -294,19 +306,53 @@ def find_curve_front(curve,
         front_checked, idx = level_excess(curve.time, curve.val, level,
                                           rising_front=is_rising)
 
+    front_time = curve.time[idx]
+    front_val = curve.val[idx]
+
+    if front_checked and interpolate:
+        if idx > 0 and idx < len(curve.time) - 1:
+            front_val = level
+            front_time = get_front_time_with_aprox(curve.time[idx - 1],
+                                                   curve.val[idx - 1],
+                                                   curve.time[idx],
+                                                   curve.val[idx],
+                                                   level)
+
     if front_checked:
         if save_plot:
             plt.close('all')
             plt.plot(curve.time, curve.val, '-b')
-            plt.plot([curve.time[idx]], [curve.val[idx]], '*r')
+            plt.plot([front_time], [front_val], '*r')
             # plt.show()
             folder = os.path.dirname(plot_name)
             if folder != "" and not os.path.isdir(folder):
                 os.makedirs(folder)
             plt.savefig(plot_name)
             plt.close('all')
-        return curve.time[idx], curve.val[idx]
+        return front_time, front_val
     return None, None
+
+
+def get_front_time_with_aprox(time1, amp1, time2, amp2, target_amp):
+    assert time2 > time1, \
+        "Time1 must be less than time2."
+    assert max(amp1, amp2) >= target_amp >= min(amp1, amp2), \
+        "Target amplitude is out of range for given two points [{}, {}]" \
+        "".format(amp1, amp2)
+
+    if amp1 == target_amp:
+        return time1
+    if amp2 == target_amp:
+        return time2
+    if amp2 == amp1:
+        return time2
+
+    # rising edge
+    # if amp2 > amp1:
+    proportion = (target_amp - amp1) / (amp2 - amp1)
+    target_time = time1 + proportion * (time2 - time1)
+
+    return target_time
 
 
 def peak_finder(x, y, level, diff_time, time_bounds=(None, None),
@@ -1097,7 +1143,10 @@ def main():
     print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
 
 
-def get_two_fronts_delay(curve1, level1, front1, curve2, level2, front2, save=False, plot_name="voltage_front", verbose=True):
+def get_two_fronts_delay(curve1, level1, front1,
+                         curve2, level2, front2,
+                         interpolate=False,
+                         save=False, plot_name="voltage_front", verbose=True):
     """Finds the falling or rising edge for the first and second curve,
     calculates the delay between the first edge and the second at the appropriate levels.
     May prints information during the process.
@@ -1121,6 +1170,10 @@ def get_two_fronts_delay(curve1, level1, front1, curve2, level2, front2, save=Fa
     :param front2: second front type: rising (positive number) or falling (negative number)
     :type front2: int
 
+    :param interpolate: if false finds the nearest curve point,
+                        if true finds the exact time using a linear approximation
+    :type interpolate: bool
+
     :param save: save two plots with first front point and second one
     :type save: bool
 
@@ -1140,6 +1193,7 @@ def get_two_fronts_delay(curve1, level1, front1, curve2, level2, front2, save=Fa
     x1, y1 = find_curve_front(curve1,
                               level=level1,
                               front=front1,
+                              interpolate=interpolate,
                               save_plot=save,
                               plot_name=save_as)
 
@@ -1147,6 +1201,7 @@ def get_two_fronts_delay(curve1, level1, front1, curve2, level2, front2, save=Fa
     x2, y2 = find_curve_front(curve2,
                               level=level2,
                               front=front2,
+                              interpolate=interpolate,
                               save_plot=save,
                               plot_name=save_as)
     front_points = list()
@@ -1286,6 +1341,7 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
                                         data.get_single_curve(cur2),
                                         level2,
                                         slope2,
+                                        interpolate=True,
                                         save=False,
                                         verbose=False)
     # front_points is the list of list of SinglePeaks
