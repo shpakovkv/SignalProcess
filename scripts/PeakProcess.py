@@ -30,7 +30,7 @@ from multiprocessing import Pool
 from itertools import repeat
 
 from multiplier_and_delay import multiplier_and_delay
-from data_types import SinglePeak, SignalsData
+from data_types import SinglePeak, SignalsData, SingleCurve
 from analysis import get_2d_array_stat_by_columns
 
 
@@ -135,7 +135,7 @@ def level_excess(x, y, level, start=0, step=1,
                         an index of the last checked element
     :rtype:             tuple ''(bool, int)''
     """
-
+    # TODO: speed up level_excess() with numba
     if window == 0:      # window default value
         datalen = x.shape[0] - 1
         while (start < datalen) and (np.isnan(x[start])):
@@ -221,7 +221,7 @@ def check_polarity(curve, time_bounds=(None, None)):
 
 
 def find_curve_front(curve,
-                     level=-0.2,
+                     level,
                      front="auto",
                      save_plot=False,
                      plot_name="voltage_front.png"):
@@ -267,8 +267,33 @@ def find_curve_front(curve,
         #     level = -abs(level)
 
     is_rising = True if front == "rise" else False
-    front_checked, idx = level_excess(curve.time, curve.val, level,
-                                      rising_front=is_rising)
+
+    front_checked = False
+    idx = 0
+
+    # search for rising front and the signal starts above level value
+    if is_rising and curve.val[0] >= level:
+        dropped_below, below_idx = level_excess(curve.time, curve.val, level,
+                                                rising_front=False)
+        if dropped_below:
+            front_checked, idx = level_excess(curve.time, curve.val, level,
+                                              start=below_idx + 1,
+                                              rising_front=is_rising)
+
+    # search for falling front and the signal starts below level value
+    elif not is_rising and curve.val[0] <= level:
+        rose_above, above_idx = level_excess(curve.time, curve.val, level,
+                                             rising_front=True)
+        if rose_above:
+            front_checked, idx = level_excess(curve.time, curve.val, level,
+                                              start=above_idx + 1,
+                                              rising_front=is_rising)
+
+    # normal condition
+    else:
+        front_checked, idx = level_excess(curve.time, curve.val, level,
+                                          rising_front=is_rising)
+
     if front_checked:
         if save_plot:
             plt.close('all')
@@ -1072,14 +1097,53 @@ def main():
     print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
 
 
-def print_front_delay(curve1, level1, front1, curve2, level2, front2, save=False, prefix="voltage_front", verbose=True):
-    save_as = prefix + ".png"
+def get_two_fronts_delay(curve1, level1, front1, curve2, level2, front2, save=False, plot_name="voltage_front", verbose=True):
+    """Finds the falling or rising edge for the first and second curve,
+    calculates the delay between the first edge and the second at the appropriate levels.
+    May prints information during the process.
+    May saves plots with front points.
+
+    :param curve1: first curve, to get the front point
+    :type curve1: SingleCurve
+
+    :param level1: first front trigger level
+    :type level1: float
+
+    :param front1: first front type: rising (positive number) or falling (negative number)
+    :type front1: int
+
+    :param curve2: second curve, to get the front point
+    :type curve2: SingleCurve
+
+    :param level2: second front trigger level
+    :type level2: float
+
+    :param front2: second front type: rising (positive number) or falling (negative number)
+    :type front2: int
+
+    :param save: save two plots with first front point and second one
+    :type save: bool
+
+    :param plot_name: plot name without extension
+    :type plot_name: str
+
+    :param verbose: print fronts delay information or not
+    :type verbose: bool
+
+    :return: list of lists with SinglePeaks,
+    return[front_idx][peak_idx]
+    where front_idx == 0 or 1 and peak_idx == 0
+
+    :rtype: list
+    """
+    save_as = plot_name + "_1st.png"
     x1, y1 = find_curve_front(curve1,
                               level=level1,
                               front=front1,
                               save_plot=save,
                               plot_name=save_as)
 
+    save_as = plot_name + "_2nd.png"
     x2, y2 = find_curve_front(curve2,
                               level=level2,
                               front=front2,
@@ -1216,18 +1280,21 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
     cur2 = front_param["cur2"]
     level2 = front_param["level2"]
     slope2 = front_param["slope2"]
-    front_points = print_front_delay(data.get_single_curve(cur1),
-                                     level1,
-                                     slope1,
-                                     data.get_single_curve(cur2),
-                                     level2,
-                                     slope2,
-                                     save=False,
-                                     verbose=False)
+    front_points = get_two_fronts_delay(data.get_single_curve(cur1),
+                                        level1,
+                                        slope1,
+                                        data.get_single_curve(cur2),
+                                        level2,
+                                        slope2,
+                                        save=False,
+                                        verbose=False)
     # front_points is the list of list of SinglePeaks
     # front_points[curve_idx][peak_idx]
-    peaks[front_param["cur1"]] = front_points[0]
-    peaks[front_param["cur2"]] = front_points[1]
+    if cur1 == cur2:
+        peaks[front_param["cur1"]] = [front_points[0][0], front_points[1][0]]
+    else:
+        peaks[front_param["cur1"]] = front_points[0]
+        peaks[front_param["cur2"]] = front_points[1]
 
     the_delay = None
     if all(val is not None for val in front_points):
@@ -1260,11 +1327,19 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
                               )
         save_as = os.path.join(front_param["save_to"], plot_name)
 
-        plotter.plot_multiplot(data,
-                               peaks,
-                               (front_param["cur1"], front_param["cur2"]),
-                               unixtime=args.unixtime,
-                               hide=True)
+        if cur1 == cur2:
+            plotter.plot_multiple_curve(data,
+                                        (front_param["cur1"]),
+                                        peaks=peaks,
+                                        unixtime=args.unixtime,
+                                        hide=True)
+        else:
+            plotter.plot_multiplot(data,
+                                   peaks,
+                                   (front_param["cur1"], front_param["cur2"]),
+                                   unixtime=args.unixtime,
+                                   hide=True)
+
         if not os.path.isdir(front_param["save_to"]):
             os.makedirs(front_param["save_to"])
         plt.savefig(save_as, dpi=400)

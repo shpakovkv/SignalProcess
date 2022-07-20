@@ -27,7 +27,7 @@ from multiprocessing import Pool
 
 from multiplier_and_delay import *
 
-from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, print_front_delay, print_pulse_duration
+from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, get_two_fronts_delay, print_pulse_duration
 from analysis import do_correlate, do_correlate_part
 
 verbose = True
@@ -757,15 +757,15 @@ def full_process(args, shot_idx, num_mask):
     # ------   GET FRONT DELAY   ---------------------------------------------
     # ========================================================================
     # peaks = [None] * data.cnt_curves
-    # # front_points = print_front_delay(data.get_single_curve(1), 1.0, "rise",
-    # #                                  data.get_single_curve(2), 1.0, "rise",
-    # #                                  save=True, prefix="fronts_"+shot_name)
+    # # front_points = get_two_fronts_delay(data.get_single_curve(1), 1.0, "rise",
+    # #                                     data.get_single_curve(2), 1.0, "rise",
+    # #                                     save=True, prefix="fronts_"+shot_name)
     # # peaks[6] = front_points[0]
     # # peaks[4] = front_points[1]
     # #
-    # # front_points = print_front_delay(data.get_single_curve(1), -6.0, "fall",
-    # #                                  data.get_single_curve(4), -6.0, "fall",
-    # #                                  save=True, prefix="fronts_" + shot_name)
+    # # front_points = get_two_fronts_delay(data.get_single_curve(1), -6.0, "fall",
+    # #                                     data.get_single_curve(4), -6.0, "fall",
+    # #                                     save=True, prefix="fronts_" + shot_name)
     # # peaks[1] = front_points[0]
     #
     # # front_points = [None] * 3
