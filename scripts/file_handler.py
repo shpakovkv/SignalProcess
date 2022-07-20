@@ -282,6 +282,9 @@ def get_grouped_file_list(dir_list, ext_list, group_size, sorted_by_ch=False):
         "specified folder(s) is not a multiple of group " \
         "size ({}).".format(number_of_files, group_size)
 
+    assert shots_count > 0, \
+        "There are no data files in the specified folders!"
+
     # check number of files in each folder
     files_per_shot_list = list()
     for idx, file_list in enumerate(files_by_folder):
