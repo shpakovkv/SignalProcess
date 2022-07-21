@@ -1397,7 +1397,11 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
                                    hide=True)
 
         if not os.path.isdir(front_param["save_to"]):
-            os.makedirs(front_param["save_to"])
+            try:
+                os.makedirs(front_param["save_to"])
+            except FileExistsError as e:
+                assert os.path.isdir(front_param["save_to"]), e.strerror
+
         plt.savefig(save_as, dpi=400)
         plt.close('all')
 

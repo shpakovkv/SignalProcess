@@ -373,7 +373,10 @@ def get_front_point(signals_data, args, multiplier, delay,
     """
     # TODO: fix for new SignalsData class
     if not os.path.isdir(os.path.dirname(front_plot_name)):
-        os.makedirs(os.path.dirname(front_plot_name))
+        try:
+            os.makedirs(os.path.dirname(front_plot_name))
+        except FileExistsError as e:
+            assert os.path.isdir(os.path.dirname(front_plot_name)), e.strerror
 
     curve_idx = args[0]
     level = args[1]
