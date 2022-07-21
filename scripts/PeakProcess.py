@@ -1082,6 +1082,7 @@ def main():
 
     # try:
     args = global_check(args)
+    # print("\n\n".join("\n".join(str(val) for val in sublist) for sublist in args.gr_files))
 
     '''
     num_mask (tuple) - contains the first and last index
@@ -1115,7 +1116,28 @@ def main():
             outputs = p.starmap(do_job, zip(repeat(args), shot_list))
             if args.front_delay is not None:
                 delay_stats = get_2d_array_stat_by_columns(outputs)
+                print("----------------------------------------------------------------")
                 for idx in range(delay_stats.shape[0]):
+                    cur1 = args.front_delay[idx]["cur1"]
+                    cur2 = args.front_delay[idx]["cur2"]
+                    slope1 = args.front_delay[idx]["slope1"]
+                    slope2 = args.front_delay[idx]["slope2"]
+                    level1 = args.front_delay[idx]["level1"]
+                    level2 = args.front_delay[idx]["level2"]
+                    units1 = args.units[cur1]
+                    units2 = args.units[cur2]
+                    label1 = args.labels[cur1]
+                    label2 = args.labels[cur2]
+                    print("DELAY of the {}'s {} front at {} [{}] "
+                          "relative to the {}'s {} front at {} [{}] statistics:"
+                          "".format(label2,
+                                    slope2,
+                                    level2,
+                                    units2,
+                                    label1,
+                                    slope1,
+                                    level1,
+                                    units1))
                     print("Mean = {:.3f} {};   Std. Dev. = {:.3f} {};    "
                           "Max. Dev. = {:.3f} {};   Number of samples = {}"
                           "".format(delay_stats[idx, 0], args.time_units,
@@ -1124,6 +1146,7 @@ def main():
                                     int(delay_stats[idx, 3])
                                     )
                           )
+                    print()
 
     stop_time = time.time()
 
