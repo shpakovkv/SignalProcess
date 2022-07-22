@@ -1115,43 +1115,55 @@ def main():
         with Pool(args.threads) as p:
             outputs = p.starmap(do_job, zip(repeat(args), shot_list))
             if args.front_delay is not None:
-                delay_stats = get_2d_array_stat_by_columns(outputs)
-                print("----------------------------------------------------------------")
-                for idx in range(delay_stats.shape[0]):
-                    cur1 = args.front_delay[idx]["cur1"]
-                    cur2 = args.front_delay[idx]["cur2"]
-                    slope1 = args.front_delay[idx]["slope1"]
-                    slope2 = args.front_delay[idx]["slope2"]
-                    level1 = args.front_delay[idx]["level1"]
-                    level2 = args.front_delay[idx]["level2"]
-                    units1 = args.units[cur1]
-                    units2 = args.units[cur2]
-                    label1 = args.labels[cur1]
-                    label2 = args.labels[cur2]
-                    print("DELAY of the {}'s {} front at {} [{}] "
-                          "relative to the {}'s {} front at {} [{}] statistics:"
-                          "".format(label2,
-                                    slope2,
-                                    level2,
-                                    units2,
-                                    label1,
-                                    slope1,
-                                    level1,
-                                    units1))
-                    print("Mean = {:.3f} {};   Std. Dev. = {:.3f} {};    "
-                          "Max. Dev. = {:.3f} {};   Number of samples = {}"
-                          "".format(delay_stats[idx, 0], args.time_units,
-                                    delay_stats[idx, 1], args.time_units,
-                                    delay_stats[idx, 2], args.time_units,
-                                    int(delay_stats[idx, 3])
-                                    )
-                          )
-                    print()
-
-    stop_time = time.time()
+                print_front_delay_stats(args, outputs)
 
     # arg_checker.print_duplicates(args.gr_files)
+    stop_time = time.time()
+    print_process_time(start_time, stop_time, args)
 
+
+def print_front_delay_stats(args, outputs):
+    delay_stats = get_2d_array_stat_by_columns(outputs)
+    print("----------------------------------------------------------------")
+    for idx in range(delay_stats.shape[0]):
+        cur1 = args.front_delay[idx]["cur1"]
+        cur2 = args.front_delay[idx]["cur2"]
+        slope1 = args.front_delay[idx]["slope1"]
+        slope2 = args.front_delay[idx]["slope2"]
+        level1 = args.front_delay[idx]["level1"]
+        level2 = args.front_delay[idx]["level2"]
+        units1 = "a.u."
+        units2 = "a.u."
+        if args.units is not None:
+            units1 = args.units[cur1]
+            units2 = args.units[cur2]
+        label1 = "Curve{}".format(cur1)
+        label2 = "Curve{}".format(cur2)
+        if args.labels is not None:
+            label1 = args.labels[cur1]
+            label2 = args.labels[cur2]
+        print("DELAY of the {}'s {} front at {} [{}] "
+              "relative to the {}'s {} front at {} [{}] statistics:"
+              "".format(label2,
+                        slope2,
+                        level2,
+                        units2,
+                        label1,
+                        slope1,
+                        level1,
+                        units1))
+        print("Mean = {:.3f} {};   Std. Dev. = {:.3f} {};    "
+              "Max. Dev. = {:.3f} {};   Number of samples = {}"
+              "".format(delay_stats[idx, 0], args.time_units,
+                        delay_stats[idx, 1], args.time_units,
+                        delay_stats[idx, 2], args.time_units,
+                        int(delay_stats[idx, 3])
+                        )
+              )
+        print()
+
+
+def print_process_time(start_time, stop_time, args):
     print()
     print("--------- Finished ---------")
     spent = stop_time - start_time
@@ -1163,7 +1175,11 @@ def main():
         spent /= 60
         units = "minutes"
 
-    print("--- Time spent: {:.2f} {units} for {n} shots ---".format(spent, units=units, n=len(args.gr_files)))
+    print("--- Time spent: {:.2f} {units} for {shots} shots, {files} files. ---"
+          "".format(spent, units=units, shots=len(args.gr_files),
+                    files=sum(len(file_list) for file_list in args.gr_files)
+                    )
+          )
 
 
 def get_two_fronts_delay(curve1, level1, front1,
@@ -1381,7 +1397,7 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
             the_delay = front_points[1][0].time - front_points[0][0].time
 
     if verbose:
-        print()
+        # print()
         print("{} DELAY of the {}'s {} front at {} [{}] "
               "relative to the {}'s {} front at {} [{}] = {} {}"
               "".format(shot_idx,
