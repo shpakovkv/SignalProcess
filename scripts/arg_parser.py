@@ -13,6 +13,7 @@ Link: https://github.com/shpakovkv/SignalProcess
 # =======================================================================
 import os
 import argparse
+from typing import Union
 
 # =======================================================================
 # -----     CONST     ---------------------------------------------------
@@ -738,6 +739,21 @@ def get_front_args_parser():
              '   rising slope or any negative number for falling slope.\n'
              '4. Repeat steps 1-3 for second front.\n'
              'NOTE: You may enter as many --front-delay flag as you want.\n\n')
+
+    front_args_parser.add_argument(
+        '--front-bounds',
+        action='append',
+        dest='front_bounds',
+        metavar=('LEFT1', 'RIGHT1', 'LEFT2', 'RIGHT2'),
+        nargs=4,
+        help='Specify the left and the right time boundaries \n'
+             'for curve1 and for curve2.\n'
+             'The search for fronts will only occur within these boundaries. \n'
+             'NOTE: You MUST enter as many --front-bounds flags \n'
+             '      as you entered --front-delay flags (or not one).\n'
+             'NOTE: You may enter \'none\' without quotes instead of \n'
+             '      any number to use the corresponding boundary \n'
+             '      of the corresponding curve.\n\n')
 
     front_args_parser.add_argument(
         '--front-delay-save-plot-to',

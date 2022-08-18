@@ -844,6 +844,14 @@ def front_delay_check(options):
                 "--front-delay-save-plot-to flags, but found {}" \
                 "".format(front_delay_count, save_to_count)
 
+        if options.front_delay_save_to is not None:
+            save_to_count = len(options.front_delay_save_to)
+            assert save_to_count == front_delay_count, \
+                "You entered {} --front-delay flag(s). " \
+                "Expected the same number (or none) of " \
+                "--front-bounds flags, but found {}" \
+                "".format(front_delay_count, save_to_count)
+
         for idx in range(front_delay_count):
             front_dict = dict()
             front_dict["cur1"] = int(options.front_delay[idx][0])
@@ -852,15 +860,83 @@ def front_delay_check(options):
             front_dict["cur2"] = int(options.front_delay[idx][3])
             front_dict["level2"] = options.front_delay[idx][4]
             front_dict["slope2"] = "fall" if options.front_delay[idx][5] < 0 else "rise"
+
             save_to = None
             if options.front_delay_save_to is not None:
                 if options.front_delay_save_to[idx] and not options.front_delay_save_to[idx].lower() == "none":
                     save_to = options.front_delay_save_to[idx]
             front_dict["save_to"] = save_to
+
+            bounds1 = None
+            bounds2 = None
+            if options.front_bounds is not None:
+                # if all --front-bounds were entered
+                if options.front_bounds[idx]:
+                    bounds1, bounds2 = check_and_prepare_front_bounds(options.front_bounds[idx])
+            front_dict["bounds1"] = bounds1
+            front_dict["bounds2"] = bounds2
+
             options.front_delay[idx] = front_dict
 
     else:
         if options.front_delay_save_to is not None:
             raise ValueError("--front-delay-save-plot-to flag was specified "
                              "but no --front-delay flag were entered!")
+        if options.front_bounds is not None:
+            raise ValueError("--front-bounds flag was specified "
+                             "but no --front-delay flag were entered!")
     return options
+
+
+def check_and_prepare_front_bounds(user_entered_bounds):
+    """ Checks one --front-bounds flag values:
+        - Checks for skipping word "none" and set value to None
+        - Checks the number of values
+        - Checks that left border < right border
+
+        Returns prepared bounds.
+
+        Possible outputs:
+        [float, float]
+        [None, float]
+        [float, None]
+        None
+    """
+    # if all --front-bounds were entered
+    bounds1 = [None, None]
+    bounds2 = [None, None]
+    if user_entered_bounds:
+        tmp_bounds = user_entered_bounds
+        assert len(tmp_bounds) == 4, \
+            "You must enter four bounds (left1, right1, left2, right2) " \
+            "after the --front-bounds flag."
+
+        # check for skipping word
+        for j in range(4):
+            if isinstance(tmp_bounds[j], str):
+                if tmp_bounds[j].lower() == "none":
+                    tmp_bounds[j] = None
+                else:
+                    try:
+                        tmp_bounds[j] = float(tmp_bounds[j])
+                    except ValueError as e:
+                        raise ValueError("Wrong value entered with --front-bounds flag. "
+                                         "Expected float type or 'none' keyword, found {}"
+                                         "".format(tmp_bounds[j]))
+        bounds1[0], bounds1[1] = tmp_bounds[0], tmp_bounds[1]
+        bounds2[0], bounds2[1] = tmp_bounds[2], tmp_bounds[3]
+
+        for bounds in (bounds1, bounds2):
+            if bounds[0] is not None and bounds[1] is not None:
+                assert bounds[1] > bounds[0], \
+                    "Wrong value entered with --front-bounds flag. " \
+                    "Еhe left border is greater than or equal to the right. " \
+                    "({}, {})".format(bounds[0], bounds[1])
+
+        if all(val is None for val in bounds1):
+            bounds1 = None
+
+        if all(val is None for val in bounds2):
+            bounds2 = None
+
+    return bounds1, bounds2

@@ -231,10 +231,12 @@ def check_polarity(curve, time_bounds=(None, None)):
 def find_curve_front(curve,
                      level,
                      front="auto",
+                     bounds=None,
                      interpolate=False,
                      save_plot=False,
                      plot_name="voltage_front.png"):
     """Find time point (x) of voltage curve edge at specific level
+    within specified time bounds.
     Default: Negative polarity, -0.2 MV level
 
     "auto" front type selection means the first front of the signal:
@@ -243,7 +245,8 @@ def find_curve_front(curve,
     
     :param curve: curve data
     :param level: amplitude value to find
-    :param front: the polarity of the curve
+    :param front: the polarity of the curve "rise"/"fall"/"auto"
+    :param bounds: left and right borders to search
     :param interpolate: if false finds the nearest curve point,
                         if true finds the exact time using a linear approximation
     :param save_plot: bool flag
@@ -251,7 +254,8 @@ def find_curve_front(curve,
     
     :type curve: SingleCurve
     :type level: float
-    :type front: str "rise"/"fall"/"auto"
+    :type front: str
+    :type bounds: list or None
     :type interpolate: bool
     :type save_plot: bool
     :type plot_name: str
@@ -259,8 +263,6 @@ def find_curve_front(curve,
     :return:  (time, amplitude) or (None, None)
     :rtype: tuple(float, float)
     """
-
-    # TODO add front type: rising, falling instead of polarity property
 
     assert front == "auto" or front == "rise" or front == "fall", \
         "Error! Wrong front type entered.\n" \
@@ -283,34 +285,58 @@ def find_curve_front(curve,
     front_checked = False
     idx = 0
 
+    # bounds check
+    start = 0
+    window = 0
+    if bounds is not None:
+        if bounds[0] is not None:
+            if bounds[0] > curve.time[-1]:
+                return None, None
+            start = find_nearest_idx(curve.time, bounds[0], side='right')
+
+        if bounds[1] is not None:
+            if bounds[1] < curve.time[0]:
+                return None, None
+            stop = find_nearest_idx(curve.time, bounds[1], side='right')
+            window = stop - start + 1
+
     # search for rising front and the signal starts above level value
     if is_rising and curve.val[0] >= level:
         dropped_below, below_idx = level_excess(curve.time, curve.val, level,
+                                                start=start,
+                                                window=window,
                                                 rising_front=False)
         if dropped_below:
+            sub_window = window - below_idx + start - 1
             front_checked, idx = level_excess(curve.time, curve.val, level,
                                               start=below_idx + 1,
+                                              window=sub_window,
                                               rising_front=is_rising)
 
     # search for falling front and the signal starts below level value
     elif not is_rising and curve.val[0] <= level:
         rose_above, above_idx = level_excess(curve.time, curve.val, level,
+                                             start=start,
+                                             window=window,
                                              rising_front=True)
         if rose_above:
+            sub_window = window - above_idx + start - 1
             front_checked, idx = level_excess(curve.time, curve.val, level,
                                               start=above_idx + 1,
+                                              window=sub_window,
                                               rising_front=is_rising)
 
     # normal condition
     else:
         front_checked, idx = level_excess(curve.time, curve.val, level,
+                                          start=start,
                                           rising_front=is_rising)
 
     front_time = curve.time[idx]
     front_val = curve.val[idx]
 
     if front_checked and interpolate:
-        if idx > 0 and idx < len(curve.time) - 1:
+        if 0 < idx < len(curve.time) - 1:
             front_val = level
             front_time = get_front_time_with_aprox(curve.time[idx - 1],
                                                    curve.val[idx - 1],
@@ -1040,7 +1066,7 @@ def do_job(args, shot_idx):
 
     delay_values = None
     if args.front_delay:
-        delay_values = do_front_delay_all(data, args, shot_idx, verbose=True)
+        delay_values = do_front_delay_all(data, args, shot_name, verbose=True)
 
     if args.read:
         if verbose:
@@ -1184,6 +1210,8 @@ def print_process_time(start_time, stop_time, args):
 
 def get_two_fronts_delay(curve1, level1, front1,
                          curve2, level2, front2,
+                         bounds1=None,
+                         bounds2=None,
                          interpolate=False,
                          save=False, plot_name="voltage_front", verbose=True):
     """Finds the falling or rising edge for the first and second curve,
@@ -1197,8 +1225,8 @@ def get_two_fronts_delay(curve1, level1, front1,
     :param level1: first front trigger level
     :type level1: float
 
-    :param front1: first front type: rising (positive number) or falling (negative number)
-    :type front1: int
+    :param front1: first front type: "rise" | "fall" | "auto"
+    :type front1: str
 
     :param curve2: second curve, to get the front point
     :type curve2: SingleCurve
@@ -1206,8 +1234,14 @@ def get_two_fronts_delay(curve1, level1, front1,
     :param level2: second front trigger level
     :type level2: float
 
-    :param front2: second front type: rising (positive number) or falling (negative number)
-    :type front2: int
+    :param front2: second front type: "rise" | "fall" | "auto"
+    :type front2: str
+
+    :param bounds1: left and right borders to search for curve1
+    :type bounds1: list or None
+
+    :param bounds2: left and right borders to search for curve2
+    :type bounds2: list or None
 
     :param interpolate: if false finds the nearest curve point,
                         if true finds the exact time using a linear approximation
@@ -1232,6 +1266,7 @@ def get_two_fronts_delay(curve1, level1, front1,
     x1, y1 = find_curve_front(curve1,
                               level=level1,
                               front=front1,
+                              bounds=bounds1,
                               interpolate=interpolate,
                               save_plot=save,
                               plot_name=save_as)
@@ -1240,6 +1275,7 @@ def get_two_fronts_delay(curve1, level1, front1,
     x2, y2 = find_curve_front(curve2,
                               level=level2,
                               front=front2,
+                              bounds=bounds2,
                               interpolate=interpolate,
                               save_plot=save,
                               plot_name=save_as)
@@ -1328,7 +1364,7 @@ def do_front_delay_all(data, args, shot_idx, verbose):
         :type args: argparse.Namespace
 
         :param shot_idx: the name of current shot
-        :type shot_idx: int
+        :type shot_idx: str or int
 
         :param verbose: shows more info during the process
         :type verbose: bool
@@ -1338,12 +1374,12 @@ def do_front_delay_all(data, args, shot_idx, verbose):
         """
     front_delay_data = list()
     for idx, front_param in enumerate(args.front_delay):
-        new_delay = do_front_delay_single(data, args, front_param, shot_idx, verbose)
+        new_delay = do_front_delay_single(data, front_param, shot_idx, verbose, args.unixtime)
         front_delay_data.append(new_delay)
     return front_delay_data
 
 
-def do_front_delay_single(data, args, front_param, shot_idx, verbose):
+def do_front_delay_single(data, front_param, shot_idx, verbose, unixtime=False):
     """ Calculates delay between fronts of two signals.
     Prints the value to console.
     Saves graph of two curves with front points.
@@ -1351,17 +1387,17 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
     :param data: SignalsData instance
     :type data: SignalsData
 
-    :param args: command line arguments, entered by the user
-    :type args: argparse.Namespace
-
     :param front_param: the front delay parameters dict
     :type front_param: dict
 
     :param shot_idx: the name of current shot
-    :type shot_idx: int
+    :type shot_idx: str or int
 
     :param verbose: shows more info during the process
     :type verbose: bool
+
+    :param unixtime: specifies the type of the time column: time or unixtime
+    :type unixtime: bool
 
     :return: the delay value
     :rtype: float
@@ -1374,12 +1410,16 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
     cur2 = front_param["cur2"]
     level2 = front_param["level2"]
     slope2 = front_param["slope2"]
+    bounds1 = front_param["bounds1"]
+    bounds2 = front_param["bounds2"]
     front_points = get_two_fronts_delay(data.get_single_curve(cur1),
                                         level1,
                                         slope1,
                                         data.get_single_curve(cur2),
                                         level2,
                                         slope2,
+                                        bounds1=bounds1,
+                                        bounds2=bounds2,
                                         interpolate=True,
                                         save=False,
                                         verbose=False)
@@ -1426,13 +1466,13 @@ def do_front_delay_single(data, args, front_param, shot_idx, verbose):
             plotter.plot_multiple_curve(data,
                                         (front_param["cur1"]),
                                         peaks=peaks,
-                                        unixtime=args.unixtime,
+                                        unixtime=unixtime,
                                         hide=True)
         else:
             plotter.plot_multiplot(data,
                                    peaks,
                                    (front_param["cur1"], front_param["cur2"]),
-                                   unixtime=args.unixtime,
+                                   unixtime=unixtime,
                                    hide=True)
 
         if not os.path.isdir(front_param["save_to"]):
