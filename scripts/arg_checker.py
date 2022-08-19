@@ -833,6 +833,7 @@ def front_delay_check(options):
 
     front_delay_count = 0
     save_to_count = 0
+    bounds_count = 0
     if options.front_delay is not None:
         front_delay_count = len(options.front_delay)
 
@@ -844,13 +845,13 @@ def front_delay_check(options):
                 "--front-delay-save-plot-to flags, but found {}" \
                 "".format(front_delay_count, save_to_count)
 
-        if options.front_delay_save_to is not None:
-            save_to_count = len(options.front_delay_save_to)
-            assert save_to_count == front_delay_count, \
+        if options.front_bounds is not None:
+            bounds_count = len(options.front_bounds)
+            assert bounds_count == front_delay_count, \
                 "You entered {} --front-delay flag(s). " \
                 "Expected the same number (or none) of " \
                 "--front-bounds flags, but found {}" \
-                "".format(front_delay_count, save_to_count)
+                "".format(front_delay_count, bounds_count)
 
         for idx in range(front_delay_count):
             front_dict = dict()
