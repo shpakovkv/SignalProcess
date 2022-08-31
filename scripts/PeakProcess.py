@@ -1178,8 +1178,8 @@ def print_front_delay_stats(args, outputs):
                         slope1,
                         level1,
                         units1))
-        print("Mean = {:.3f} {};   Std. Dev. = {:.3f} {};    "
-              "Max. Dev. = {:.3f} {};   Number of samples = {}"
+        print("Mean = {:.6f} {};   Std. Dev. = {:.6f} {};    "
+              "Max. Dev. = {:.6f} {};   Number of samples = {}"
               "".format(delay_stats[idx, 0], args.time_units,
                         delay_stats[idx, 1], args.time_units,
                         delay_stats[idx, 2], args.time_units,
@@ -1403,6 +1403,8 @@ def do_front_delay_single(data, front_param, shot_idx, verbose, unixtime=False):
     :rtype: float
     """
 
+    print_format = "{:.6f}"
+
     peaks = [None] * data.cnt_curves
     cur1 = front_param["cur1"]
     level1 = front_param["level1"]
@@ -1449,7 +1451,7 @@ def do_front_delay_single(data, front_param, shot_idx, verbose, unixtime=False):
                         front_param["slope1"],
                         front_param["level1"],
                         data.get_curve_units(front_param["cur1"]),
-                        "{:.3f}".format(the_delay) if the_delay is not None else None,
+                        print_format.format(the_delay) if the_delay is not None else None,
                         data.time_units))
 
     if front_param["save_to"] is not None:
