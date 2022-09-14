@@ -17,6 +17,7 @@ import sys
 import numpy
 import bisect
 import argparse
+import time
 
 import numpy as np
 import scipy.integrate as integrate
@@ -1093,61 +1094,6 @@ def do_job(args, shot_idx):
     return delay_values
 
 
-def main():
-    parser = get_parser()
-
-    # # for debugging
-    # file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
-    # with open(file_name) as fid:
-    #     file_lines = [line.strip() for line in fid.readlines()]
-    # args = parser.parse_args(file_lines)
-
-    args = parser.parse_args()
-
-    verbose = not args.silent
-
-    # try:
-    args = global_check(args)
-    # print("\n\n".join("\n".join(str(val) for val in sublist) for sublist in args.gr_files))
-
-    '''
-    num_mask (tuple) - contains the first and last index
-    of substring of filenameplt.show
-    That substring contains the shot number.
-    The last idx is excluded: [first, last).
-    Read numbering_parser docstring for more info.
-    '''
-
-    num_mask = file_handler.numbering_parser([files[0] for
-                                              files in args.gr_files])
-    args_dict = vars(args)
-    args_dict["num_mask"] = num_mask
-
-    if args.hide_all:
-        # by default backend == Qt5Agg
-        # savefig() time for Qt5Agg == 0.926 s
-        #                for Agg == 0.561 s
-        # for single curve with 10000 points and one peak
-        # run on Intel Core i5-4460 (average for 100 runs)
-        # measured by cProfile
-        matplotlib.use("Agg")
-
-    # MAIN LOOP
-    import time
-    start_time = time.time()
-    if args.level or args.read or args.front_delay:
-
-        shot_list = [shot_idx for shot_idx in range(len(args.gr_files))]
-        with Pool(args.threads) as p:
-            outputs = p.starmap(do_job, zip(repeat(args), shot_list))
-            if args.front_delay is not None:
-                print_front_delay_stats(args, outputs)
-
-    # arg_checker.print_duplicates(args.gr_files)
-    stop_time = time.time()
-    print_process_time(start_time, stop_time, args)
-
-
 def print_front_delay_stats(args, outputs):
     delay_stats = get_2d_array_stat_by_columns(outputs)
     print("----------------------------------------------------------------")
@@ -1487,6 +1433,60 @@ def do_front_delay_single(data, front_param, shot_idx, verbose, unixtime=False):
         plt.close('all')
 
     return the_delay
+
+
+def main():
+    parser = get_parser()
+
+    # # for debugging
+    # file_name = '/home/shpakovkv/Projects/PythonSignalProcess/untracked/args/peak_20150515N99.arg'
+    # with open(file_name) as fid:
+    #     file_lines = [line.strip() for line in fid.readlines()]
+    # args = parser.parse_args(file_lines)
+
+    args = parser.parse_args()
+
+    verbose = not args.silent
+
+    # try:
+    args = global_check(args)
+    # print("\n\n".join("\n".join(str(val) for val in sublist) for sublist in args.gr_files))
+
+    '''
+    num_mask (tuple) - contains the first and last index
+    of substring of filenameplt.show
+    That substring contains the shot number.
+    The last idx is excluded: [first, last).
+    Read numbering_parser docstring for more info.
+    '''
+
+    num_mask = file_handler.numbering_parser([files[0] for
+                                              files in args.gr_files])
+    args_dict = vars(args)
+    args_dict["num_mask"] = num_mask
+
+    if args.hide_all:
+        # by default backend == Qt5Agg
+        # savefig() time for Qt5Agg == 0.926 s
+        #                for Agg == 0.561 s
+        # for single curve with 10000 points and one peak
+        # run on Intel Core i5-4460 (average for 100 runs)
+        # measured by cProfile
+        matplotlib.use("Agg")
+
+    # MAIN LOOP
+    start_time = time.time()
+    if args.level or args.read or args.front_delay:
+
+        shot_list = [shot_idx for shot_idx in range(len(args.gr_files))]
+        with Pool(args.threads) as p:
+            outputs = p.starmap(do_job, zip(repeat(args), shot_list))
+            if args.front_delay is not None:
+                print_front_delay_stats(args, outputs)
+
+    # arg_checker.print_duplicates(args.gr_files)
+    stop_time = time.time()
+    print_process_time(start_time, stop_time, args)
 
 
 if __name__ == '__main__':

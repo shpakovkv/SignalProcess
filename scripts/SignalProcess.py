@@ -832,8 +832,9 @@ def full_process(args, shot_idx, num_mask):
 # ============================================================================
 # --------------   MAIN    ----------------------------------------
 # ======================================================
-if __name__ == "__main__":
 
+
+def main():
     parser = get_parser()
     args = parser.parse_args()
     verbose = not args.silent
@@ -867,12 +868,12 @@ if __name__ == "__main__":
             p.starmap(convert_only, [(args, shot_idx, num_mask) for shot_idx in range(len(args.gr_files))])
 
     elif (args.save or
-            args.plot or
-            args.multiplot or
-            args.multicurve or
-            args.offset_by_front or
-            args.correlate or
-            args.correlate_part):
+          args.plot or
+          args.multiplot or
+          args.multicurve or
+          args.offset_by_front or
+          args.correlate or
+          args.correlate_part):
 
         with Pool(args.threads) as p:
             p.starmap(full_process, [(args, shot_idx, num_mask) for shot_idx in range(len(args.gr_files))])
@@ -884,6 +885,10 @@ if __name__ == "__main__":
     #     print()
     #     sys.exit(e)
     # ========================================================================
+
+
+if __name__ == "__main__":
+    main()
     # TODO: description
     # TODO: file names validity check
     # TODO: test plot and multiplot save
