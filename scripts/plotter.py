@@ -579,11 +579,16 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
 
     if xlim is not None and xlim[0] is not None and xlim[1] is not None:
         plt.xlim(xlim)
+    else:
+        # simplify checks
+        xlim = None
+
     color_iter = iter(ColorRange())
 
     if isinstance(curve_list, int):
         curve_list = [curve_list]
 
+    ylim = None
     for curve_idx in curve_list:
         if len(curve_list) > 1:
             color = next(color_iter)
@@ -602,6 +607,21 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
                      '-',
                      label=signals.get_curve_label(curve_idx),
                      color=color, linewidth=1)
+
+        # calc max amplitude limits (+10%) for all plotted curves
+        if xlim is not None:
+            new_ylim = calc_y_lim(signals.get_x(curve_idx),
+                                  signals.get_y(curve_idx),
+                                  xlim,
+                                  reserve=0.1)
+            if ylim is None:
+                ylim = list(new_ylim)
+            else:
+                if ylim[0] > new_ylim[0]:
+                    ylim[0] = new_ylim[0]
+                if ylim[1] < new_ylim[1]:
+                    ylim[1] = new_ylim[1]
+
         # if peaks is not None:
         #     if peaks[curve_idx] is not None:
         #         peak_x = [peak.time for peak in peaks[curve_idx] if peak is not None]
@@ -646,7 +666,6 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
                         plt.scatter([pk.time], [pk.val], s=60, edgecolors='#dd3328',
                                     facecolors='none', linewidths=2)
 
-
         axes_obj = plt.gca()
         axes_obj.tick_params(direction='in', top=True, right=True)
         if unixtime:
@@ -654,6 +673,10 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
             axes_obj.xaxis.set_major_formatter(dt_fmt)      # set format
             plt.subplots_adjust(bottom=0.22)                # make more space for datetime values
             plt.xticks(rotation=25)                         # rotate long datetime values to avoid overlapping
+
+    if ylim is not None:
+        axes_obj = plt.gca()
+        axes_obj.set_ylim(ylim)
 
     time_label = "Time"
     amp_label = "Amplitude"
@@ -931,8 +954,10 @@ def plot_multiplot_independent(list_of_2d_arrays,
         if xlim is not None:
             axes[icurve, 0].set_xlim(xlim[icurve])
             axes[icurve, 0].set_ylim(calc_y_lim(data[0],
-                                     data[1],
-                                     xlim[icurve], reserve=0.1))
+                                                data[1],
+                                                xlim[icurve],
+                                                reserve=0.1)
+                                     )
         # y label (units only)
         if amp_units is None:
             axes[icurve, 0].set_ylabel('a.u.', size=10, rotation='horizontal')
