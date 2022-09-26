@@ -302,7 +302,7 @@ def find_curve_front(curve,
             window = stop - start + 1
 
     # search for rising front and the signal starts above level value
-    if is_rising and curve.val[0] >= level:
+    if is_rising and curve.val[start] >= level:
         dropped_below, below_idx = level_excess(curve.time, curve.val, level,
                                                 start=start,
                                                 window=window,
@@ -315,7 +315,7 @@ def find_curve_front(curve,
                                               rising_front=is_rising)
 
     # search for falling front and the signal starts below level value
-    elif not is_rising and curve.val[0] <= level:
+    elif not is_rising and curve.val[start] <= level:
         rose_above, above_idx = level_excess(curve.time, curve.val, level,
                                              start=start,
                                              window=window,
@@ -364,8 +364,8 @@ def get_front_time_with_aprox(time1, amp1, time2, amp2, target_amp):
     assert time2 > time1, \
         "Time1 must be less than time2."
     assert max(amp1, amp2) >= target_amp >= min(amp1, amp2), \
-        "Target amplitude is out of range for given two points [{}, {}]" \
-        "".format(amp1, amp2)
+        "Target amplitude ({}) is out of range for given two points [{}, {}]" \
+        "".format(target_amp, amp1, amp2)
 
     if amp1 == target_amp:
         return time1
