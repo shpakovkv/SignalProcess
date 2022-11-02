@@ -9,6 +9,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import dates as md
+from matplotlib.cm import get_cmap
 import bisect
 import colorsys
 import argparse
@@ -583,7 +584,11 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
         # simplify checks
         xlim = None
 
-    color_iter = iter(ColorRange())
+    # color_iter = iter(ColorRange())
+    cmap = get_cmap("tab20")
+    color_list = list(cmap.colors[::2])
+    color_list.extend(cmap.colors[1::2])
+    color_iter = iter(color_list)
 
     if isinstance(curve_list, int):
         curve_list = [curve_list]
@@ -737,13 +742,19 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
     if stop - start < 1:
         return -1, 1
     local_y = y[start:stop]
-    y_max = np.nanmax(local_y[local_y != np.inf])
-    y_min = np.nanmin(local_y[local_y != -np.inf])
+    y_max = 0
+    y_min = 0
+
+    if len(local_y[local_y != np.inf]) > 0:
+        y_max = np.nanmax(local_y[local_y != np.inf])
+    if len(local_y[local_y != -np.inf]) > 0:
+        y_min = np.nanmin(local_y[local_y != -np.inf])
     y_range = y_max - y_min
-    reserve *= y_range
+    if y_range > 0:
+        reserve *= y_range
     if y_max == 0 and y_min == 0:
-        y_max = 1.4
-        y_min = -1.4
+        y_max = 1.0
+        y_min = -1.0
     return y_min - reserve, y_max + reserve
 
 
