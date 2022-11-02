@@ -500,7 +500,6 @@ def read_signals(file_list, start=0, step=1, points=-1,
 
         if verbose:
             print(current_labels)
-
         data.add_from_array(new_data.transpose(), current_labels, current_units, current_time_units,
                             force_single_time_row=single_time_column)
 
@@ -824,13 +823,44 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
             lines.append(units)
             lines.append(time_unit)
 
-        # add data
+        # handle empty files
+        if table.shape[0] == 1 and table.size - np.isnan(table).sum() == 0:
+            table = make_zero_data(table.shape[1], rows=10)
+            # table = table.transpose()
+
+        # add lines with data
         for row in range(table.shape[0]):
             s = delimiter.join([value_format % table[row, col] for
                                 col in range(table.shape[1])]) + "\n"
             s = re.sub(r'nan', '', s)
             lines.append(s)
         fid.writelines(lines)
+
+
+def make_zero_data(columns, rows=10, dtype=np.float64, single_time_column=False):
+    """
+
+    :param columns:
+    :type columns:
+    :param rows:
+    :type rows:
+    :param dtype:
+    :type dtype:
+    :param single_time_column:
+    :type single_time_column:
+    :return:
+    :rtype:
+    """
+    data = np.zeros(shape=(rows, 1), dtype=np.float64)
+    for idx in range(rows):
+        data[idx, 0] = idx
+
+    for idx in range(1, columns):
+        if idx % 2 == 0 and not single_time_column:
+            data = np.c_[data, np.array(range(rows), dtype=dtype)]
+        else:
+            data = np.c_[data, np.zeros(shape=(rows,), dtype=dtype)]
+    return data
 
 
 def save_peaks_csv(filename, peaks, labels=None):

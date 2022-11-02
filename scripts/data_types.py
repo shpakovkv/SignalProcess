@@ -368,6 +368,8 @@ class SignalsData:
         :return: None
         :rtype: NoneType
         """
+        if s is None:
+            s = "a.u."
         assert isinstance(s, str), \
             "Wrong type. Expected str, got {} instead.".format(type(s))
         self._time_units = s
@@ -878,6 +880,8 @@ def align_and_append_ndarray(*args):
     # ALIGN & APPEND
     col_len_list = [get_2d_arr_real_len(arr) for arr in args]
     max_rows = max(col_len_list)
+    if max_rows == 0:
+        max_rows = 1
     data = np.empty(shape=(0, max_rows), dtype=dtype, order='F')
     for arr in args:
         miss_rows = max_rows - arr.shape[1]

@@ -446,6 +446,22 @@ def read_wfm(filename, start_index=0, number_of_points=-1,
                   file_info['ed1_dim_offset'])
 
         _printif("{} Finalising...".format(datetime.datetime.now()), PRINT_TIME)
+
+        # handling empty files
+        if raw_data.size == 0:
+            data_t = numpy.insert(data_t, 0, numpy.nan, axis=0)
+            data_t = numpy.insert(data_t, 0, numpy.nan, axis=0)
+            data_y = numpy.insert(data_y, 0, numpy.nan, axis=0)
+            data_y = numpy.insert(data_y, 0, numpy.nan, axis=0)
+            # print(f"{data_t},  shape = {data_t.shape};  len = {len(data_t)};  size == {data_t.size}")
+            # print(f"{data_y},  shape = {data_y.shape};  len = {len(data_y)};  size == {data_y.size}")
+            output.append(data_t)
+            output.append(data_y)
+            output.append(file_info)
+            output.append(None)  # over-val indexes
+            output.append(None)  # under-val indexes
+            return output
+
         # handling RAW DATA over- and underranged values
         if file_info['ed1_format'][0] < 4 or file_info['ed1_format'][0] > 5:
             # integer type

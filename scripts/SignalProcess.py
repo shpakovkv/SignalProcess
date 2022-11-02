@@ -411,6 +411,10 @@ def get_front_point(signals_data, args, multiplier, delay,
     data_x = curve.get_x(0)
     data_y = curve.get_y(0)
 
+    # handling empty array and nan only array
+    if data_y.size - np.isnan(data_y).sum() == 0:
+        return None
+
     first_num, last_num = file_handler.get_real_num_bounds_1d(data_y)
 
     data_y = data_y[first_num:last_num + 1]
