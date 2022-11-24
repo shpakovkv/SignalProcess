@@ -745,10 +745,13 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
     y_max = 0
     y_min = 0
 
+    if sum(np.isfinite(local_y)) == 0:
+        return -1, 1
+
     if len(local_y[local_y != np.inf]) > 0:
-        y_max = np.nanmax(local_y[local_y != np.inf])
+        y_max = np.nanmax(local_y[np.isfinite(local_y)])
     if len(local_y[local_y != -np.inf]) > 0:
-        y_min = np.nanmin(local_y[local_y != -np.inf])
+        y_min = np.nanmin(local_y[np.isfinite(local_y)])
     y_range = y_max - y_min
     if y_range > 0:
         reserve *= y_range
