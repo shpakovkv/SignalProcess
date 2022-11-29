@@ -575,7 +575,7 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
                                   front_plot_name,
                                   interactive=cl_args.it_offset)
     # update delays
-    new_delay = cl_args.delay[:]
+    new_delay = np.copy(cl_args.delay)
     if front_point is not None:
         for idx in range(0, cl_args.delay.shape[0]):
             new_delay[idx, 0] += front_point.time
