@@ -402,8 +402,13 @@ def get_front_point(signals_data, args, multiplier, delay,
     # else:
     #     level = -abs(level)
 
-    cur_mult = multiplier[curve_idx: curve_idx + 1]
-    cur_del = delay[curve_idx: curve_idx + 1]
+    cur_mult = None
+    if multiplier is not None:
+        cur_mult = multiplier[curve_idx: curve_idx + 1]
+
+    cur_del = None
+    if delay is not None:
+        cur_del = delay[curve_idx: curve_idx + 1]
 
     # apply multiplier and delay to local copy
     curve.data = multiplier_and_delay(curve.data, cur_mult, cur_del)
@@ -454,7 +459,9 @@ def get_front_point(signals_data, args, multiplier, delay,
                                                 curve.time_units)
         # find front
         front_x, front_y = find_curve_front(smoothed_curve,
-                                            level, front)
+                                            level,
+                                            front,
+                                            interpolate=True)
 
         plot_title = ("Curve[{idx}] \"{label}\"\n"
                       "".format(idx=curve_idx, label=curve.get_curve_label(0)))
@@ -570,14 +577,20 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
 
     front_plot_name = file_handler.get_front_plot_name(cl_args.offset_by_front,
                                                        cl_args.save_to, shot_name)
+
     front_point = get_front_point(signals_data, cl_args.offset_by_front,
                                   cl_args.multiplier, cl_args.delay,
                                   front_plot_name,
                                   interactive=cl_args.it_offset)
     # update delays
-    new_delay = np.copy(cl_args.delay)
+    new_delay = None
+    if cl_args.delay is None:
+        new_delay = np.zeros(shape=(signals_data.cnt_curves, 2))
+    else:
+        new_delay = np.copy(cl_args.delay)
+
     if front_point is not None:
-        for idx in range(0, cl_args.delay.shape[0]):
+        for idx in range(0, new_delay.shape[0]):
             new_delay[idx, 0] += front_point.time
         return new_delay
     return None
@@ -713,6 +726,10 @@ def full_process(args, shot_idx, num_mask):
 
     # checks the number of columns with data,
     # as well as the number of multipliers, delays, labels
+    args.multiplier = arg_checker.check_multiplier(args.multiplier,
+                                                   curves_count=data.cnt_curves)
+    args.delay = arg_checker.check_delay(args.delay,
+                                         curves_count=data.cnt_curves)
 
     # multiplier and delay are 2D ndarrays [curve][axis]
     arg_checker.check_coeffs_number(data.cnt_curves * 2, ["multiplier", "delay"],
