@@ -361,11 +361,14 @@ def find_curve_front(curve,
 
 
 def get_front_time_with_aprox(time1, amp1, time2, amp2, target_amp):
-    assert time2 > time1, \
-        "Time1 must be less than time2."
+    assert time2 >= time1, \
+        "Time1 must be less or equal than Time2."
     assert max(amp1, amp2) >= target_amp >= min(amp1, amp2), \
         "Target amplitude ({}) is out of range for given two points [{}, {}]" \
         "".format(target_amp, amp1, amp2)
+
+    if time1 == time2:
+        return time1
 
     if amp1 == target_amp:
         return time1
