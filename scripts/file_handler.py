@@ -420,7 +420,7 @@ def is_time_col(col):
     assert col.ndim == 1, "Expected array shape {}, got {}.".format("(1,)", col.shape)
     first_num, last_num = get_real_num_bounds_1d(col)
 
-    res = np.all(np.diff(col[first_num:last_num]) > 0)
+    res = np.all(np.diff(col[first_num:last_num]) >= 0)
     return res
 
 
