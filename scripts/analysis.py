@@ -5,7 +5,7 @@ Data analysis functions.
 Maintainer: Shpakov Konstantin
 Link: https://github.com/shpakovkv/SignalProcess
 """
-
+import numpy
 from matplotlib import pyplot as plt
 import timeit
 import numpy as np
@@ -15,11 +15,16 @@ from data_types import SignalsData, SinglePeak, SingleCurve
 from arg_checker import check_plot_param
 from plotter import find_nearest_idx
 from scipy.signal import correlate as scipy_correlate
+from scipy import interpolate
 
 
 # =======================================================================
 # ------   CORRELATION   ------------------------------------------------
 # =======================================================================
+
+
+def print_curve_base(arr, name=""):
+    print(f"[{name}] Start = {arr[0]},  Stop = {arr[-1]},  Step = {arr[1] - arr[0]},   length = {len(arr)}")
 
 
 def correlation_func_2d(curve1, curve2):
@@ -61,21 +66,46 @@ def correlation_func_2d(curve1, curve2):
     time_step[0] = (curve1[0, -1] - curve1[0, 0]) / (curve1.shape[1] - 1)
     time_step[1] = (curve2[0, -1] - curve2[0, 0]) / (curve2.shape[1] - 1)
     tolerance = time_step.min() / 1e6
-    assert np.isclose(time_step[0], time_step[1], atol=tolerance), \
-        "Curve1 and curve2 have different time step: {} and {}. " \
-        "The difference exceeds tolerance {}" \
-        "".format(time_step[0], time_step[1], tolerance)
+
+    # assert np.isclose(time_step[0], time_step[1], atol=tolerance), \
+    #     "Curve1 and curve2 have different time step: {} and {}. " \
+    #     "The difference exceeds tolerance {}" \
+    #     "".format(time_step[0], time_step[1], tolerance)
+
+    if not np.isclose(time_step[0], time_step[1], atol=tolerance):
+        if time_step[1] < time_step[0]:
+            # curve_2 is more precise, need to interpolate curve_1
+            time_step[0] = time_step[1]
+            interp_funk = interpolate.interp1d(curve1[0], curve1[1])
+            new_curve_x = numpy.arange(curve1[0, 0], stop=curve1[0, -1], step=time_step[0])
+            new_curve_y = interp_funk(new_curve_x)
+            curve1 = numpy.stack((new_curve_x, new_curve_y))
+        else:
+            # curve_1 is more precise, need to interpolate curve_2
+            time_step[1] = time_step[0]
+            interp_funk = interpolate.interp1d(curve2[0], curve2[1])
+            new_curve_x = numpy.arange(curve2[0, 0], stop=curve2[0, -1], step=time_step[1])
+            new_curve_y = interp_funk(new_curve_x)
+            curve2 = numpy.stack((new_curve_x, new_curve_y))
 
     # get correlation
     # res = np.correlate(curve1[1], curve2[1], mode='full')
+    # print_curve_base(curve1[1], "CURVE_1")
+    # print_curve_base(curve2[1], "CURVE_2")
     res = scipy_correlate(curve1[1], curve2[1], mode='full')
 
     # add time column
     # np.arange(first, last, step)  == [first, last)  last point is not included
+    # print(f"start = {curve1[0, 0] - curve2[0, -1]},    stop = {curve1[0, -1] - curve2[0, 0] + time_step[0]},   "
+    #       f"step = {time_step[0]}")
     time_col = np.arange(curve1[0, 0] - curve2[0, -1],
                          curve1[0, -1] - curve2[0, 0] + time_step[0],
                          time_step[0],
                          dtype=np.float64)
+
+    # even/odd length correction
+    if len(time_col) > len(res):
+        time_col = time_col[:-1]
 
     # take the autocorrelation of the smallest curve as a reference
     smaller_curve = curve1
@@ -108,11 +138,11 @@ def correlate_single(curve1, curve2):
     """
     corr = correlation_func_2d(curve1.data, curve2.data)
 
-    label = "Correlate_{}_to_{}".format(curve1.label, curve2.label)
-    return SignalsData(corr,
-                       labels=[label],
-                       units=["a.u."],
-                       time_units=curve1.t_units
+    label = "Corr_{}_to_{}".format(curve1.label, curve2.label)
+    return SingleCurve(corr,
+                       label=label,
+                       units="a.u.",
+                       t_units=curve1.t_units
                        )
 
 
