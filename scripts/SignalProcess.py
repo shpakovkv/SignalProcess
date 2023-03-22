@@ -338,12 +338,14 @@ def do_y_zero_offset(signals_data, cl_args):
 
 
 def get_front_point(signals_data, args, multiplier, delay,
-                    front_plot_name, interactive=False):
+                    front_plot_name, plot_bounds=None, interactive=False):
     """Finds the most left front point where the curve
     amplitude is greater (lower - for negative curve) than
     the level (args[1]) value.
     To improve accuracy, the signal is smoothed by
     the savgol filter.
+
+    Saves a curve plot with the point on the front.
 
     :param signals_data: the SignalsData instance
     :param args: the list of 4 values [idx, level, window, order]:
@@ -358,14 +360,16 @@ def get_front_point(signals_data, args, multiplier, delay,
     :param front_plot_name: the full path to save the graph with the curve
                             and the marked point on the rise front
                             (fall front - for negative curve)
+    :param plot_bounds: save a curve plot with the point on the front with specified bounds
     :param interactive: turns on interactive mode of the smooth filter
                         parameters selection
 
     :type signals_data: SignalsData
-    :type args: tuple/list
-    :type multiplier: tuple/list
-    :type delay: tuple/list
+    :type args: tuple or list
+    :type multiplier: tuple or list
+    :type delay: tuple or list
     :type front_plot_name: str
+    :type plot_bounds: tuple ot list
     :type interactive: bool
 
     :return: front point
@@ -538,6 +542,7 @@ def get_front_point(signals_data, args, multiplier, delay,
     plotter.plot_multiple_curve(curve,
                                 curve_list=[0, 1],
                                 peaks=peaks,
+                                xlim=plot_bounds,
                                 title=plot_title)
 
     plt.savefig(front_plot_name, dpi=400)
@@ -581,6 +586,7 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
     front_point = get_front_point(signals_data, cl_args.offset_by_front,
                                   cl_args.multiplier, cl_args.delay,
                                   front_plot_name,
+                                  plot_bounds=cl_args.t_bounds,
                                   interactive=cl_args.it_offset)
     # update delays
     new_delay = None
