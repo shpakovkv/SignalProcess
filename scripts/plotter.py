@@ -219,7 +219,7 @@ def do_multicurve_plots(signals_data, cl_args, plot_name,
         plot_multiple_curve(signals_data, curve_list,
                             peaks=peaks,
                             xlim=cl_args.t_bounds,
-                            amp_unit=signals_data.get_curve_label(curve_list[0]),
+                            amp_unit=signals_data.get_curve_units(curve_list[0]),
                             time_units=signals_data.time_units,
                             unixtime=cl_args.unixtime,
                             hide=hide)
