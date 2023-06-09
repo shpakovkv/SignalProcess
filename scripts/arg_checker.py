@@ -9,6 +9,7 @@ import os
 import hashlib
 import numpy as np
 from file_handler import get_grouped_file_list, get_csv_headers, get_dialect
+from data_types import SingleCurve
 
 ENCODING = 'latin-1'
 
@@ -664,6 +665,125 @@ def save_arg_check(options):
     return options
 
 
+def global_check_smooth(smooth_params, labels=None):
+    """ Checks the smooth curve processing parameters
+    as much as possible without loading curves data.
+
+    The parameters should be in the form of a list of dictionaries:
+
+    [
+      {
+
+      'idx': <idx_value>,
+
+      'window': <window_value>,
+
+      'order': <order_value>,
+
+      'label': <label_value>
+
+      },
+
+      {
+
+      'idx': <idx_value>,
+
+      'window': <window_value>,
+
+      'order': <order_value>,
+
+      'label': <label_value>
+
+      },
+
+      etc.
+    ]
+
+    :param smooth_params: list of dictionaries with smooth curve parameters
+    :type smooth_params: list of dict
+    :param labels: list of labels for data curves (necessary to verify
+                   the uniqueness of the smoothed curve label)
+    :type labels: list of str
+    :return: unchanged smooth_params
+    :rtype: list of dict
+    """
+    for param_dict in smooth_params:
+
+        # check types
+        for param_name in ('idx', 'window', 'order'):
+            assert isinstance(param_dict['idx'], int), \
+                f"Wrong --smooth-curve {param_name.upper()} type " \
+                f"({param_dict[param_name]})! Expected 'int', " \
+                f"got {type(param_dict[param_name])} instead. " \
+                f"Check --smooth-curve parameters!"
+
+        # check values
+        assert isinstance(param_dict['label'], str), \
+            f"Wrong --smooth-curve LABEL type " \
+            f"({param_dict['label']})! Expected 'str', " \
+            f"got {type(param_dict['label'])} instead. " \
+            f"Check --smooth-curve parameters!"
+
+        assert param_dict['idx'] >= 0, \
+            f"Unsupported value for --smooth-curve CURVE-IDX " \
+            f"({param_dict['idx']}) \n" \
+            f"Only integer values >=0 are allowed."
+
+        assert param_dict['window'] >= 5, \
+            f"Unsupported value for --smooth-curve WINDOW parameter " \
+            f"({param_dict['window']}) \n" \
+            f"Only integer values >=5 are allowed."
+
+        assert param_dict['order'] >= 1, \
+            f"Unsupported value for --smooth-curve ORDER parameter " \
+            f"({param_dict['order']}) \n" \
+            f"Only integer values >=1 are allowed."
+
+        # check label uniqueness
+        if labels is not None:
+            assert param_dict['label'] not in labels, \
+                f"Bad --smooth-curve LABEL parameter!\n" \
+                f"The curve with label '{param_dict['label']}' is already exist! " \
+                f"Choose unique label!"
+
+    return smooth_params
+
+
+def prepare_params_smooth(smooth_params):
+    """ Convert smooth curves parameters structure
+    from list of list:
+    [
+      [curve_idx, window, order, label],
+      [curve_idx, window, order, label],
+      etc.
+    ]
+
+    to list of dict:
+
+    [
+      {'idx': <idx_value>, 'window': <window_value>, 'order': <order_value>, 'label': <label_value>},
+      {'idx': <idx_value>, 'window': <window_value>, 'order': <order_value>, 'label': <label_value>},
+      etc.
+    ]
+
+    :param smooth_params: user entered smooth curve parameters
+    :type smooth_params: list of list
+    :return: list of dictionaries with smooth curve parameters
+    :rtype: list of dict
+    """
+    param_list = list()
+    for params in smooth_params:
+        #  CURVE_IDX, WINDOW, ORDER, LABEL
+        curve_idx, window, order, label = params
+        if not isinstance(label, str):
+            label = str(label)
+        param_list.append({'idx': curve_idx,
+                           'window': window,
+                           'order': order,
+                           'label': label})
+    return param_list
+
+
 def data_corr_arg_check(options):
     """Needed for data manipulation/correction process.
 
@@ -673,6 +793,7 @@ def data_corr_arg_check(options):
     --set-to-zero,
     --multiplier,
     --delay,
+    --smooth-curve
 
     :param options: namespace with args
     :type options: argparse.Namespace
@@ -714,6 +835,10 @@ def data_corr_arg_check(options):
             ("The number of multipliers ({}) is not equal"
              " to the number of delays ({})."
              "".format(len(options.multiplier), len(options.delay)))
+
+    if options.smooth:
+        options.smooth = prepare_params_smooth(options.smooth)
+        options.smooth = global_check_smooth(options.smooth, options.labels)
 
     return options
 

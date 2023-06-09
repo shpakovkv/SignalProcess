@@ -386,6 +386,26 @@ def get_data_corr_args_parser():
              'you want to set to zero.\n'
              'Enter \'all\' or \'-1\' (without the quotes) to set all curves\n'
              'values to zero.\n\n')
+
+    data_corr_args_parser.add_argument(
+        '--smooth-curve',
+        action='append',
+        metavar=('CURVE_IDX', 'WINDOW', 'ORDER', 'LABEL'),
+        nargs=4,
+        dest='smooth',
+        help='Applies a Savitzky-Golay filter to selected curve.\n'
+             'Then adds this new smoothed curve to SignalsData.'
+             'Enter: CURVE_IDX WINDOW ORDER, where:\n'
+             'CURVE_IDX - the index of the curve\n'
+             'WINDOW    - length of the filter window (must be an odd \n'
+             '            integer greater than 4)\n'
+             'ORDER     - the order of the polinomial used to fit the\n'
+             '            samples (must be less than window length)\n'
+             'LABEL     - choose an unique label for new curve. '
+             '            Use only Latin letters, numbers, dashes \n'
+             '            and underscores, any other symbols will be\n'
+             '            replaced with underscores.\n\n')
+
     return data_corr_args_parser
 
 
