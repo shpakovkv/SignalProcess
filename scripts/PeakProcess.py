@@ -1323,12 +1323,12 @@ def do_front_delay_all(data, args, shot_idx, verbose):
         """
     front_delay_data = list()
     for idx, front_param in enumerate(args.front_delay):
-        new_delay = do_front_delay_single(data, front_param, shot_idx, verbose, args.unixtime)
+        new_delay = do_front_delay_single(data, front_param, shot_idx, args.t_bounds, verbose, args.unixtime)
         front_delay_data.append(new_delay)
     return front_delay_data
 
 
-def do_front_delay_single(data, front_param, shot_idx, verbose, unixtime=False):
+def do_front_delay_single(data, front_param, shot_idx, xlim=(None, None), verbose=False, unixtime=False):
     """ Calculates delay between fronts of two signals.
     Prints the value to console.
     Saves graph of two curves with front points.
@@ -1341,6 +1341,9 @@ def do_front_delay_single(data, front_param, shot_idx, verbose, unixtime=False):
 
     :param shot_idx: the name of current shot
     :type shot_idx: str or int
+
+    :param xlim: the tuple/list with the left and the right X bounds in X units.
+    :type xlim: tuple | list
 
     :param verbose: shows more info during the process
     :type verbose: bool
@@ -1423,6 +1426,7 @@ def do_front_delay_single(data, front_param, shot_idx, verbose, unixtime=False):
             plotter.plot_multiplot(data,
                                    peaks,
                                    (front_param["cur1"], front_param["cur2"]),
+                                   xlim=xlim,
                                    unixtime=unixtime,
                                    hide=True)
 
