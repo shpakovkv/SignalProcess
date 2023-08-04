@@ -63,10 +63,11 @@ def label_check(labels):
     import re
     if labels is not None:
         for label in labels:
-            if re.search(r'[^\w-]+', label):
+            # if re.search(r'[^\w-]+', label):
+            if re.search(r'[^\.|^\w]+', label):
                 raise ValueError("{}\nWrong labels values!\n"
-                                 "Latin letters, numbers, underscore and dash"
-                                 " are allowed only.".format(label))
+                                 "Latin letters, numbers, underscore, dash and"
+                                 " '.' (dot) are allowed only.".format(label))
 
 
 def filename_is_valid(name):
