@@ -381,8 +381,8 @@ def plot_multiplot(data, peak_data, curves_list,
         # plot curve
 
         if unixtime:
-            axes[wf, 0].plot(md.epoch2num(data.time(curves_list[wf])),
-                             data.value(curves_list[wf]),
+            axes[wf, 0].plot(md.epoch2num(data.get_x(curves_list[wf])),
+                             data.get_y(curves_list[wf]),
                              '-', color='#9999aa', linewidth=0.5)
         else:
             axes[wf, 0].plot(data.get_x(curves_list[wf]),
