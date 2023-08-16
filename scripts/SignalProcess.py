@@ -30,6 +30,8 @@ from multiplier_and_delay import *
 from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, get_two_fronts_delay, print_pulse_duration
 from analysis import do_correlate, do_correlate_part
 
+from file_handler import check_files_for_duplicates
+
 verbose = True
 global_log = ""
 DEBUG = True
@@ -904,6 +906,8 @@ def main():
 
         with Pool(args.threads) as p:
             p.starmap(full_process, [(args, shot_idx, num_mask) for shot_idx in range(len(args.gr_files))])
+
+    check_files_for_duplicates(args)
 
     # if verbose:
     #     arg_checker.print_duplicates(args.gr_files, 30)

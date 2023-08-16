@@ -34,6 +34,8 @@ from multiplier_and_delay import multiplier_and_delay
 from data_types import SinglePeak, SignalsData, SingleCurve
 from analysis import get_2d_array_stat_by_columns
 
+from file_handler import check_files_for_duplicates
+
 
 pos_polarity_labels = {'pos', 'positive', '+'}
 neg_polarity_labels = {'neg', 'negative', '-'}
@@ -1494,6 +1496,8 @@ def main():
     # arg_checker.print_duplicates(args.gr_files)
     stop_time = time.time()
     print_process_time(start_time, stop_time, args)
+
+    check_files_for_duplicates(args)
 
 
 if __name__ == '__main__':
