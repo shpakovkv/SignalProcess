@@ -23,6 +23,8 @@ from isfconverter import isfreader as isf
 from data_types import SignalsData
 from data_types import SinglePeak
 
+from duplicate_checker import check_for_duplicates
+
 
 CSV_DELIMITER_LIST = [',', ';', ' ', ':', '\t']
 LOGDIRECTORY = "LOG_SignalProcess"
@@ -1044,3 +1046,27 @@ def save_m_log(src, saved_as, labels, multiplier=None, delays=None,
     if len(log_lines) > 8 or src != saved_as:
         with open(save_log_as, mode) as f:
             f.writelines(log_lines)
+
+
+def check_files_for_duplicates(options):
+    """Checks all input files for duplicates.
+    Prints the full paths of duplicates.
+
+    :param options: namespace with args
+    :type options: argparse.Namespace
+    :return: None
+    :rtype: None
+    """
+    dir_list = set()
+    if options.src_dir:
+        for value in options.src_dir:
+            dir_list.add(value.strip())
+            assert os.path.isdir(value), \
+                "Can not find directory {}".format(value)
+
+    if options.files:
+        for sublist_of_files in options.files:
+            for filepath in sublist_of_files:
+                dir_list.add(os.path.realpath(filepath))
+
+    check_for_duplicates(dir_list)
