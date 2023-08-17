@@ -155,7 +155,7 @@ def align_and_append_ndarray(*args):
     return data
 
 
-def y_zero_offset(curve, start_x, stop_x):
+def get_y_zero_offset(curve, start_x, stop_x):
     """
     Returns the Y zero level offset value.
     Use it for zero level correction before PeakProcess.
@@ -175,47 +175,97 @@ def y_zero_offset(curve, start_x, stop_x):
         return 0
     start_idx = find_nearest_idx(curve.time, start_x, side='right')
     stop_idx = find_nearest_idx(curve.time, stop_x, side='left')
-    amp_sum = 0.0
-    for val in curve.val[start_idx:stop_idx + 1]:
-        amp_sum += val
+
+    amp_sum = np.nansum(curve.val[start_idx:stop_idx + 1])
     return amp_sum / (stop_idx - start_idx + 1)
 
 
-def y_zero_offset_all(signals_data, curves_list, start_stop_tuples):
-    """Return delays list for all columns in SignalsData stored
-    in filename_or_list.
-    Delays for Y-columns will be filled with
-    the Y zero level offset values for only specified curves.
+def get_delays_with_y_zero_offsets(signals_data, multiplier, delay, curves_list, start_stop_tuples):
+    """Calculates zero level correction for specified curves.
+    Returns delays structure for all columns in SignalsData.
+    Delays for Y-columns of specified curves will be filled with
+    the Y zero level offset values.
     For all other Y columns and for all X columns delay will be 0.
 
     Use it for zero level correction before PeakProcess.
 
-    filename_or_list    -- file with data or list of files,
-                           if the data stored in several files
-    curves_list         -- zero-based indices of curves for which
-                           you want to find the zero level offset
-    start_stop_tuples   -- list of (start_x, stop_x) tuples for each
-                           curves in curves list.
-                           You can specify one tuple or list and
-                           it will be applied to all the curves.
-    file_type           -- file type (Default = 'CSV')
-    delimiter           -- delimiter for csv files
+    :param signals_data: SignalsData structure with all curve data
+    :type signals_data: SignalsData
+    :param multiplier: np.ndarray(ndim=2) with multiplier[curve, axis] values
+                       for X-columns (multiplier[:, 0])
+                       and for Y-columns (multiplier[:, 1]) of signals_data array
+    :type multiplier: np.ndarray
+    :param delay: np.ndarray(ndim=2) with delay[curve, axis] values
+                  for X-columns (delay[:, 0])
+                  and for Y-columns (delay[:, 1]) of signals_data array
+    :type delay: np.ndarray
+    :param curves_list: zero-based indices of curves for which
+                        you want to find the zero level offset
+    :type curves_list: list
+    :param start_stop_tuples: list of (bg_start_x, bg_stop_x) tuples for each
+                              curves in curves list.
+                              You can specify one tuple or list, and
+                              it will be applied to all the curves.
+    :type start_stop_tuples: list of tuple
+    :return: new delays structure (ndarray(ndim=2))
+    :rtype: np.ndarray
     """
 
     assert len(curves_list) == len(start_stop_tuples), \
         "Error! The number of (start_x, stop_x) tuples ({}) " \
-        "does not match the number of specified curves " \
+        "does not match the number of the specified curves " \
         "({}).".format(len(start_stop_tuples), len(curves_list))
 
-    delays = [0 for _ in range(2 * signals_data.count)]
+    delays_shape = (signals_data.cnt_curves, 2)
+    delays = np.zeros(shape=delays_shape, dtype=np.float64)
     for tuple_idx, curve_idx in enumerate(curves_list):
-        y_data_idx = curve_idx * 2 + 1
-        delays[y_data_idx] = y_zero_offset(signals_data.curves[curve_idx],
-                                           *start_stop_tuples[tuple_idx])
-    # print("Delays = ")
-    # for i in range(0, len(delays), 2):
-    #     print("{}, {},".format(delays[i], delays[i + 1]))
+        # get curve copy
+        curve = signals_data.get_single_curve(curve_idx)
+        # get SignalsData instance with only selected curve
+        signals_data_single = SignalsData(curve.data.copy(), [curve.label], [curve.units], curve.t_units)
+        signals_data_single.data = multiplier_and_delay(signals_data_single.data,
+                                                        # need multiplier and delay ndarray(ndim=2)
+                                                        # for single curve
+                                                        multiplier[curve_idx:curve_idx + 1],
+                                                        delay[curve_idx:curve_idx + 1])
+        delays[curve_idx, 1] = get_y_zero_offset(signals_data_single.get_single_curve(0),
+                                                 *start_stop_tuples[tuple_idx])
+        # print(f"New delay for curve #{curve_idx} = {delays[curve_idx, 1]}")
+
     return delays
+
+
+def update_delays_by_zero_level_offset(data, args):
+    """Calculates zero level correction for specified curves.
+    Returns modified delays structure for all columns in SignalsData.
+    Delays for Y-columns of specified curves will be filled with
+    the Y zero level offset values.
+    For all other Y columns and for all X columns delay will not be modified.
+
+    Use it for zero level correction before PeakProcess.
+
+    :param data: SignalsData structure with all curve data
+    :type data: SignalsData
+    :param args: namespace with args
+    :type args: argparse.Namespace
+    :return: modified delays structure
+    :rtype: np.ndarray
+    """
+    curves_list = [val[0] for val in args.y_auto_zero]
+    start_stop_tuples = [(val[1], val[2]) for val in args.y_auto_zero]
+
+    # data has ndim=3 with this structure: SignalsData.data[curve, axis, point]
+    # ndarray_copy = data.data[curves_list, :, :].copy()
+    # ndarray_copy = multiplier_and_delay(ndarray_copy, args.multiplier[curves_list, :], args.delay[curves_list, :])
+    # data_copy = SignalsData(ndarray_copy, data.labels[curves_list, :], data.units[curves_list, :], data.time_units)
+
+    zero_level_offset_delays = get_delays_with_y_zero_offsets(data,
+                                                              args.multiplier,
+                                                              args.delay,
+                                                              curves_list,
+                                                              start_stop_tuples)
+    args.delay = args.delay + zero_level_offset_delays
+    return args.delay
 
 
 def pretty_print_nums(nums, prefix=None, postfix=None,
@@ -246,97 +296,6 @@ def pretty_print_nums(nums, prefix=None, postfix=None,
     if show:
         print(message)
     return message
-
-
-def raw_y_auto_zero(params, multiplier, delay):
-    """Returns raw values for y_auto_zero parameters.
-    'Raw values' are values before applying the multiplier.
-
-    params      -- y auto zero parameters (see --y-auto-zero
-                   argument's hep for more detail)
-    multiplier  -- the list of multipliers for all the curves
-                   in the SignalsData
-    delay       -- the list of delays for all the curves
-                   in the SignalsData
-    """
-    raw_params = []
-    for item_idx, item in enumerate(params):
-        curve_idx = item[0]
-        start_x = (item[1] + delay[curve_idx * 2]) / multiplier[curve_idx * 2]
-        stop_x = (item[2] + delay[curve_idx * 2]) / multiplier[curve_idx * 2]
-        raw_params.append([curve_idx, start_x, stop_x])
-    return raw_params
-
-
-def update_by_y_auto_zero(data, y_auto_zero_params,
-                          multiplier, delay, verbose=True):
-    """The function analyzes the mean amplitude in
-    the selected X range of the selected curves.
-    The Y zero offset values obtained are added to
-    the corresponding items of the original list of delays.
-    The new list of delays is returned.
-
-    data                -- SignalsData instance
-    y_auto_zero_params  -- y auto zero parameters (see --y-auto-zero
-                           argument's hep for more detail)
-    multiplier          -- the list of multipliers for all the curves
-                           in the SignalsData
-    delay               -- the list of delays for all the curves
-                           in the SignalsData
-    verbose             -- show/hide information during function execution
-    """
-    new_delay = delay[:]
-    curves_list = [item[0] for item in y_auto_zero_params]
-    start_stop_tuples = [(item[1], item[2]) for item in
-                         raw_y_auto_zero(y_auto_zero_params,
-                                         multiplier,
-                                         delay)]
-    for idx, new_val in \
-            enumerate(y_zero_offset_all(data,
-                                        curves_list,
-                                        start_stop_tuples)):
-        new_delay[idx] += new_val * multiplier[idx]
-
-    if verbose:
-        print()
-        print("Y auto zero offset results:")
-        curves_labels = ["Curve[{}]: ".format(curve_idx) for
-                         curve_idx in curves_list]
-        # print(pretty_print_nums([new_delay[idx] for idx in
-        #                               range(0, len(new_delay), 2)],
-        #                               curves_labels_DEBUG, " ns",
-        #                               show=False))
-        print(pretty_print_nums([new_delay[idx] for idx in
-                                 range(1, len(new_delay), 2)],
-                                curves_labels, show=False))
-    return new_delay
-
-
-def do_y_zero_offset(signals_data, cl_args):
-    """Analyzes the signal fragment in the selected time interval and
-    finds the value of the DC component.
-    Subtracts the constant component of the signal.
-
-    NOTE: this function only changes the delay list. Apply it to
-    the signals data via multiplier_and_delay function.
-
-    :param signals_data: SignalsData instance with curves data
-    :param cl_args: command line arguments, entered by the user
-
-    :type signals_data: SignalsData
-    :type cl_args: argparse.Namespace
-
-    :return: changed cl_args
-    :rtype: argparse.Namespace
-    """
-    arg_checker.check_y_auto_zero_params(signals_data, cl_args.y_auto_zero)
-
-    # updates delays with accordance to Y zero offset
-    cl_args.delay = update_by_y_auto_zero(signals_data, cl_args.y_auto_zero,
-                                          cl_args.multiplier,
-                                          cl_args.delay,
-                                          verbose=True)
-    return cl_args
 
 
 def get_front_point(signals_data, args, multiplier, delay,
@@ -745,14 +704,12 @@ def full_process(args, shot_idx, num_mask):
     arg_checker.check_coeffs_number(data.cnt_curves, ["label", "unit"],
                                     args.labels, args.units)
 
-    # check y_zero_offset parameters (if idx is out of range)
-    # NOT WORKING WITH MULTITHREADING
-    # if args.y_auto_zero is not None:
-    #     args = do_y_zero_offset(data, args)
-
     # reset to zero
     if args.zero is not None:
         data = zero_curves(data, args.zero, verbose)
+
+    if args.y_auto_zero:
+        args.delay = update_delays_by_zero_level_offset(data, args)
 
     # check offset_by_voltage parameters (if idx is out of range)
     new_delay = None

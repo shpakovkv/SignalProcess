@@ -136,10 +136,10 @@ def multiplier_and_delay(signals, multiplier, delay):
     :param signals: signal's data to be modified
     :type signals: SignalsData or np.ndarray
 
-    :param multiplier: 2-dim ndarray
+    :param multiplier: 2-dim ndarray with multipliers [curve, axis]
     :type multiplier: np.ndarray
 
-    :param delay: 2-dim ndarray
+    :param delay: 2-dim ndarray with delays [curve, axis]
     :type delay: np.ndarray
 
     :return: signals with modified data

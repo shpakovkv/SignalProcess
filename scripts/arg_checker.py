@@ -507,6 +507,8 @@ def check_multiplier(m, curves_count=1):
     """Checks 'multiplier' argument, return it's copy
      or generates a list of ones.
 
+     Multiplier has the structure multiplier[curve, axis]
+
     :param m:     the list of multipliers
     :param curves_count: the number of data curves
     :return:      the list of multipliers (copy)
@@ -522,6 +524,8 @@ def check_multiplier(m, curves_count=1):
 def check_delay(d, curves_count=1):
     """Checks 'delay' argument, return it's copy
      or generates a list of zeros.
+
+     Delay has the structure delay[curve, axis]
 
     :param d:     the list of delays
     :param curves_count: the number of data curves
