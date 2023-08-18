@@ -16,6 +16,7 @@ import WFMReader
 import csv
 
 import sys
+from collections import defaultdict
 sys.path.append(os.path.join(os.path.dirname(__file__), '../isf-converter-py/'))
 
 from isfconverter import isfreader as isf
@@ -1070,3 +1071,102 @@ def check_files_for_duplicates(options):
                 dir_list.add(os.path.realpath(filepath))
 
     check_for_duplicates(dir_list)
+
+
+def parse_csv_for_peaks(filename, shot_col, curve_col, time_col, amp_col, curves_count, peak_number_col=None, transposed=False):
+    """Reads peak (time, amplitude) data from csv table.
+
+    The csv-file must contain columns with values:
+      - shot number
+      - curve idx
+      - peak time
+      - peak amplitude
+
+    The csv-file may contain any other columns.
+    The csv-file must contain peak data for all shots !
+
+    Returns a dictionary with shot number ("name") as keys and peak data as values.
+    Each such value has the following structure: a list of curve's peaks data.
+    where one curve's peaks data is a list of SinglePeak instances and None
+    or None, if curve has no peaks in corresponding shot.
+
+    Peak data [None, SinglePeak, SinglePeak, None] means, that corresponding curve has:
+      - no peak detected at first peak group time interval
+      - detected peak at 2nd peak group time interval
+      - detected peak at 3rd peak group time interval
+      - no peak detected at 4th peak group time interval
+
+    If peak_number_col=None, then each single curve peak data wll be
+    a list of SinglePeak instances without any None,
+    or just None (instead of list), if corresponding curve has no peaks.
+
+
+    :param filename: path to file
+    :type filename: str
+    :param shot_col: zero-based index of shot number column
+    :type shot_col: int
+    :param curve_col: zero-based index of the curve to which the data of the corresponding row belongs
+    :type curve_col: int
+    :param time_col: zero-based index of the column with peak time data
+    :type time_col: int
+    :param amp_col: zero-based index of the column with peak amplitude data
+    :type amp_col: int
+    :param curves_count: the number of curves in signals database to which the current peaks data belongs
+    :type curves_count: int
+    :param peak_number_col: zero-based index of the column with peak index -
+                            the index of the maximum of the corresponding curve
+                            within the corresponding shot (optional)
+    :type peak_number_col: int or None
+    :param transposed: set True for
+    :type transposed:
+    :return: a dictionary with shot number ("name") as keys and peak data as values
+    :rtype: dict
+    """
+
+    #
+    dialect, text_data = get_dialect(filename)
+    header_lines = get_csv_headers(text_data, delimiter=str(dialect.delimiter))
+
+    data = np.genfromtxt(text_data, np.float64, delimiter=str(dialect.delimiter), skip_header=header_lines)
+
+    if not transposed:
+        # by default numpy.genfromtxt reads columns as rows and rows as columns
+        # by default we need to transpose data
+        data = np.transpose(data)
+
+    # peaks[curve_idx, peak_idx]
+    # if curve has no peaks then peak[curve_idx] is None
+
+    all_shot_peaks = dict()
+    shot_with_peaks = sorted(list(set(data[shot_col])))
+    curve_with_peaks = sorted(list(set(data[curve_col])))
+    for shot in shot_with_peaks:
+        bool_arr = data[shot_col, :] == shot
+        shot_data = data[:, bool_arr]
+        peaks = [None] * curves_count
+        for curve in curve_with_peaks:
+            bool_data_2 = shot_data[curve_col] == curve
+            shot_curve_data = shot_data[:, bool_data_2]
+
+            # shot_curve_data = shot_data[shot_data[curve_col, :] == curve)]
+            peak_list = list()
+            for idx in range(shot_curve_data.shape[1]):
+                peak_list.append(SinglePeak(shot_curve_data[time_col, idx], shot_curve_data[amp_col, idx]))
+            peaks[int(curve)] = peak_list
+
+        # print(f"Shot #{int(shot):03d} | ", end="")
+        # for val in peaks:
+        #     if val is None:
+        #         print(0, end="")
+        #     else:
+        #         print(len(val), end="")
+        #     print(", ", end="")
+        # print()
+
+        all_shot_peaks[int(shot)] = peaks
+
+    # TODO: regroup peaks according to their numbers (peak_number_col) from csv file
+    return all_shot_peaks
+
+
+

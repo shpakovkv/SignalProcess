@@ -35,6 +35,7 @@ from data_types import SinglePeak, SignalsData, SingleCurve
 from analysis import get_2d_array_stat_by_columns
 
 from file_handler import check_files_for_duplicates
+from file_handler import parse_csv_for_peaks
 
 
 pos_polarity_labels = {'pos', 'positive', '+'}
@@ -1012,6 +1013,7 @@ def do_job(args, shot_idx):
                                      time_units=args.time_units,
                                      # verbose=verbose
                                      )
+
     # if verbose:
     #     print("The number of curves = {}".format(data.cnt_curves))
 
@@ -1090,6 +1092,29 @@ def do_job(args, shot_idx):
         plotter.do_plots(data, args, shot_name,
                          peaks=peaks_data, verbose=verbose,
                          hide=args.p_hide)
+
+    filename = "D:\\Experiments\\2023\\2023-08-09-PMT_Linear_colimator\\PEAKS\\PMT_ALL.csv"
+    shot_col = 5
+    curve_col = 7
+    time_col = 2
+    amp_col = 3
+    curves_count = 22
+
+    all_shot_peaks = parse_csv_for_peaks(filename, shot_col, curve_col, time_col, amp_col, curves_count,
+                                         header_lines=0, transposed=False)
+
+    peaks_data = [None] * curves_count
+    # print(shot_name)
+    # print(f"int(shot_name) = {int(shot_name)}")
+    # keys = [val for val in all_shot_peaks.keys()]
+    # print(f"Type of keys is '{type(keys[0])}'")
+
+    if int(shot_name) in all_shot_peaks.keys():
+        peaks_data = all_shot_peaks[int(shot_name)]
+
+    # print(f"From curve 12 '{data.labels[12]}'")
+    # for peak in peaks_data[12]:
+    #     print(f"[{peak.time}, {peak.val}]")
 
     # plot and save multi-plots
     if args.multiplot:
@@ -1485,7 +1510,7 @@ def main():
 
     # MAIN LOOP
     start_time = time.time()
-    if args.level or args.read or args.front_delay:
+    if args.level or args.read or args.front_delay or args.multiplot or args.plot:
 
         shot_list = [shot_idx for shot_idx in range(len(args.gr_files))]
         with Pool(args.threads) as p:
