@@ -180,7 +180,7 @@ def check_for_duplicates(folder_list):
     print("Checking files for duplicates...", end="")
 
     for path in folder_list:
-        assert os.path.isdir(path), "Error! Can't find folder '{path}'"
+        assert os.path.isdir(path), f"Error! Can't find folder '{path}'"
 
     files_by_size = get_file_dict_by_size(folder_list)
 

@@ -25,7 +25,7 @@ import itertools
 from numba import vectorize, float64
 from multiprocessing import Pool
 
-from multiplier_and_delay import *
+from data_manipulation import *
 
 from PeakProcess import find_nearest_idx, check_polarity, is_pos, find_curve_front, get_two_fronts_delay, print_pulse_duration
 from analysis import do_correlate, do_correlate_part
@@ -508,7 +508,7 @@ def get_front_point(signals_data, args, multiplier, delay,
 
     plt.savefig(front_plot_name, dpi=400)
     # show plot to avoid tkinter warning "can't invoke "event" command..."
-    plt.show(block=False)
+    # plt.show(block=False)
     plt.close('all')
 
     return front_point
@@ -858,6 +858,7 @@ def main():
           args.multiplot or
           args.multicurve or
           args.offset_by_front or
+          args.zero or
           args.correlate or
           args.correlate_part):
 

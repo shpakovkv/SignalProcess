@@ -30,7 +30,7 @@ import plotter
 from multiprocessing import Pool
 from itertools import repeat
 
-from multiplier_and_delay import multiplier_and_delay
+from data_manipulation import multiplier_and_delay
 from data_types import SinglePeak, SignalsData, SingleCurve
 from analysis import get_2d_array_stat_by_columns
 
@@ -786,12 +786,12 @@ def get_peaks(data, args, verbose):
                     For the curves not in the args.curves list:
                     data[curve_idx] == None
     """
-    unsorted_peaks = [None] * data.count
+    unsorted_peaks = [None] * data.cnt_curves
     for idx in args.curves:
         if verbose:
             print("Curve #" + str(idx))
         new_peaks, peak_log = peak_finder(
-            data.time(idx), data.value(idx),
+            data.get_x(idx), data.get_y(idx),
             level=args.level, diff_time=args.pk_diff,
             time_bounds=args.t_bounds, tnoise=args.t_noise,
             is_negative=args.level < 0,
@@ -813,9 +813,9 @@ def check_curves_list(curves, signals_data):
     :return: None
     """
     for curve_idx in curves:
-        assert curve_idx < signals_data.count, \
+        assert curve_idx < signals_data.cnt_curves, \
             ("The curve index {} is out of range. The total number "
-             "of curves: {}.".format(curve_idx, signals_data.count))
+             "of curves: {}.".format(curve_idx, signals_data.cnt_curves))
 
 
 def global_check(options):

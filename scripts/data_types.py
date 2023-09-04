@@ -32,7 +32,7 @@ class SignalsData:
         :type from_array: np.ndarray
         :type labels: list
         :type units: list
-        :type time_units: list
+        :type time_units: str
         :type dtype: np.dtype
         """
         # CONST  --------------------------------------------------------------
