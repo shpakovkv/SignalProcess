@@ -1059,16 +1059,15 @@ def check_files_for_duplicates(options):
     :rtype: None
     """
     dir_list = set()
-    if options.src_dir:
+    if options.files:
+        for sublist_of_files in options.files:
+            for filepath in sublist_of_files:
+                dir_list.add(os.path.dirname(os.path.realpath(filepath)))
+    elif options.src_dir:
         for value in options.src_dir:
             dir_list.add(value.strip())
             assert os.path.isdir(value), \
                 "Can not find directory {}".format(value)
-
-    if options.files:
-        for sublist_of_files in options.files:
-            for filepath in sublist_of_files:
-                dir_list.add(os.path.realpath(filepath))
 
     check_for_duplicates(dir_list)
 
