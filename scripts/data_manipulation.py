@@ -248,3 +248,37 @@ def multiplier_and_delay_peak(peaks, multiplier, delay, curve_idx):
                                      peak.val * amp_mult - amp_del,
                                      peak.idx, peak.sqr_l, peak.sqr_r))
     return corr_peaks
+
+
+def inf_correction(signals, axis=1):
+    """Replaces the 'inf' values with the maximum value of the curve and
+    replaces the '-inf' values with the minimum value of the curve
+    for all curves in signals.
+
+    :param signals: SignalsData instance with signals data
+    :type signals: SignalsData
+    :param axis: selects the axis along which the replacement takes place
+                 axis==1 means Y_axis, axis==0 means X_axis
+    :type axis: int
+    :return: None
+    :rtype: None
+    """
+    assert isinstance(signals, SignalsData), f"Wrong data type. Expected SignalsData got {type(signals)} instead."
+
+    for cur_idx in range(signals.cnt_curves):
+        # prepare bool arrays
+        col_shape = signals.data[cur_idx, axis].shape
+        inf_mask_pos = np.ndarray(shape=col_shape, dtype=bool)
+        inf_mask_neg = np.ndarray(shape=col_shape, dtype=bool)
+
+        # get inf and -inf values masks
+        np.isposinf(signals.data[cur_idx, axis, :], inf_mask_pos)
+        np.isneginf(signals.data[cur_idx, axis, :], inf_mask_neg)
+
+        # get maximum and minimum without 'nan' and 'inf'
+        max_val = np.nanmax(signals.data[cur_idx, axis, ~inf_mask_pos])
+        min_val = np.nanmin(signals.data[cur_idx, axis, ~inf_mask_neg])
+
+        # correction
+        signals.data[cur_idx, axis, inf_mask_pos] = max_val
+        signals.data[cur_idx, axis, inf_mask_neg] = min_val
