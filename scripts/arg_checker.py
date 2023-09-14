@@ -782,9 +782,9 @@ def prepare_params_smooth(smooth_params):
         curve_idx, window, order, label = params
         if not isinstance(label, str):
             label = str(label)
-        param_list.append({'idx': curve_idx,
-                           'window': window,
-                           'order': order,
+        param_list.append({'idx': int(curve_idx),
+                           'window': int(window),
+                           'order': int(order),
                            'label': label})
     return param_list
 
