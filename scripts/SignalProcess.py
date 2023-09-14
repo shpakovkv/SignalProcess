@@ -563,6 +563,81 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
     return None
 
 
+def do_smooth_curves_and_add(signals, param_list, shot_name):
+    """
+
+    The param_list should be in the form of a list of dictionaries:
+
+    [
+      {
+      'idx': <idx_value>,
+      'window': <window_value>,
+      'order': <order_value>,
+      'label': <label_value>
+      },
+      etc.
+    ]
+
+    :param signals: signals data
+    :type signals: SignalsData
+    :param param_list: list of dict with smooth parameters
+    :type param_list: list of dict
+    :param shot_name: the name (usually number) of shot
+    :type shot_name: str
+    :return:
+    :rtype:
+    """
+    if param_list is None:
+        return
+
+    assert all(val["label"] not in signals.labels for val in param_list), \
+        f"The label for the smoothed curve already exists."
+
+    for param_dict in param_list:
+        cur_idx = param_dict['idx']
+        smoothed = smooth_curve_2d_arr(signals.get_curve_2d_arr(cur_idx), param_dict)
+        signals.add_from_array(smoothed,
+                               labels=[param_dict["label"]],
+                               units=[signals.get_curve_label(cur_idx)])
+
+
+
+def smooth_curve_2d_arr(data, params):
+    """Smooth values along y-axis of 2-dim ndarray.
+    Expected [axis][points] data structure.
+
+    X: axis == 0,
+    Y: axis == 1.
+
+    The 'params' dictionary should have the structure given below:
+
+    {
+    'idx': <int_value>,
+    'window': <int_value>,
+    'order': <int_value>,
+    'label': <str_value>
+    }
+
+
+    :param data: curve data
+    :type data: np.ndarray
+    :param params: smooth parameters: window size, order of the polynomial, etc.
+    :type params: dict
+    :return: data curve with smoothed Y values
+    :rtype: np.ndarray
+    """
+    axis_x = 0
+    axis_y = 1
+
+    assert isinstance(data, np.ndarray), f"Wrong type. Expected 'numpy.ndarray', got {type(data)}."
+    assert data.ndim == 2, f"Incorrect number of input data dimensions. Expected {2}, got {data.ndim}."
+
+    data_y_smooth = smooth_voltage(data[axis_y], params["window"], params["order"])
+    smooth_data = np.stack((data[axis_x], data_y_smooth))
+    return smooth_data
+
+
+
 def zero_curves(signals, curve_indexes, verbose=False):
     """Resets the y values to 0, for all curves with index in
     curve_indexes.
@@ -721,6 +796,9 @@ def full_process(args, shot_idx, num_mask):
         data = multiplier_and_delay(data, args.multiplier, args.delay)
     else:
         data = multiplier_and_delay(data, args.multiplier, new_delay)
+
+    if args.smooth is not None:
+        do_smooth_curves_and_add(data, args.smooth, shot_name)
 
     correlate_data = list()
     if args.correlate is not None:
