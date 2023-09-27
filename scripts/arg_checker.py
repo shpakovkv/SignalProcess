@@ -818,6 +818,13 @@ def data_corr_arg_check(options):
             options.it_offset = True
         options.offset_by_front = global_check_offset_by_front_params(options.offset_by_front)
 
+        if options.off_front_bounds[0] is not None:
+            left = options.off_front_bounds[0]
+            right = options.off_front_bounds[1]
+            assert left < right, \
+                (f"The left edge of the search front ({left}) should be "
+                 f"smaller than the right ({right})")
+
     # # raw check labels (not used)
     # # instead: the forbidden symbols are replaced during CSV saving
     # if options.labels:

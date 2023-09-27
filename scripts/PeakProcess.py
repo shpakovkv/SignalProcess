@@ -1093,28 +1093,20 @@ def do_job(args, shot_idx):
                          peaks=peaks_data, verbose=verbose,
                          hide=args.p_hide)
 
-    filename = "D:\\Experiments\\2023\\2023-08-09-PMT_Linear_colimator\\PEAKS\\PMT_ALL.csv"
-    shot_col = 5
-    curve_col = 7
-    time_col = 2
-    amp_col = 3
-    curves_count = 22
-
-    all_shot_peaks = parse_csv_for_peaks(filename, shot_col, curve_col, time_col, amp_col, curves_count,
-                                         header_lines=0, transposed=False)
-
-    peaks_data = [None] * curves_count
-    # print(shot_name)
-    # print(f"int(shot_name) = {int(shot_name)}")
-    # keys = [val for val in all_shot_peaks.keys()]
-    # print(f"Type of keys is '{type(keys[0])}'")
-
-    if int(shot_name) in all_shot_peaks.keys():
-        peaks_data = all_shot_peaks[int(shot_name)]
-
-    # print(f"From curve 12 '{data.labels[12]}'")
-    # for peak in peaks_data[12]:
-    #     print(f"[{peak.time}, {peak.val}]")
+    # filename = "D:\\Experiments\\2023\\2023-09-07-PMT-Linear-colimator20mm-foil\\PMT-peaks\\PEAKS\\peaks_all.csv"
+    # shot_col = 5
+    # curve_col = 7
+    # time_col = 2
+    # amp_col = 3
+    # curves_count = 24
+    #
+    # all_shot_peaks = parse_csv_for_peaks(filename, shot_col, curve_col, time_col, amp_col, curves_count,
+    #                                      transposed=False)
+    #
+    # peaks_data = [None] * curves_count
+    #
+    # if int(shot_name) in all_shot_peaks.keys():
+    #     peaks_data = all_shot_peaks[int(shot_name)]
 
     # plot and save multi-plots
     if args.multiplot:

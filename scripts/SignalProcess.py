@@ -299,7 +299,7 @@ def pretty_print_nums(nums, prefix=None, postfix=None,
 
 
 def get_front_point(signals_data, args, multiplier, delay,
-                    front_plot_name, plot_bounds=None, interactive=False):
+                    front_plot_name, search_bounds=None, plot_bounds=None, interactive=False):
     """Finds the most left front point where the curve
     amplitude is greater (lower - for negative curve) than
     the level (args[1]) value.
@@ -321,6 +321,7 @@ def get_front_point(signals_data, args, multiplier, delay,
     :param front_plot_name: the full path to save the graph with the curve
                             and the marked point on the rise front
                             (fall front - for negative curve)
+    :param search_bounds: the left and right time limits to search for the curve front
     :param plot_bounds: save a curve plot with the point on the front with specified bounds
     :param interactive: turns on interactive mode of the smooth filter
                         parameters selection
@@ -330,6 +331,7 @@ def get_front_point(signals_data, args, multiplier, delay,
     :type multiplier: tuple or list
     :type delay: tuple or list
     :type front_plot_name: str
+    :type search_bounds: list or None
     :type plot_bounds: tuple ot list
     :type interactive: bool
 
@@ -353,8 +355,8 @@ def get_front_point(signals_data, args, multiplier, delay,
 
     # make local copy of target curve
     curve = SignalsData(np.copy(signals_data.get_curve_2d_arr(curve_idx)),
-                        labels=[signals_data.get_curve_label(0)],
-                        units=[signals_data.get_curve_units(0)],
+                        labels=[signals_data.get_curve_label(curve_idx)],
+                        units=[signals_data.get_curve_units(curve_idx)],
                         time_units=signals_data.time_units)
 
     # polarity = check_polarity(curve.get_single_curve(0))
@@ -413,6 +415,17 @@ def get_front_point(signals_data, args, multiplier, delay,
               "Close graph window to continue.")
     cancel = False
     # interactive cycle is performed at least once
+
+    if search_bounds is not None:
+        left = search_bounds[0]
+        right = search_bounds[1]
+        assert len(search_bounds) == 2, \
+            (f"search_bounds list must consist of exactly 2 elements, "
+             f"got {len(search_bounds)} instead.")
+        assert left < right, \
+            (f"The left edge of the search front ({left}) should be "
+             f"smaller than the right ({right})")
+
     while not cancel:
         # smooth curve
         data_y_smooth = smooth_voltage(data_y, window, poly_order)
@@ -426,6 +439,7 @@ def get_front_point(signals_data, args, multiplier, delay,
         front_x, front_y = find_curve_front(smoothed_curve,
                                             level,
                                             front,
+                                            bounds=search_bounds,
                                             interpolate=True)
 
         plot_title = ("Curve[{idx}] \"{label}\"\n"
@@ -547,6 +561,7 @@ def do_offset_by_front(signals_data, cl_args, shot_name):
     front_point = get_front_point(signals_data, cl_args.offset_by_front,
                                   cl_args.multiplier, cl_args.delay,
                                   front_plot_name,
+                                  search_bounds=cl_args.off_front_bounds,
                                   plot_bounds=cl_args.t_bounds,
                                   interactive=cl_args.it_offset)
     # update delays

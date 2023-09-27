@@ -336,7 +336,7 @@ def get_data_corr_args_parser():
     data_corr_args_parser = argparse.ArgumentParser(add_help=False)
 
     data_corr_args_parser.add_argument(
-        '--offset-by-curve-front',
+        '--offset-by-curve-front', '--offset-by-edge',
         action='store',
         metavar='VAL',
         nargs='+',
@@ -360,6 +360,19 @@ def get_data_corr_args_parser():
              'NOTE: you can enter only two parameters (IDX LEVEL),\n'
              '      then the interactive mode of the smooth filter\n'
              '      parameters selection will start.\n\n')
+
+    data_corr_args_parser.add_argument(
+        '--offset-by-front-bounds',
+        action='store',
+        dest='off_front_bounds',
+        metavar=('LEFT', 'RIGHT'),
+        nargs=2,
+        type=float,
+        default=(None, None),
+        help='Specify the left and right time limits to search \n'
+             'for the curve front.\n'
+             'The search for the front (--offset-by-curve-front) \n'
+             'will take place inside these borders.\n\n')
 
     data_corr_args_parser.add_argument(
         '--y-auto-zero',
