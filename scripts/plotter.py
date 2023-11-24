@@ -596,6 +596,8 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
     ylim = None
     for curve_idx in curve_list:
         if len(curve_list) > 1:
+            if curve_idx >= len(color_list):
+                color_iter = iter(color_list)
             color = next(color_iter)
         else:
             color = '#9999aa'
