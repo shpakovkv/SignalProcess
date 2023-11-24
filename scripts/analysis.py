@@ -5,17 +5,27 @@ Data analysis functions.
 Maintainer: Shpakov Konstantin
 Link: https://github.com/shpakovkv/SignalProcess
 """
-import numpy
+import os
+import time
+
 from matplotlib import pyplot as plt
-import timeit
 import numpy as np
 from numba import njit
-import time
-from data_types import SignalsData, SinglePeak, SingleCurve
-from arg_checker import check_plot_param
-from plotter import find_nearest_idx
 from scipy.signal import correlate as scipy_correlate
 from scipy import interpolate
+
+from data_types import SignalsData
+from data_types import SinglePeak
+from data_types import SingleCurve
+
+from arg_checker import check_plot_param
+
+from file_handler import load_from_file
+from file_handler import save_signals_csv
+from file_handler import get_file_list_by_ext
+
+from plotter import plot_multiple_curve
+from plotter import find_nearest_idx
 
 
 # =======================================================================
@@ -77,16 +87,16 @@ def correlation_func_2d(curve1, curve2):
             # curve_2 is more precise, need to interpolate curve_1
             time_step[0] = time_step[1]
             interp_funk = interpolate.interp1d(curve1[0], curve1[1])
-            new_curve_x = numpy.arange(curve1[0, 0], stop=curve1[0, -1], step=time_step[0])
+            new_curve_x = np.arange(curve1[0, 0], stop=curve1[0, -1], step=time_step[0])
             new_curve_y = interp_funk(new_curve_x)
-            curve1 = numpy.stack((new_curve_x, new_curve_y))
+            curve1 = np.stack((new_curve_x, new_curve_y))
         else:
             # curve_1 is more precise, need to interpolate curve_2
             time_step[1] = time_step[0]
             interp_funk = interpolate.interp1d(curve2[0], curve2[1])
-            new_curve_x = numpy.arange(curve2[0, 0], stop=curve2[0, -1], step=time_step[1])
+            new_curve_x = np.arange(curve2[0, 0], stop=curve2[0, -1], step=time_step[1])
             new_curve_y = interp_funk(new_curve_x)
-            curve2 = numpy.stack((new_curve_x, new_curve_y))
+            curve2 = np.stack((new_curve_x, new_curve_y))
 
     # get correlation
     # res = np.correlate(curve1[1], curve2[1], mode='full')
@@ -522,3 +532,130 @@ if __name__ == "__main__":
     # print(timeit.timeit("test_correlation_2d_jit()", setup="from __main__ import test_correlation_2d_jit", number=100))
 
     print("Done!")
+
+
+def get_signals_average(signals, x_bounds=None):
+    #TODO: get_signals_average description
+    assert isinstance(signals, SignalsData), f"Expected type SignalsData, got {type(signals)}."
+
+    # GET TIME_STEP, CHECK TIME STEPS EQUALITY
+    time_step_list = np.ndarray(shape=(signals.cnt_curves,), dtype=np.float64)
+    for idx in range(signals.cnt_curves):
+        curve = signals.get_single_curve(idx)
+        time_step_list[idx] = (curve.data[0, -1] - curve.data[0, 0]) / (curve.data.shape[1] - 1)
+    time_step = time_step_list[0]
+    tolerance = time_step_list.min() / 1e6
+    for idx, step in enumerate(time_step_list):
+        assert np.isclose(time_step, step, atol=tolerance), \
+            f"Curve[{idx} has different time step ({step}) from other curves ({time_step})]"
+
+    # different curves may have different start and stop x-values
+    # GET FINAL X-BOUNDS
+    start_x_list = np.ndarray(shape=(signals.cnt_curves,), dtype=np.float64)
+    stop_x_list = np.ndarray(shape=(signals.cnt_curves,), dtype=np.float64)
+    start_x_list[0] = signals.data[0, 0, 0]
+    stop_x_list[0] = signals.data[0, 0, -1]
+    if x_bounds is None:
+        x_bounds = [start_x_list[0], stop_x_list[0]]
+    for idx in range(1, signals.cnt_curves):
+        curve = signals.get_single_curve(idx)
+        start_x_list[idx] = curve.data[0, 0]
+        stop_x_list[idx] = curve.data[0, -1]
+        assert x_bounds[0] < stop_x_list[idx], \
+            (f"The boundaries of averaging {x_bounds} are located to the right "
+             f"of the curve[{idx}] along the time axis")
+        assert x_bounds[1] > start_x_list[idx], \
+            (f"The boundaries of averaging {x_bounds} are located to the left "
+             f"of the curve[{idx}] along the time axis")
+        assert start_x_list[idx] < stop_x_list[idx], f"x-start >= x-stop for the curve[{idx}]"
+        x_bounds[0] = start_x_list[idx] if start_x_list[idx] > x_bounds[0] else x_bounds[0]
+        x_bounds[1] = stop_x_list[idx] if stop_x_list[idx] < x_bounds[1] else x_bounds[1]
+
+    # print(f"Min x-start: {np.min(signals.data[:, 0, 0])};    Max x-start: {np.max(signals.data[:, 0, 0])}")
+    # print(f"Min x-stop: {np.min(signals.data[:, 0, -1])};    Max x-stop: {np.max(signals.data[:, 0, -1])}")
+    # print(f"x_bounds: {x_bounds}")
+
+    # GET START and STOP IDX
+    start_idx_list = np.ndarray(shape=(signals.cnt_curves,), dtype=int)
+    stop_idx_list = np.ndarray(shape=(signals.cnt_curves,), dtype=int)
+    for idx in range(signals.cnt_curves):
+        curve = signals.get_single_curve(idx)
+        start_idx_list[idx] = find_nearest_idx(curve.get_x(), x_bounds[0], side='right')
+        stop_idx_list[idx] = find_nearest_idx(curve.get_x(), x_bounds[1], side='left')
+
+    points_list = stop_idx_list - start_idx_list
+    max_points = np.max(points_list)
+    min_points = np.min(points_list)
+
+    assert max_points - min_points == 1, f"Sub-curves points differ more than 1"
+    points = min_points
+    for idx in range(signals.cnt_curves):
+        if points_list[idx] > points:
+            stop_idx_list[idx] -= 1
+
+    mean_curve_data = np.zeros(shape=(2, points), dtype=np.float64)
+    for idx in range(signals.cnt_curves):
+        data = signals.data[idx]
+        data = data[:, start_idx_list[idx]: stop_idx_list[idx]]
+        assert data.shape == mean_curve_data.shape, \
+            (f"Curve[{idx}] has different shape "
+             f"({data.shape}) form other curves ({mean_curve_data.shape})")
+        mean_curve_data += data
+
+    mean_curve_data /= signals.cnt_curves
+
+    return mean_curve_data
+
+
+def save_signals_average(source_dir, save_to, name, plot=False):
+    # todo: save_signals_average description
+    file_list = get_file_list_by_ext(source_dir, ["wfm", "csv"])
+
+    if not os.path.isdir(save_to):
+        os.makedirs(save_to)
+
+    data, _ = load_from_file(file_list.pop())
+    print(f"Loading file {1}/{len(file_list) + 1}")
+    signals_data = SignalsData(data.transpose(), labels=["000"], units=["a.u."], time_units="ns")
+    for idx, fname in enumerate(file_list):
+        print(f"Loading file {idx + 2}/{len(file_list) + 1}")
+        new_data, new_header = load_from_file(fname)
+        signals_data.add_from_array(new_data.transpose(), labels=[f"{idx + 1:03d}"], units=["a.u."])
+    print()
+
+    mean_curve = get_signals_average(signals_data, [-25.0, 100.0])
+    mean_signal = SignalsData(mean_curve, [f"Mean_{name}"], ["a.u."], "ns")
+    save_as = os.path.join(save_to, name + "_mean.csv")
+    save_signals_csv(save_as, mean_signal)
+    print(f"Saved as '{save_as}'")
+
+    if plot:
+        plot_multiple_curve(signals_data,
+                            list(range(signals_data.cnt_curves)),
+                            xlim=[-25.0, 100.0],
+                            amp_unit=signals_data.get_curve_units(0),
+                            time_units=signals_data.time_units,
+                            hide=True)
+
+        mplot_name = f"mean_{name}.mc.png"
+        mplot_path = os.path.join(save_to, mplot_name)
+        plt.savefig(mplot_path, dpi=400)
+        plt.close('all')
+        print("Plot is saved as {}".format(mplot_path))
+
+        plot_multiple_curve(mean_signal,
+                            0,
+                            xlim=[-25.0, 100.0],
+                            amp_unit=mean_signal.get_curve_units(0),
+                            time_units=mean_signal.time_units,
+                            hide=True)
+
+        plot_name = f"mean_{name}.png"
+        plot_path = os.path.join(save_to, plot_name)
+        plt.savefig(plot_path, dpi=400)
+        plt.close('all')
+        print("Plot is saved as {}".format(plot_path))
+
+
+
+
