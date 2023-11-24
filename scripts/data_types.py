@@ -325,7 +325,8 @@ class SignalsData:
                 "No curve with label '{}' found.".format(idx_or_label)
             idx = self.get_curve_idx(idx_or_label)
         assert 0 <= idx < self.cnt_curves, \
-            "Curve index [{}] is out of bounds.".format(idx)
+            ("Curve index [{}] is out of bounds. The number of curves is "
+             "{}").format(idx, self.cnt_curves)
         return idx
 
     def set_units(self, units_list):
