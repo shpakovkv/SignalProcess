@@ -794,6 +794,8 @@ def find_nearest_idx(sorted_arr, value, side='auto'):
     if side == 'auto':
         return idx if after - value < value - before else idx - 1
     else:
+        if after == value:
+            return idx
         return idx if side == 'right' else idx - 1
 
 

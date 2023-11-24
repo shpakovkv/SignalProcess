@@ -417,14 +417,17 @@ def get_front_point(signals_data, args, multiplier, delay,
     # interactive cycle is performed at least once
 
     if search_bounds is not None:
-        left = search_bounds[0]
-        right = search_bounds[1]
-        assert len(search_bounds) == 2, \
-            (f"search_bounds list must consist of exactly 2 elements, "
-             f"got {len(search_bounds)} instead.")
-        assert left < right, \
-            (f"The left edge of the search front ({left}) should be "
-             f"smaller than the right ({right})")
+        if search_bounds[0] is not None and search_bounds[1] is not None:
+            left = search_bounds[0]
+            right = search_bounds[1]
+            assert len(search_bounds) == 2, \
+                (f"search_bounds list must consist of exactly 2 elements, "
+                 f"got {len(search_bounds)} instead.")
+            assert left < right, \
+                (f"The left edge of the search front ({left}) should be "
+                 f"smaller than the right ({right})")
+        else:
+            search_bounds = None
 
     while not cancel:
         # smooth curve
