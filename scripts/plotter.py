@@ -763,44 +763,6 @@ def calc_y_lim(time, y, time_bounds=None, reserve=0.1):
     return y_min - reserve, y_max + reserve
 
 
-def find_nearest_idx(sorted_arr, value, side='auto'):
-    """
-    Returns the index of the 'sorted_arr' element closest to 'value'
-
-    :param sorted_arr: sorted array/list of ints or floats
-    :param value: the int/float number to which the
-                  closest value should be found
-    :param side: 'left': search among values that are lower then X
-                 'right': search among values that are greater then X
-                 'auto': handle all values (default)
-    :type sorted_arr: array-like
-    :type value: int, float
-    :type side: str ('left', 'right', 'auto')
-    :return: the index of the value closest to 'value'
-    :rtype: int
-
-    .. note:: if two numbers are equally close and side='auto',
-           returns the index of the smaller one.
-    """
-
-    idx = bisect.bisect_left(sorted_arr, value)
-    # print("IDX = {};  SIDE = {}; max = {};   min = {}".format(idx, side, np.nanmax(sorted_arr), np.nanmin(sorted_arr)))
-    if idx == 0:
-        return idx if side == 'auto' or side == 'right' else None
-
-    if idx == len(sorted_arr):
-        return idx if side == 'auto' or side == 'left' else None
-
-    after = sorted_arr[idx]
-    before = sorted_arr[idx - 1]
-    if side == 'auto':
-        return idx if after - value < value - before else idx - 1
-    else:
-        if after == value:
-            return idx
-        return idx if side == 'right' else idx - 1
-
-
 def do_plot_correlate_all(signals_data, args, shot_idx, correlate_data, correlate_part_data):
     """
 

@@ -7,26 +7,35 @@ Link: https://github.com/shpakovkv/SignalProcess
 """
 import os
 import time
+import sys
 
 from matplotlib import pyplot as plt
 import numpy as np
 from numba import njit
 from scipy.signal import correlate as scipy_correlate
 from scipy import interpolate
+from scipy.signal import savgol_filter
 
 from data_types import SignalsData
 from data_types import SinglePeak
 from data_types import SingleCurve
 
 from arg_checker import check_plot_param
+from arg_checker import check_multiplier
 
-from file_handler import load_from_file
+from file_handler import read_signals
 from file_handler import save_signals_csv
 from file_handler import get_file_list_by_ext
+from file_handler import get_grouped_file_list
+from file_handler import get_real_num_bounds_1d
+
+from data_manipulation import multiplier_and_delay
 
 from plotter import plot_multiple_curve
-from plotter import find_nearest_idx
 
+from analyse_peak import find_nearest_idx
+from analyse_front import get_front_point
+from analyse_front import find_curve_front
 
 # =======================================================================
 # ------   CORRELATION   ------------------------------------------------
@@ -442,8 +451,8 @@ def get_2d_array_stat_by_columns(data):
 
     result([ 2.0,  15.0,  24.0, 106,3333])
 
-    :param delay_list: list with delay values delay_list[shot_num][delay_num]
-    :type delay_list: list or np.ndarray
+    :param data: list or np.ndarray with data
+    :type data: list or np.ndarray
     :return: two-dimensional ndarray: result[column][stat_type]
     where stat_type are: mean, std deviation, max deviation, number of non-nan samples
     :rtype: np.ndarray
