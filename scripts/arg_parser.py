@@ -735,6 +735,23 @@ def get_peak_args_parser():
              'will be plotted.\n\n'
              ''.format(folder=os.path.join(SAVETODIR, PEAKDATADIR)))
 
+    # peak_args_parser.add_argument(
+    #     '--read-peaks-from-scv',
+    #     action='store',
+    #     metavar=('file'),
+    #     nargs=7,
+    #     dest='read',
+    #     help='Read the peak from files at the default folder\n'
+    #          '({folder}).\n'
+    #          'If the arguments needed for the searching of peaks \n'
+    #          'were specified, the program will find peaks, save them\n'
+    #          'and show the multiplot with all found peaks.\n'
+    #          'You may delete some peak files or edit them.\n'
+    #          'When the multiplot window is closed, the program \n'
+    #          'will read the edited peak data and the new plots\n'
+    #          'will be plotted.\n\n'
+    #          ''.format(folder=os.path.join(SAVETODIR, PEAKDATADIR)))
+
     return peak_args_parser
 
 
