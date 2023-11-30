@@ -18,6 +18,7 @@ import argparse
 from analyse_peak import find_nearest_idx
 
 from data_types import SignalsData
+from analyse_peak import find_nearest_idx
 
 
 class ColorRange:
@@ -707,10 +708,11 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
 
     if title is not None:
         plt.title(title)
-    elif len(curve_list) > 1:
-        plt.legend()
-    else:
+    elif len(curve_list) == 1:
         plt.title(signals.get_curve_label(curve_list[0]))
+    if 1 < len(curve_list) < 21:
+        plt.legend()
+
     plt.xlabel(time_label)
     plt.ylabel(amp_label)
 
