@@ -7,12 +7,15 @@ Link: https://github.com/shpakovkv/SignalProcess
 
 import os
 import numpy as np
+import pandas as pd
+from pytz import timezone as ptz
 from matplotlib import pyplot as plt
 from matplotlib import dates as md
 from matplotlib.cm import get_cmap
 import bisect
 import colorsys
 import argparse
+from analyse_peak import find_nearest_idx
 
 from data_types import SignalsData
 
@@ -381,7 +384,8 @@ def plot_multiplot(data, peak_data, curves_list,
         # plot curve
 
         if unixtime:
-            axes[wf, 0].plot(md.epoch2num(data.get_x(curves_list[wf])),
+            dt_arr = pd.to_datetime(data.get_x(curves_list[wf]), unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+            axes[wf, 0].plot(dt_arr,
                              data.get_y(curves_list[wf]),
                              '-', color='#9999aa', linewidth=0.5)
         else:
@@ -603,7 +607,8 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
             color = '#9999aa'
         # print("||  COLOR == {} ===================".format(color))
         if unixtime:
-            plt.plot(md.epoch2num(signals.get_x(curve_idx)),
+            dt_arr = pd.to_datetime(signals.get_x(curve_idx), unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+            plt.plot(dt_arr,
                      signals.get_y(curve_idx),
                      '-',
                      label=signals.get_curve_label(curve_idx),
@@ -634,9 +639,10 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
         #         peak_x = [peak.time for peak in peaks[curve_idx] if peak is not None]
         #         peak_y = [peak.val for peak in peaks[curve_idx] if peak is not None]
         #         if unixtime:
-        #             plt.scatter(md.epoch2num(peak_x), peak_y, s=50, edgecolors='#ff7f0e',
+        #             pk_dt_arr = pd.to_datetime(peak_x, unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+        #             plt.scatter(pk_dt_arr, peak_y, s=50, edgecolors='#ff7f0e',
         #                         facecolors='none', linewidths=2)
-        #             plt.scatter(md.epoch2num(peak_x), peak_y, s=90, edgecolors='#dd3328',
+        #             plt.scatter(pk_dt_arr, peak_y, s=90, edgecolors='#dd3328',
         #                         facecolors='none', linewidths=2)
         #         else:
         #             plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e',
@@ -651,15 +657,16 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
                 pk_color = next(pk_color_iter)
                 if pk is not None:
                     if unixtime:
-                        plt.scatter(md.epoch2num([pk.time]), [pk.val], s=30,
+                        pk_dt_arr = pd.to_datetime([pk.time], unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+                        plt.scatter(pk_dt_arr, [pk.val], s=30,
                                     edgecolors=color, facecolors='none',
                                     linewidths=1.5)
-                        plt.scatter(md.epoch2num([pk.time]), [pk.val], s=60,
+                        plt.scatter(pk_dt_arr, [pk.val], s=60,
                                     edgecolors='none', facecolors=pk_color,
                                     linewidths=1.5, marker='x')
-                        # plt.scatter(md.epoch2num([pk.time]), [pk.val], s=50, edgecolors='#ff7f0e',
+                        # plt.scatter(pk_dt_arr, [pk.val], s=50, edgecolors='#ff7f0e',
                         #                     facecolors='none', linewidths=2)
-                        # plt.scatter(md.epoch2num([pk.time]), [pk.val], s=90, edgecolors='#dd3328',
+                        # plt.scatter(pk_dt_arr, [pk.val], s=90, edgecolors='#dd3328',
                         #             facecolors='none', linewidths=2)
                     else:
                         # plt.scatter([pk.time], [pk.val], s=50,
@@ -921,7 +928,8 @@ def plot_multiplot_independent(list_of_2d_arrays,
         # print("ICURVE = {};   LABEL = {};  DATA.SHAPE = {};  ============================"
         #       "".format(icurve, labels[icurve], data.shape))
         if unixtime:
-            axes[icurve, 0].plot(md.epoch2num(data[0]),
+            dt_arr = pd.to_datetime(data[0], unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+            axes[icurve, 0].plot(dt_arr,
                                  data[1],
                                  '-', color='#9999aa', linewidth=0.5)
         else:
