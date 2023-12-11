@@ -569,6 +569,8 @@ def file_arg_check(options):
     """
     # input directory and files check
     if options.src_dir:
+        if isinstance(options.src_dir, str):
+            options.src_dir = [options.src_dir]
         dir_list = list()
         for value in options.src_dir:
             dir_list.append(value.strip())
