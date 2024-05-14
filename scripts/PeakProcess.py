@@ -786,20 +786,20 @@ def do_job(args, shot_idx):
                          peaks=peaks_data, verbose=verbose,
                          hide=args.p_hide)
 
-    filename = "G:\\Experiments\\2023\\2023-08-22-PMT-Linear-colimator40mm-Al3mm\\PMT-peaks\\PMT-Peaks-all.csv"
-    shot_col = 5
-    curve_col = 7
-    time_col = 2
-    amp_col = 3
-    curves_count = 24
-
-    all_shot_peaks = parse_csv_for_peaks(filename, shot_col, curve_col, time_col, amp_col, curves_count,
-                                         transposed=False)
-
-    peaks_data = [None] * curves_count
-
-    if int(shot_name) in all_shot_peaks.keys():
-        peaks_data = all_shot_peaks[int(shot_name)]
+    # filename = "G:\\Experiments\\2023\\2023-08-22-PMT-Linear-colimator40mm-Al3mm\\PMT-peaks\\PMT-Peaks-all.csv"
+    # shot_col = 5
+    # curve_col = 7
+    # time_col = 2
+    # amp_col = 3
+    # curves_count = 24
+    #
+    # all_shot_peaks = parse_csv_for_peaks(filename, shot_col, curve_col, time_col, amp_col, curves_count,
+    #                                      transposed=False)
+    #
+    # peaks_data = [None] * curves_count
+    #
+    # if int(shot_name) in all_shot_peaks.keys():
+    #     peaks_data = all_shot_peaks[int(shot_name)]
 
     # plot and save multi-plots
     if args.multiplot:
