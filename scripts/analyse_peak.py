@@ -185,7 +185,7 @@ def find_curve_front(curve,
     :param curve: curve data
     :param level: amplitude value to find
     :param front: the polarity of the curve "rise"/"fall"/"auto"
-    :param bounds: left and right borders to search
+    :param bounds: left and right borders to search (with the same units as curve.time)
     :param interpolate: if false finds the nearest curve point,
                         if true finds the exact time using a linear approximation
     :param save_plot: bool flag

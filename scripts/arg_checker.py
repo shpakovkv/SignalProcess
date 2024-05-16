@@ -1028,6 +1028,38 @@ def front_delay_check(options):
     return options
 
 
+def front_stat_check(options):
+    """Needed for front delay calculation process.
+
+    Check data manipulation arguments:
+    --front-stat
+    --front-stat-save-plot-to
+
+    :param options: namespace with args
+    :type options: argparse.Namespace
+
+    :return: changed options
+    :rtype: argparse.Namespace
+    """
+    if options.front_stat is not None:
+        front_stat_count = len(options.front_stat)
+
+        for idx in range(front_stat_count):
+            front_dict = dict()
+            front_dict["curve"] = int(options.front_stat[idx][0])
+            front_dict["level"] = float(options.front_stat[idx][1])
+            front_dict["slope"] = "fall" if float(options.front_stat[idx][2]) < 0.0 else "rise"
+            front_dict["high_ref"] = float(options.front_stat[idx][3])
+            front_dict["low_ref"] = float(options.front_stat[idx][4])
+            front_dict["bounds_x"] = (float(options.front_stat[idx][5]), float(options.front_stat[idx][6]))
+            front_dict["save_to"] = options.front_stat[idx][7]
+            if front_dict["save_to"].lower() == "none":
+                front_dict["save_to"] = None
+
+            options.front_stat[idx] = front_dict
+    return options
+
+
 def check_and_prepare_front_bounds(user_entered_bounds):
     """ Checks one --front-bounds flag values:
         - Checks for skipping word "none" and set value to None

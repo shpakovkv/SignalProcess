@@ -821,4 +821,27 @@ def get_front_args_parser():
              'NOTE: You may enter \'none\' to skip plotting '
              '      some --front-delay instances.\n\n')
 
+    front_args_parser.add_argument(
+        '--front-stat',
+        action='append',
+        metavar=('CURVE', 'LEVEL', 'SLOPE', 'HIGH_REF', 'LOW_REF', 'START_X', 'STOP_X', 'SAVE_TO'),
+        nargs=8,
+        type=str,
+        dest='front_stat',
+        default=None,
+        help='Calculates the curve pulse parameters. \n'
+             '1. Search front edge that excess (for SLOPE > 0) or \n'
+             '   falls below (SLOPE < 0) specified LEVEL value within \n'
+             '   specified bounds [START_X, STOP_X]. \n'
+             '2. Search for pulse maximum/minimum peak point.\n'
+             '3. Search for rising/falling front edge two points: \n'
+             '   the low reference level point (at LOW_REF * PEAK) \n'
+             '   and high reference level point (at HIGH_REF * PEAK) .\n'
+             '4. Search for falling/rising back edge two point.\n'
+             '5. Search for peak width at half height.\n'
+             '6. If you want to save plot and stat data to file, specify folder '
+             '   as last value. If you do not want to save plots and data to files\n'
+             '   you may enter "none" as SAVE_TO value\n'
+             'NOTE: You may enter as many --front-stat flag as you want (for different curves).\n\n')
+
     return front_args_parser

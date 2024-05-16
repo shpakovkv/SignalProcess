@@ -32,7 +32,8 @@ from itertools import repeat
 
 from data_manipulation import multiplier_and_delay
 from data_types import SinglePeak, SignalsData, SingleCurve
-from analysis import get_2d_array_stat_by_columns
+from analysis import (get_2d_array_stat_by_columns,
+                      get_1d_array_stat)
 
 from file_handler import check_files_for_duplicates
 from file_handler import parse_csv_for_peaks
@@ -555,6 +556,9 @@ def global_check(options):
     # front delay args check
     options = arg_checker.front_delay_check(options)
 
+    # front stats args check
+    options = arg_checker.front_stat_check(options)
+
     return options
 
 
@@ -765,9 +769,11 @@ def do_job(args, shot_idx):
         else:
             plt.show()
 
-    delay_values = None
+    out_data = None
     if args.front_delay:
-        delay_values = do_front_delay_all(data, args, shot_name, verbose=True)
+        out_data = do_front_delay_all(data, args, shot_name, verbose=True)
+    elif args.front_stat:
+        out_data = do_front_stat_all(data, args, shot_name, verbose=True)
 
     if args.read:
         if verbose:
@@ -806,10 +812,10 @@ def do_job(args, shot_idx):
         plotter.do_multiplots(data, args, shot_name,
                               peaks=peaks_data, verbose=verbose,
                               hide=args.mp_hide)
-    return delay_values
+    return out_data
 
 
-def print_front_delay_stats(args, outputs):
+def print_front_delay_values(args, outputs):
     delay_stats = get_2d_array_stat_by_columns(outputs)
     print("----------------------------------------------------------------")
     for idx in range(delay_stats.shape[0]):
@@ -846,6 +852,87 @@ def print_front_delay_stats(args, outputs):
                         delay_stats[idx, 2], args.time_units,
                         int(delay_stats[idx, 3])
                         )
+              )
+        print()
+
+
+def print_front_stat_values(args, outputs):
+    """
+
+    :param args:
+    :type args:
+    :param outputs:
+    :type outputs:
+    :return:
+    :rtype:
+    """
+    print("----------------------------------------------------------------")
+
+    curve_num = len(outputs[0])
+    rise_time = []
+    fall_time = []
+    half_width = []
+    peak_val = []
+    for idx in range(curve_num):
+        rise_time.append([shot_data[idx]["rise_time"] for shot_data in outputs])
+        fall_time.append([shot_data[idx]["fall_time"] for shot_data in outputs])
+        half_width.append([shot_data[idx]["half_width"] for shot_data in outputs])
+        peak_val.append([shot_data[idx]["peak"].val for shot_data in outputs])
+
+    rise_time = np.array(rise_time, dtype=np.float64)
+    fall_time = np.array(fall_time, dtype=np.float64)
+    half_width = np.array(half_width, dtype=np.float64)
+    peak_val = np.array(peak_val, dtype=np.float64)
+
+    for idx in range(curve_num):
+        curve = args.front_stat[idx]["curve"]
+        level = args.front_stat[idx]["level"]
+        slope = args.front_stat[idx]["slope"]
+        high_ref = args.front_stat[idx]["high_ref"]
+        low_ref = args.front_stat[idx]["low_ref"]
+        bounds_x = args.front_stat[idx]["bounds_x"]
+        save_to = args.front_stat[idx]["save_to"]
+        time_units = args.time_units
+        units = "a.u."
+        if args.units is not None:
+            units = args.units[curve]
+
+        label = ""
+        if args.labels is not None:
+            label = args.labels[curve]
+
+        print(f"Parameters of curve {curve} ('{label}') peak front within {bounds_x} "
+              f"from {high_ref * 100:.2f}% of peak to {low_ref * 100:.2f}% of peak, slope: {slope}:")
+
+        arr_mean, arr_std, arr_maxerr, arr_samples_num = get_1d_array_stat(rise_time[idx])
+        print(f"RISE TIME: Mean = {arr_mean:.6f} {time_units}; "
+              f" Std. Dev. = {arr_std:.6f} {time_units};  "
+              f"Max. Dev. = {arr_maxerr:.6f} {time_units};   "
+              f"Number of samples = {arr_samples_num}"
+              )
+
+        arr_mean, arr_std, arr_maxerr, arr_samples_num = get_1d_array_stat(fall_time[idx])
+
+        print(f"FALL TIME: Mean = {arr_mean:.6f} {time_units}; "
+              f" Std. Dev. = {arr_std:.6f} {time_units};  "
+              f"Max. Dev. = {arr_maxerr:.6f} {time_units};   "
+              f"Number of samples = {arr_samples_num}"
+              )
+
+        arr_mean, arr_std, arr_maxerr, arr_samples_num = get_1d_array_stat(half_width[idx])
+
+        print(f"HALF WIDTH: Mean = {arr_mean:.6f} {time_units}; "
+              f" Std. Dev. = {arr_std:.6f} {time_units};  "
+              f"Max. Dev. = {arr_maxerr:.6f} {time_units};   "
+              f"Number of samples = {arr_samples_num}"
+              )
+
+        arr_mean, arr_std, arr_maxerr, arr_samples_num = get_1d_array_stat(peak_val[idx])
+
+        print(f"PEAK VALUE: Mean = {arr_mean:.6f} {units}; "
+              f" Std. Dev. = {arr_std:.6f} {units};  "
+              f"Max. Dev. = {arr_maxerr:.6f} {units};   "
+              f"Number of samples = {arr_samples_num}"
               )
         print()
 
@@ -965,6 +1052,269 @@ def get_two_fronts_delay(curve1, level1, front1,
     return front_points
 
 
+def get_front_stats(curve,
+                    level,
+                    slope,
+                    top_part=0.9,
+                    bot_part=0.1,
+                    bounds=None,
+                    interpolate=False,
+                    min_points=10,
+                    save=False,
+                    plot_name="voltage_front",
+                    folder="",
+                    verbose=True):
+    """Finds the falling or rising edge for the first peak exceeding the set level,
+    calculates peak parameters ().
+    May prints information during the process.
+    May saves plots with front points.
+
+    :param curve: first curve, to get the front point
+    :type curve: SingleCurve
+
+    :param level: first front trigger level
+    :type level: float
+
+    :param slope: first front type: "rise" | "fall" | "auto"
+    :type slope: str
+
+    :param top_part: the upper boundary of the rise/fall front of the signal pulse in fractions of its maximum
+    :type top_part: float
+
+    :param bot_part: the lower boundary of the rise/fall front of the signal pulse in fractions of its maximum
+    :type bot_part: float
+
+    :param bounds: left and right borders to search for curve (with the same units as curve.time)
+    :type bounds: list or None
+
+    :param interpolate: if false finds the nearest curve point,
+                        if true finds the exact time using a linear approximation
+    :type interpolate: bool
+
+    :param min_points: the minimum number of points on witch the maximum is searched
+    :type min_points: int
+
+    :param save: save plot with front points
+    :type save: bool
+
+    :param plot_name: plot name without extension
+    :type plot_name: str
+
+    :param folder: folder to save plot to
+    :type folder: str
+
+    :param verbose: print signal edge information or not
+    :type verbose: bool
+
+    :return: signal edge parameters in dict format or None if no edge found
+
+    :rtype: dict or None
+    """
+    time_col = curve.time
+    amp_col = curve.val
+
+    # filter nan values
+    last_idx1 = time_col.shape[0] - 1
+    while np.isnan(time_col[last_idx1]):
+        last_idx1 -= 1
+
+    last_idx2 = amp_col.shape[0] - 1
+    while np.isnan(amp_col[last_idx2]):
+        last_idx2 -= 1
+
+    last_idx = min(last_idx1, last_idx2)
+    time_col = time_col[:last_idx + 1]
+    amp_col = amp_col[:last_idx + 1]
+
+    save_as = plot_name + ".png"
+    folder = os.path.abspath(folder)
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+
+    # find edge
+    x1, y1 = find_curve_front(curve,
+                              level=level,
+                              front=slope,
+                              bounds=bounds,
+                              interpolate=interpolate,
+                              save_plot=False,
+                              plot_name=save_as)
+
+    if slope.lower() in ["fall", "falling"]:
+        amp_col = -amp_col
+        level = -level
+
+    # check bounds
+    if bounds is None:
+        bounds = (time_col[0], time_col[-1])
+
+    search_stop_idx = find_nearest_idx(time_col, bounds[1], side='right')  # last point is not included
+    search_start_idx = find_nearest_idx(time_col, bounds[0], side='right')
+
+    assert 0 <= search_start_idx < time_col.shape[0] - min_points - 1
+    assert search_start_idx < search_stop_idx <= time_col.shape[0]
+
+    time_col = time_col[search_start_idx: search_stop_idx]
+    amp_col = amp_col[search_start_idx: search_stop_idx]
+
+    if x1 is None:
+        print("None")
+        return None
+    results = dict()
+
+    # add front point
+    if slope.lower() in ["fall", "falling"]:
+        y1 = -y1
+    results["level_excess"] = SinglePeak(x1, y1, 0)
+
+    # get pulse peak
+    front_nearest_idx = find_nearest_idx(time_col, x1, side='right')
+    front_nearest_x = time_col[front_nearest_idx]
+    amp_max_idx = search_maximum_of_one_pulse(amp_col, front_nearest_idx, threshold=0.5, to_right=True, min_points=min_points)
+    amp_max = amp_col[amp_max_idx]
+    results["peak"] = SinglePeak(time_col[amp_max_idx], amp_max, 0)
+
+    # find the front edge bottom point
+    amp_max_idx_reversed = flip_index(amp_max_idx, amp_col)
+    amp_col_reversed = np.flip(amp_col)
+    front_bot_point_idx = search_front_point(amp_col_reversed, bot_part * amp_max, start=amp_max_idx_reversed, stop=None,
+                                       rising=False)
+    front_bot_point_idx = flip_index(front_bot_point_idx, amp_col)
+    results["front_edge"] = [SinglePeak(time_col[front_bot_point_idx], amp_col[front_bot_point_idx], 0)]
+
+    # find the front edge top point
+    front_top_point_idx = search_front_point(amp_col, top_part * amp_max, start=0, stop=None, rising=True)
+    results["front_edge"].append(SinglePeak(time_col[front_top_point_idx], amp_col[front_top_point_idx], 0))
+
+    # find half-width
+    hw_front_idx = search_front_point(amp_col, 0.5 * amp_max, start=0, stop=None, rising=True)
+    results["hw"] = [SinglePeak(time_col[hw_front_idx], amp_col[hw_front_idx], 0)]
+    hw_back_idx = search_front_point(amp_col, 0.5 * amp_max, start=amp_max_idx, stop=None, rising=False)
+    results["hw"].append(SinglePeak(time_col[hw_back_idx], amp_col[hw_back_idx], 0))
+
+    # find back edge
+    back_bot_point_idx = search_front_point(amp_col, bot_part * amp_max, start=amp_max_idx, stop=None, rising=False)
+    back_bot_point_idx_reverced = flip_index(back_bot_point_idx, amp_col)
+    back_top_point_idx = search_front_point(amp_col_reversed, top_part * amp_max, start=back_bot_point_idx_reverced, stop=None, rising=True)
+    back_top_point_idx = flip_index(back_top_point_idx, amp_col)
+    results["back_edge"] = [SinglePeak(time_col[back_top_point_idx], amp_col[back_top_point_idx], 0)]
+    results["back_edge"].append(SinglePeak(time_col[back_bot_point_idx], amp_col[back_bot_point_idx], 0))
+
+    results["rise_time"] = results["front_edge"][1].time - results["front_edge"][0].time
+    results["fall_time"] = results["back_edge"][1].time - results["back_edge"][0].time
+    results["half_width"] = results["hw"][1].time - results["hw"][0].time
+
+    if save:
+        plt.close("all")
+        plt.plot(time_col, amp_col, "-b")
+        fig = matplotlib.pyplot.gcf()
+        fig.set_size_inches(10, 6)
+        plt.scatter([results["level_excess"].time], [results["level_excess"].val],
+                    edgecolor="b", facecolor="none", marker="o", s=50, label=f"Level {level}")
+        plt.scatter([results["peak"].time], [results["peak"].val],
+                    edgecolor="r", facecolor="none", marker="*", s=70, label="Peak")
+        plt.scatter([point.time for point in results["front_edge"]], [point.val for point in results["front_edge"]],
+                    edgecolor="limegreen", facecolor="none", marker="*", s=70)
+        plt.plot([point.time for point in results["front_edge"]], [point.val for point in results["front_edge"]],
+                    color="limegreen", label=f"Front edge {top_part * 100:.2f}% and {bot_part * 100:.2f}% of max")
+        plt.scatter([point.time for point in results["hw"]], [point.val for point in results["hw"]],
+                    edgecolor="m", facecolor="none", marker="*", s=70)
+        plt.plot([point.time for point in results["hw"]], [point.val for point in results["hw"]],
+                    color="m", label="Half-width")
+        plt.scatter([point.time for point in results["back_edge"]], [point.val for point in results["back_edge"]],
+                    edgecolor="goldenrod", facecolor="none", marker="*", s=70)
+        plt.plot([point.time for point in results["back_edge"]], [point.val for point in results["back_edge"]],
+                 color="goldenrod", label=f"Back edge {top_part * 100:.2f}% and {bot_part * 100:.2f}% of max")
+        plt.legend()
+        # plt.show(block=True)
+        plt.savefig(os.path.join(folder, plot_name), dpi=400)
+
+        # TODO: save data in JSON file
+    return results
+
+
+def flip_index(idx, arr):
+    # if idx is None:
+    #     return None
+    assert isinstance(arr, np.ndarray), f"Wrong array type. Expected numpy.ndarray, got {type(arr)} instead."
+    assert arr.ndim == 1, f"Wrong input array shape. Expected 1-dimensional array, got ndim == {arr.ndim} instead."
+    last_idx = arr.shape[0] - 1
+    return last_idx - idx
+
+
+def search_maximum_of_one_pulse(data, start=0, stop=None, threshold=0.5, threshold_abs=None, to_right=True, min_points=10):
+    assert to_right, "to_right=False is not implemented"
+    # TODO: add to_right == False algorythm
+    assert 0.0 < threshold < 1.0, f"Bad threshold value ({threshold}). Expected 0.0 < threshold < 1.0 "
+    assert isinstance(data, np.ndarray), f"Wrong input data formatn, Expected numpy.ndarray, got {type(data)} instead."
+    assert data.ndim == 1, f"Wrong input data shape. Expected 1-dimensional array, got ndim == {data.ndim} instead."
+    assert 0 <= start, f"The start index must be greater or equal to 0"
+    assert start < data.shape[0] - 1 - min_points, (f"Not enough data points. data_points: {data.shape[0]};  "
+                                                    f"start: {start};  stop: {stop};  min_points: {min_points}")
+    if stop is None or stop > data.shape[0]:
+        stop = data.shape[0]  # last is not included
+
+    assert abs(stop - start) >= min_points, (f"Not enough data points. data_points: {data.shape[0]};  "
+                                        f"start: {start};  stop: {stop};  min_points: {min_points}")
+    use_abs_val = False
+    if threshold_abs is None:
+        threshold_abs = data[start] * threshold
+    else:
+        use_abs_val = True
+
+    increment = 1
+    if not to_right:
+        increment = -1
+
+    idx = start
+    last_max_idx = np.argmax(data[idx: idx + min_points])
+    last_max = data[last_max_idx]
+    if not use_abs_val:
+        threshold_abs = last_max * threshold
+
+    # TODO: handle inf and nan values
+    while idx < stop and data[idx] > threshold_abs:
+        idx += increment
+        if last_max < data[idx]:
+            last_max = data[idx]
+            last_max_idx = idx
+            if not use_abs_val:
+                threshold_abs = last_max * threshold
+
+    # the lower point of pulse fall is not found
+    if idx == stop and data[idx - 1] > threshold_abs:
+        return last_max_idx
+
+    return last_max_idx
+
+
+def search_front_point(data, threshold_abs, start=0, stop=None, rising=True):
+    assert isinstance(data, np.ndarray), f"Wrong input data formatn, Expected numpy.ndarray, got {type(data)} instead."
+    assert data.ndim == 1, f"Wrong input data shape. Expected 1-dimensional array, got ndim == {data.ndim} instead."
+    if start is None:
+        start = 0
+    assert 0 <= start < data.shape[0], f"The start index must be greater or equal to 0. Got {start} instead."
+
+    if stop is None or stop > data.shape[0]:
+        stop = data.shape[0]  # last is not included
+
+    idx = start
+
+    # TODO: handle inf and nan values
+    if rising:
+        while idx < stop and data[idx] < threshold_abs:
+            idx += 1
+    else:
+        while idx < stop and data[idx] > threshold_abs:
+            idx += 1
+
+    # the lower point of pulse fall is not found
+    if idx == stop:
+        return stop - 1  # last index is not included
+
+    return idx
+
+
 def print_pulse_duration(curve1, level1, front1, save=False, prefix="pulse_"):
     save_as = prefix + ".png"
     front_points = list()
@@ -1031,7 +1381,7 @@ def do_front_delay_all(data, args, shot_idx, verbose):
         :type verbose: bool
 
         :return: the list of delay values
-        :rtype: float
+        :rtype: list
         """
     front_delay_data = list()
     for idx, front_param in enumerate(args.front_delay):
@@ -1154,6 +1504,88 @@ def do_front_delay_single(data, front_param, shot_idx, xlim=(None, None), verbos
     return the_delay
 
 
+def do_front_stat_all(data, args, shot_idx, verbose):
+    """ For all --front-stat flags:
+      1. Calculates peak key points and parameters.
+      2. Prints the values to console.
+      3. Saves graph of two curves with front points if needed.
+
+    :param data: SignalsData instance
+    :type data: SignalsData
+
+    :param args: command line arguments, entered by the user
+    :type args: argparse.Namespace
+
+    :param shot_idx: the name of current shot
+    :type shot_idx: str or int
+
+    :param verbose: shows more info during the process
+    :type verbose: bool
+
+    :return: the list of the front parameters of pulses of different curves
+    :rtype: list
+    """
+    front_stat_list = list()
+    for idx, front_param in enumerate(args.front_stat):
+        new_stat = do_front_stat_single(data, front_param, shot_idx, verbose)
+        front_stat_list.append(new_stat)
+    return front_stat_list
+
+
+def do_front_stat_single(data, front_param, shot_idx, verbose=False):
+    """ Calculates curve pulse parameters (front edge, back edge, half width, peak).
+    Prints the value to console.
+    Saves graph of two curves with front points.
+
+    :param data: SignalsData instance
+    :type data: SignalsData
+
+    :param front_param: the front stat parameters dict
+    :type front_param: dict
+
+    :param shot_idx: the name of current shot
+    :type shot_idx: str or int
+
+    :param verbose: shows more info during the process
+    :type verbose: bool
+    :return: the key points of curve pulse
+    :rtype: dict
+    """
+
+    curve = front_param["curve"]
+    level = front_param["level"]
+    slope = front_param["slope"]
+    high_ref = front_param["high_ref"]
+    low_ref = front_param["low_ref"]
+    bounds_x = front_param["bounds_x"]
+    save_to = front_param["save_to"]
+    save = True
+    if save_to is None:
+        save = False
+
+    res = get_front_stats(data.get_single_curve(curve),
+                          level,
+                          slope,
+                          top_part=high_ref,
+                          bot_part=low_ref,
+                          bounds=bounds_x,
+                          interpolate=True,
+                          min_points=10,
+                          save=save,
+                          plot_name=f"{shot_idx}_curve{curve:03d}_peak_stats",
+                          folder=save_to,
+                          verbose=True)
+
+    if verbose:
+        # print()
+        print(f"{shot_idx}: curve {curve} '{data.get_curve_label(curve)}' peak within {bounds_x} parameters: "
+              f"rise time: {res['front_edge'][1].time - res['front_edge'][0].time} {data.time_units};  "
+              f"fall time: {res['back_edge'][1].time - res['back_edge'][0].time} {data.time_units};  "
+              f"half width: {res['hw'][1].time - res['hw'][0].time} {data.time_units}.")
+
+    return res
+
+
 def main():
     parser = get_parser()
 
@@ -1195,13 +1627,15 @@ def main():
 
     # MAIN LOOP
     start_time = time.time()
-    if args.level or args.read or args.front_delay or args.multiplot or args.plot:
+    if args.level or args.read or args.front_delay or args.multiplot or args.plot or args.front_stat:
 
         shot_list = [shot_idx for shot_idx in range(len(args.gr_files))]
         with Pool(args.threads) as p:
             outputs = p.starmap(do_job, zip(repeat(args), shot_list))
             if args.front_delay is not None:
-                print_front_delay_stats(args, outputs)
+                print_front_delay_values(args, outputs)
+            elif args.front_stat is not None:
+                print_front_stat_values(args, outputs)
 
     # arg_checker.print_duplicates(args.gr_files)
     stop_time = time.time()
