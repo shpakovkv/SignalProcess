@@ -749,32 +749,38 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
                         signals_data.max_points))
 
     if save_as is None:
-        save_name = ("{pref}{number}{postf}.csv"
+        save_name = ("{pref}{number}{postf}"
                      "".format(pref=cl_args.prefix, number=shot_name,
                                postf=cl_args.postfix))
         save_as = os.path.join(cl_args.save_to, save_name)
-
-    if separate_files:
+    else:
         # delete extension
         if len(save_as) > 4 and save_as[-4] == ".":
             save_as = save_as[:-4]
-        # save single curve
-        if signals_data.cnt_curves == 1:
-            save_curve_as = "{}.csv".format(save_as)
-            save_signals_csv(save_curve_as, signals_data, curves_list=[0])
-        else:
-            for curve in range(signals_data.cnt_curves):
-                save_curve_as = "{}_curve{:03d}.csv".format(save_as, curve)
-                if verbose:
-                    print("Saving '{}'".format(save_curve_as))
-                save_signals_csv(save_curve_as, signals_data, curves_list=[curve])
-        # restore extension
-        save_as = "{}.csv".format(save_as)
+
+    if separate_files:
+        if cl_args.save_isf:
+            save_signals_isf(save_as, signals_data, verbose=verbose)
+        if cl_args.save_csv:
+            # save single curve
+            if signals_data.cnt_curves == 1:
+                save_curve_as = "{}.csv".format(save_as)
+                save_signals_csv(save_curve_as, signals_data, curves_list=[0])
+            else:
+                for curve in range(signals_data.cnt_curves):
+                    save_curve_as = "{}_curve{:03d}.csv".format(save_as, curve)
+                    if verbose:
+                        print("Saving '{}'".format(save_curve_as))
+                    save_signals_csv(save_curve_as, signals_data, curves_list=[curve])
 
     else:
-        save_signals_csv(save_as, signals_data)
-        if verbose:
-            print("Saved as {}".format(save_as))
+        if cl_args.save_csv:
+            save_csv = "{}.csv".format(save_as)
+            save_signals_csv(save_csv, signals_data)
+            if verbose:
+                print("Saved as {}".format(save_csv))
+        if cl_args.save_isf:
+            save_signals_isf(save_as, signals_data, verbose=verbose)
 
     # TODO: logging with separate_files==True
 
@@ -842,6 +848,58 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
             s = re.sub(r'nan', '', s)
             lines.append(s)
         fid.writelines(lines)
+
+
+def save_signals_isf(filename, signals, curves_list=None, verbose=False):
+    """Saves SignalsData to an ISF file in XY format.
+
+    filename  -- the full path
+    signals   -- SignalsData instance
+
+    :param filename:
+    :type filename: str
+    :param signals:
+    :type signals: SignalsData
+    :param curves_list:
+    :type curves_list: list or tuple
+    :param verbose: print information during the process or not
+    :type verbose: bool
+    :return:
+    :rtype:
+    """
+
+    # make file name template
+    curve_num_digits = 3
+    if len(str(signals.cnt_curves)) > 3:
+        curve_num_digits = len(str(signals.cnt_curves))
+    sub_file_name_fmt = "{name}_curve{idx:0"
+    sub_file_name_fmt += str(curve_num_digits)   # adds a sufficient number of leading zeros
+    sub_file_name_fmt += "d}.isf"
+
+    # check filename
+    if filename[-4:].upper() in (".ISF", ".CSV"):
+        filename = filename[:-4]
+    basename = os.path.basename(filename)
+
+    folder_path = os.path.dirname(filename)
+
+    # check and create dir
+    try:
+        if folder_path and not os.path.isdir(folder_path):
+            os.makedirs(folder_path)
+    except FileExistsError as ex:
+        # the folder may be created by another thread
+        pass
+
+    if curves_list is None:
+        curves_list = list(range(signals.cnt_curves))
+
+    for idx in curves_list:
+        x = signals.get_x(idx)
+        y = signals.get_y(idx)
+        subname = sub_file_name_fmt.format(name=basename, idx=idx)
+        save_as = os.path.join(folder_path, subname)
+        isf.write_isf_xy(x, y, save_as, verbose=verbose)
 
 
 def make_zero_data(columns, rows=10, dtype=np.float64, single_time_column=False):

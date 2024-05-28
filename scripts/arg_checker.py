@@ -654,7 +654,8 @@ def save_arg_check(options):
     :return: changed options
     :rtype: argparse.Namespace
     """
-    if options.separate_save:
+    options.save = False
+    if options.separate_save or options.save_csv or options.save_isf:
         options.save = True
 
     options.save_to = check_param_path(options.save_to, '--save-to')

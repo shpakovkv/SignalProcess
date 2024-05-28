@@ -34,12 +34,22 @@ def get_output_args_parser():
     """
     output_params_parser = argparse.ArgumentParser(add_help=False)
     output_params_parser.add_argument(
-        '-s', '--save',
+        '--save-csv',
         action='store_true',
-        dest='save',
+        dest='save_csv',
         help='saves the shot data to one CSV file after all the changes\n'
              'have been applied.\n'
-             'NOTE: if one shot corresponds to one CSV file, and\n'
+             'NOTE: if one shot corresponds to one input CSV file, and\n'
+             '      the output directory is not specified, the input\n'
+             '      files will be overwritten.\n\n')
+
+    output_params_parser.add_argument(
+        '--save-isf',
+        action='store_true',
+        dest='save_isf',
+        help='saves the shot data to separate ISF file (one file per curve)'
+             'after all the changes have been applied.\n'
+             'NOTE: if one shot corresponds to one input ISF file, and\n'
              '      the output directory is not specified, the input\n'
              '      files will be overwritten.\n\n')
 
