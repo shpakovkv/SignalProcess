@@ -899,7 +899,7 @@ def save_signals_isf(filename, signals, curves_list=None, verbose=False):
         y = signals.get_y(idx)
         subname = sub_file_name_fmt.format(name=basename, idx=idx)
         save_as = os.path.join(folder_path, subname)
-        isf.write_isf_xy(x, y, save_as, verbose=verbose)
+        isf.write_isf(x, y, save_as, verbose=verbose)
 
 
 def make_zero_data(columns, rows=10, dtype=np.float64, single_time_column=False):
