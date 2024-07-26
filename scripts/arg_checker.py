@@ -615,11 +615,8 @@ def plot_arg_check(options):
     :return: changed options
     :rtype: argparse.Namespace
     """
-    options.plot_dir = check_param_path(options.plot_dir, '--p_save')
-    options.multiplot_dir = check_param_path(options.multiplot_dir,
-                                             '--mp-save')
-    options.multicurve_dir = check_param_path(options.multicurve_dir,
-                                              '--multicurve-plot-save')
+    options.plot_dir = check_param_path(options.plot_dir, '--plot-save')
+
     # check and convert plot and multiplot options
     if options.plot:
         options.plot = global_check_idx_list(options.plot, '--plot',
@@ -633,6 +630,12 @@ def plot_arg_check(options):
         for idx, mc_param in enumerate(options.multicurve):
             options.multicurve[idx] = global_check_idx_list(mc_param,
                                                            '--multicurve-plot')
+
+    if options.customplot:
+        for idx, plot_param in enumerate(options.customplot):
+            options.customplot[idx] = check_custom_plot_param(plot_param)
+
+    options.plot_hide = options.p_hide
 
     return options
 
@@ -658,10 +661,6 @@ def save_arg_check(options):
     if options.separate_save or options.save_csv or options.save_isf:
         options.save = True
 
-    options.save_to = check_param_path(options.save_to, '--save-to')
-    if not options.save_to:
-        options.save_to = os.path.dirname(options.gr_files[0][0])
-
     # checks if postfix and prefix can be used in filename
     if options.prefix:
         options.prefix = re.sub(r'[^-.\w]', '_', options.prefix)
@@ -669,7 +668,19 @@ def save_arg_check(options):
         options.postfix = re.sub(r'[^-.\w]', '_', options.postfix)
 
     if options.out_names is None and not options.convert_only:
-        options.out_names = [None for _ in range(len(options.gr_files))]
+        # if output dir was not set and there is one file per shot
+        # then save data with the same file names
+        if len(options.gr_files[0]) == 1 and not options.save_to:
+            # if there is one file for each shot, then save data in place
+            options.out_names = [name[0] for name in options.gr_files]
+        else:
+            options.out_names = [None for _ in range(len(options.gr_files))]
+
+    # this must be done after options.out_names check
+    options.save_to = check_param_path(options.save_to, '--save-to')
+    if not options.save_to:
+        options.save_to = os.path.dirname(options.gr_files[0][0])
+
     return options
 
 
@@ -922,6 +933,7 @@ def check_utility_args(options):
     assert options.threads > 0, "The number of threads must be > 0."
 
     if options.hide_all:
+        options.plot_hide = True
         options.p_hide = True
         options.mp_hide = True
         options.mcp_hide = True
@@ -1113,3 +1125,40 @@ def check_and_prepare_front_bounds(user_entered_bounds):
             bounds2 = None
 
     return bounds1, bounds2
+
+
+def check_custom_plot_param(params):
+    """ Checks user entered parameters for custom-plots.
+    Params is a list of custom-plots where custom-plot
+    is a list of curve indexes separated with non-numeric character or word.
+    Separator words is used to form groups of curves
+    that will be further drawn on the graph with the number of subplots
+    equal to the number of groups, and within each group the axes will be shared.
+
+    :param params: list of custom-plots where custom-plot
+                   is a list of curve indexes separated
+                   with non-numeric character or word
+
+    :type params: list
+    :return: a list of groups, where each group is a list of curves indexes
+    :rtype: list of list
+    """
+    list_of_groups = list()
+    group = list()
+    for val in params:
+        try:
+            val = int(val)
+            group.append(val)
+        except ValueError:
+            list_of_groups.append(group)
+            group = list()
+    if group:
+        list_of_groups.append(group)
+    final_groups = list()
+    # filter empty groups
+    for group in list_of_groups:
+        if len(group) > 0:
+            final_groups.append(group)
+    assert len(final_groups) > 1 or len(final_groups[0]) > 0, \
+        f"Can't plot custom plot with only one curve. Add more curves to list!"
+    return final_groups

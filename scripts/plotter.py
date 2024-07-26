@@ -11,6 +11,7 @@ import pandas as pd
 from pytz import timezone as ptz
 from matplotlib import pyplot as plt
 from matplotlib import dates as md
+from matplotlib import ticker as tck
 from matplotlib.cm import get_cmap
 import bisect
 import colorsys
@@ -190,6 +191,73 @@ def do_multiplot_single(signals_data, curve_list, cl_args, plot_name,
     #     # the plot will be closed as soon as drawn
     #     plt.show(block=False)
     plt.close('all')
+
+
+def do_custom_plots(signals_data, cl_args, plot_name,
+                    peaks=None, verbose=False, hide=False):
+    """Plots all the custom-plot graphs specified by the user.
+    Saves the graphs that the user specified to save.
+
+    :param signals_data: SignalsData instance
+    :param cl_args: user-entered arguments (namespace from parser)
+    :param plot_name: shot number, needed for saving
+    :param peaks: the list of list of peaks (SinglePeak instance)
+                    peak_data[0] == list of peaks for data.curves[curves_list[0]]
+                    peak_data[1] == list of peaks for data.curves[curves_list[1]]
+                    etc.
+    :param verbose: show additional information or no
+
+    :type signals_data: SignalsData
+    :type cl_args: argparse.Namespace
+    :type plot_name: str
+    :type peaks: list of lists of SinglePeak
+    :type verbose: bool
+
+    :return: None
+
+    """
+
+    for curve_list in cl_args.customplot:
+        for group in curve_list:
+            check_plot_param(group, signals_data.cnt_curves)
+
+    for group_list in cl_args.customplot:
+        plot_custom_plot(signals_data, group_list,
+                         peaks=peaks,
+                         xlim=cl_args.t_bounds,
+                         amp_unit=signals_data.get_curve_units(group_list[0][0]),
+                         time_units=signals_data.time_units,
+                         unixtime=cl_args.unixtime,
+                         hide=hide)
+        # ax_list = fig.axes
+        # # print("AXIS LIST = {}".format(ax_list))
+        # ax = ax_list[0]
+        # # print("AXIS 0 = {}".format(ax))
+        # ax.legend()
+        # plt.legend()
+
+        if cl_args.plot_dir is not None:
+            curve_list = list()
+            for group in group_list:
+                curve_list.extend(group)
+            idx_list = get_curve_indexes_for_name_str(curve_list)
+            final_plot_name = ("{shot}_cur_"
+                               "{idx_list}.cp.png"
+                               "".format(shot=plot_name,
+                                         idx_list=idx_list))
+            plot_path = os.path.join(cl_args.plot_dir,
+                                     final_plot_name)
+            plt.savefig(plot_path, dpi=400)
+            if verbose:
+                print("Multicurve plot is saved {}"
+                      "".format(plot_path))
+        if not cl_args.plot_hide:
+            plt.show(block=True)
+        # else:
+        #     # draw plot, but don't pause the process
+        #     # the plot will be closed as soon as drawn
+        #     plt.show(block=False)
+        plt.close('all')
 
 
 def do_multicurve_plots(signals_data, cl_args, plot_name,
@@ -715,6 +783,191 @@ def plot_multiple_curve(signals, curve_list, peaks=None,
 
     plt.xlabel(time_label)
     plt.ylabel(amp_label)
+
+    return fig
+
+
+def plot_custom_plot(signals, group_list, peaks=None,
+                     xlim=None, amp_unit=None,
+                     time_units=None, title=None,
+                     unixtime=False, hide=False):
+
+    """Draws one or more curves on one graph.
+    Additionally draws peaks on the underlying layer
+    of the same graph, if the peaks exists.
+    The color of the curves iterates though the ColorRange iterator.
+
+    NOTE: after the function execution you need to show() or save() pyplot
+          otherwise the figure will not be saved or shown
+
+    signals     -- the SignalsData instance with curves data
+    group_list  -- the list of curve indexes
+    peaks       -- the list or SinglePeak instances
+    title       -- the title for plot
+    amp_unit    -- the units for curves Y scale
+    time_units   -- the unit for time scale
+    xlim        -- the tuple with the left and the right X bounds
+    hide        -- truth turns interactive graph mode off (time save option)
+    """
+    # index of corresponding row
+    x_row = 0
+    y_row = 1
+
+    plt.close('all')
+
+    # turn on/off interactive mode
+    if hide is True:
+        plt.ioff()
+    else:
+        plt.ion()
+
+    plt_rows = len(group_list)
+    curves_list = list()
+    for group in group_list:
+        curves_list.extend(group)
+
+    fig, ax = plt.subplots(nrows=plt_rows, ncols=1, sharex=True, squeeze=False)
+
+    if xlim is not None and xlim[0] is not None and xlim[1] is not None:
+        ax[0, 0].set_xlim(xlim)
+    else:
+        # simplify checks
+        xlim = None
+    ax[0, 0].xaxis.set_minor_locator(tck.AutoMinorLocator())
+
+    color_list = ["r", "chocolate", "orange", "olive", "chartreuse", "seagreen", "teal",
+                  "cyan", "dodgerblue", "navy", "darkviolet", "magenta"]
+    while len(color_list) < len(curves_list):
+        color_list.extend(color_list[:])
+    # color_iter = iter(color_list)
+
+    for row, group in enumerate(group_list):
+        ylim = None
+        color_iter = iter(color_list)
+        for curve_idx in group:
+            if len(group) > 1:
+                color = next(color_iter)
+            else:
+                color = '#9999aa'
+            # print("||  COLOR == {} ===================".format(color))
+            if unixtime:
+                dt_arr = pd.to_datetime(signals.get_x(curve_idx), unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+                ax[row, 0].plot(dt_arr,
+                             signals.get_y(curve_idx),
+                             '-',
+                             label=signals.get_curve_label(curve_idx),
+                             color=color, linewidth=1)
+            else:
+                ax[row, 0].plot(signals.get_x(curve_idx),
+                             signals.get_y(curve_idx),
+                             '-',
+                             label=signals.get_curve_label(curve_idx),
+                             color=color, linewidth=1)
+
+            # calc max amplitude limits (+10%) for all plotted curves
+            if xlim is not None:
+                new_ylim = calc_y_lim(signals.get_x(curve_idx),
+                                      signals.get_y(curve_idx),
+                                      xlim,
+                                      reserve=0.1)
+                if ylim is None:
+                    ylim = list(new_ylim)
+                else:
+                    if ylim[0] > new_ylim[0]:
+                        ylim[0] = new_ylim[0]
+                    if ylim[1] < new_ylim[1]:
+                        ylim[1] = new_ylim[1]
+
+            # if peaks is not None:
+            #     if peaks[curve_idx] is not None:
+            #         peak_x = [peak.time for peak in peaks[curve_idx] if peak is not None]
+            #         peak_y = [peak.val for peak in peaks[curve_idx] if peak is not None]
+            #         if unixtime:
+            #             pk_dt_arr = pd.to_datetime(peak_x, unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+            #             plt.scatter(pk_dt_arr, peak_y, s=50, edgecolors='#ff7f0e',
+            #                         facecolors='none', linewidths=2)
+            #             plt.scatter(pk_dt_arr, peak_y, s=90, edgecolors='#dd3328',
+            #                         facecolors='none', linewidths=2)
+            #         else:
+            #             plt.scatter(peak_x, peak_y, s=50, edgecolors='#ff7f0e',
+            #                         facecolors='none', linewidths=2)
+            #             plt.scatter(peak_x, peak_y, s=90, edgecolors='#dd3328',
+            #                         facecolors='none', linewidths=2)
+
+            # plot peaks scatter
+            if peaks is not None and peaks[curve_idx] is not None:
+                pk_color_iter = iter(ColorRange())
+                for pk in peaks[curve_idx]:
+                    pk_color = next(pk_color_iter)
+                    if pk is not None:
+                        if unixtime:
+                            pk_dt_arr = pd.to_datetime([pk.time], unit="s", utc=True).tz_convert(tz=ptz('Europe/Moscow'))
+                            ax[row, 0].scatter(pk_dt_arr, [pk.val], s=30,
+                                            edgecolors=color, facecolors='none',
+                                            linewidths=1.5)
+                            ax[row, 0].scatter(pk_dt_arr, [pk.val], s=60,
+                                            edgecolors='none', facecolors=pk_color,
+                                            linewidths=1.5, marker='x')
+                            # ax[row, 0].scatter(pk_dt_arr, [pk.val], s=50, edgecolors='#ff7f0e',
+                            #                 facecolors='none', linewidths=2)
+                            # ax[row, 0].scatter(pk_dt_arr, [pk.val], s=90, edgecolors='#dd3328',
+                            #                 facecolors='none', linewidths=2)
+                        else:
+                            # ax[row, 0].scatter([pk.time], [pk.val], s=50,
+                            #                 edgecolors=color, facecolors='none',
+                            #                 linewidths=1.5)
+                            # ax[row, 0].scatter([pk.time], [pk.val], s=90,
+                            #                 edgecolors='none', facecolors=pk_color,
+                            #                 linewidths=1, marker='x')
+                            ax[row, 0].scatter([pk.time], [pk.val], s=30, edgecolors='#ff7f0e',
+                                            facecolors='none', linewidths=2)
+                            ax[row, 0].scatter([pk.time], [pk.val], s=60, edgecolors='#dd3328',
+                                            facecolors='none', linewidths=2)
+
+            ax[row, 0].tick_params(direction='in', top=True, right=True)
+            if unixtime:
+                dt_fmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
+                ax[row, 0].xaxis.set_major_formatter(dt_fmt)      # set format
+                plt.subplots_adjust(bottom=0.22)                # make more space for datetime values
+                plt.xticks(rotation=25)                         # rotate long datetime values to avoid overlapping
+
+            if len(group) > 7:
+                ax[row, 0].legend(loc="upper right", prop={'size': 4})
+            elif len(group) > 4:
+                ax[row, 0].legend(loc="upper right", prop={'size': 6})
+            else:
+                ax[row, 0].legend(loc="upper right", prop={'size': 8})
+
+        if ylim is not None:
+            ax[row, 0].set_ylim(ylim)
+
+        amp_label = "Amp."
+        if amp_unit is not None:
+            amp_label += ", " + amp_unit
+        elif all(signals.get_curve_units(curves_list[0]) ==
+                 signals.get_curve_units(idx) for idx in curves_list):
+            amp_label += ", " + signals.get_curve_units(curves_list[0])
+        else:
+            labels = set(signals.get_curve_units(index) for index in group)
+            amp_label += ", " + ", ".join(str(unit_name) for unit_name in labels)
+        ax[row, 0].set_ylabel(amp_label)
+        ax[row, 0].grid(True, which='minor', axis='both', color='#bbbbbb', linestyle=':')
+        ax[row, 0].grid(True, which='major', axis='both', color='#aaaaaa', linestyle='--')
+
+    time_label = "Time"
+    if time_units is not None:
+        time_label += ", " + time_units
+    elif signals.time_units is not None:
+        time_label += ", " + signals.time_units
+
+    if title is not None:
+        plt.title(title)
+    elif len(curves_list) == 1:
+        plt.title(signals.get_curve_label(curves_list[0]))
+
+    plt.xlabel(time_label)
+    fig.subplots_adjust(hspace=0)
+
 
     return fig
 

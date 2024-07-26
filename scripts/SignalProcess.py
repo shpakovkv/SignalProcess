@@ -554,6 +554,10 @@ def full_process(args, shot_idx, num_mask):
     if args.multicurve is not None:
         plotter.do_multicurve_plots(data, args, shot_name, verbose=verbose)
 
+    # plot and save custom plots
+    if args.customplot is not None:
+        plotter.do_custom_plots(data, args, shot_name, verbose=verbose)
+
     # ========================================================================
     # ------   GET FRONT DELAY   ---------------------------------------------
     # ========================================================================

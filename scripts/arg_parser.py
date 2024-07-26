@@ -532,8 +532,9 @@ def get_plot_args_parser():
         '--p-hide', '--plot-hide',
         action='store_true',
         dest='p_hide',
-        help='if the --plot, --p-save and this flag is specified\n'
-             'the single plots will be saved but not shown.\n'
+        help='if the --plot or --multiplot or --multicurve-plot, '
+             'as well as --save-plot-to flags is specified\n'
+             'the plots will be saved but not shown.\n'
              'This option can reduce the running time of the program.\n\n')
 
     plot_args_parser.add_argument(
@@ -542,7 +543,8 @@ def get_plot_args_parser():
         dest='plot_dir',
         metavar='PLOT_DIR',
         help='specify the directory.\n'
-             'Each curve from the list, entered via --plot flag\n'
+             'Each curve from the list, entered via --plot'
+             'or --multiplot or --multicurve-plot flag\n'
              'will be plotted and saved separately as .png file\n'
              'to this directory.\n\n')
 
@@ -559,24 +561,6 @@ def get_plot_args_parser():
              'of curves) as you want. One flag for one graph.\n\n')
 
     plot_args_parser.add_argument(
-        '--mp-hide', '--multiplot-hide',
-        action='store_true',
-        dest='mp_hide',
-        help='if the --multiplot, --mp-save and this flag is specified\n'
-             'the multiplots will be saved but not shown.\n'
-             'This option can reduce the running time of the program.\n\n')
-
-    plot_args_parser.add_argument(
-        '--mp-save', '--save-multiplot-to',
-        action='store',
-        dest='multiplot_dir',
-        metavar='MULTIPLOT_DIR',
-        help='specify the directory.\n'
-             'Each multiplot, entered via --multiplot flag(s)\n'
-             'will be plotted and saved separately as .png file\n'
-             'to this directory.\n\n')
-
-    plot_args_parser.add_argument(
         '--multicurve-plot',
         action='append',
         dest='multicurve',
@@ -588,22 +572,20 @@ def get_plot_args_parser():
              'of curves) as you want. One flag for one graph.\n\n')
 
     plot_args_parser.add_argument(
-        '--mcp-hide', '--multicurve-plot-hide',
-        action='store_true',
-        dest='mcp_hide',
-        help='if the --multicurve-plot, --mcp-save and this flag is specified\n'
-             'the multicurve plots will be saved but not shown.\n'
-             'This option can reduce the running time of the program.\n\n')
-
-    plot_args_parser.add_argument(
-        '--mcp-save', '--save-multicurve-plot-to',
-        action='store',
-        dest='multicurve_dir',
-        metavar='MULTICURVE_DIR',
-        help='specify the directory.\n'
-             'Each multicurve plot, entered via --multicurve-plot flag(s)\n'
-             'will be plotted and saved separately as .png file\n'
-             'to this directory.\n\n')
+        '--custom-plot',
+        action='append',
+        dest='customplot',
+        metavar='CURVE_IDX',
+        nargs='+',
+        help='specify the indexes of the curves you want to plot\n'
+             'at one graph (with the same amplityde scale and time scale\n'
+             'If you want to draw several groups of curves \n'
+             'on the same graph (each with separate axes), then insert \n'
+             'any non-numeric symbol or word between corresponding indexes.\n'
+             'For example:\n'
+             '--custom-plot 0 1 2 group 5 6 group 8 9'
+             'You may use as many \'--custom-plot\' flags (with different lists\n'
+             'of curves) as you want. One flag for one graph.\n\n')
 
     plot_args_parser.add_argument(
         '--plot-bounds',
