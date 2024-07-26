@@ -643,6 +643,10 @@ def main():
 
     # try:
     args = global_check(args)
+    # print(args.out_names)
+    # print()
+    # print(f"args.save_to: '{args.save_to}'")
+    # asfadf = 124 / 0
 
     '''
     num_mask (tuple) - contains the first and last index
@@ -659,8 +663,10 @@ def main():
         # run on Intel Core i5-4460 (average for 100 runs)
         # measured by cProfile
         matplotlib.use("Agg")
+        print(f"Matplotlib backend: 'Agg'")
     else:
         matplotlib.use("Qt5Agg")
+        print(f"Matplotlib backend: 'Qt5Agg'")
 
     num_mask = file_handler.numbering_parser([files[0] for
                                               files in args.gr_files])
@@ -673,6 +679,7 @@ def main():
           args.plot or
           args.multiplot or
           args.multicurve or
+          args.customplot or
           args.offset_by_front or
           args.zero or
           args.correlate or

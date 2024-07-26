@@ -873,16 +873,19 @@ def print_front_stat_values(args, outputs):
     fall_time = []
     half_width = []
     peak_val = []
+    front_time = []
     for idx in range(curve_num):
         rise_time.append([shot_data[idx]["rise_time"] for shot_data in outputs])
         fall_time.append([shot_data[idx]["fall_time"] for shot_data in outputs])
         half_width.append([shot_data[idx]["half_width"] for shot_data in outputs])
         peak_val.append([shot_data[idx]["peak"].val for shot_data in outputs])
+        front_time.append([shot_data[idx]["front_edge"][0].time for shot_data in outputs])
 
     rise_time = np.array(rise_time, dtype=np.float64)
     fall_time = np.array(fall_time, dtype=np.float64)
     half_width = np.array(half_width, dtype=np.float64)
     peak_val = np.array(peak_val, dtype=np.float64)
+    front_time = np.array(front_time, dtype=np.float64)
 
     for idx in range(curve_num):
         curve = args.front_stat[idx]["curve"]
@@ -930,6 +933,14 @@ def print_front_stat_values(args, outputs):
         arr_mean, arr_std, arr_maxerr, arr_samples_num = get_1d_array_stat(peak_val[idx])
 
         print(f"PEAK VALUE: Mean = {arr_mean:.6f} {units}; "
+              f" Std. Dev. = {arr_std:.6f} {units};  "
+              f"Max. Dev. = {arr_maxerr:.6f} {units};   "
+              f"Number of samples = {arr_samples_num}"
+              )
+
+        arr_mean, arr_std, arr_maxerr, arr_samples_num = get_1d_array_stat(front_time[idx])
+
+        print(f"FRONT TIME AT {low_ref * 100:.2f}% of peak: Mean = {arr_mean:.6f} {units}; "
               f" Std. Dev. = {arr_std:.6f} {units};  "
               f"Max. Dev. = {arr_maxerr:.6f} {units};   "
               f"Number of samples = {arr_samples_num}"
@@ -1129,7 +1140,10 @@ def get_front_stats(curve,
     save_as = plot_name + ".png"
     folder = os.path.abspath(folder)
     if not os.path.isdir(folder):
-        os.makedirs(folder)
+        try:
+            os.makedirs(folder)
+        except FileExistsError as e:
+            assert os.path.isdir(folder), e.strerror
 
     # find edge
     x1, y1 = find_curve_front(curve,

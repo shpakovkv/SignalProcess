@@ -21,8 +21,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../isf-converter-py/'))
 
 from isfconverter import isfreader as isf
 
-from data_types import SignalsData
-from data_types import SinglePeak
+from data_types import (SignalsData,
+                        SinglePeak,
+                        SingleCurve)
 
 from duplicate_checker import check_for_duplicates
 
@@ -270,20 +271,20 @@ def get_grouped_file_list(dir_list, ext_list, group_size, sorted_by_ch=False):
     :return: list of grouped (sublists) by shot files
     :rtype: list
     """
-    number_of_files = 0
+    files_number = 0
     files_by_folder = list()
     # get lists of files and summary number of files
     for idx, folder in enumerate(dir_list):
         files_by_folder.append(get_file_list_by_ext(folder, ext_list, sort=True))
         count = len(files_by_folder[idx])
-        number_of_files += count
+        files_number += count
 
     # check summary number of files
-    shots_count = number_of_files // group_size
-    assert number_of_files % group_size == 0, \
+    shots_count = files_number // group_size
+    assert files_number % group_size == 0, \
         "The summary number of data files ({}) in the " \
         "specified folder(s) is not a multiple of group " \
-        "size ({}).".format(number_of_files, group_size)
+        "size ({}).".format(files_number, group_size)
 
     assert shots_count > 0, \
         "There are no data files in the specified folders!"
@@ -760,7 +761,7 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
 
     if separate_files:
         if cl_args.save_isf:
-            save_signals_isf(save_as, signals_data, verbose=verbose)
+            save_signals_isf_multiple(save_as, signals_data, verbose=verbose)
         if cl_args.save_csv:
             # save single curve
             if signals_data.cnt_curves == 1:
@@ -780,7 +781,7 @@ def do_save(signals_data, cl_args, shot_name, save_as=None, verbose=False, separ
             if verbose:
                 print("Saved as {}".format(save_csv))
         if cl_args.save_isf:
-            save_signals_isf(save_as, signals_data, verbose=verbose)
+            save_signals_isf_multiple(save_as, signals_data, verbose=verbose)
 
     # TODO: logging with separate_files==True
 
@@ -850,17 +851,17 @@ def save_signals_csv(filename, signals, delimiter=",", precision=18, curves_list
         fid.writelines(lines)
 
 
-def save_signals_isf(filename, signals, curves_list=None, verbose=False):
+def save_signals_isf_multiple(filename, signals, curves_list=None, verbose=False):
     """Saves SignalsData to an ISF file in XY format.
 
     filename  -- the full path
     signals   -- SignalsData instance
 
-    :param filename:
+    :param filename: input data file(s) name
     :type filename: str
-    :param signals:
+    :param signals: the structure with data on all signals
     :type signals: SignalsData
-    :param curves_list:
+    :param curves_list: the list of indexes of the curves to be saved
     :type curves_list: list or tuple
     :param verbose: print information during the process or not
     :type verbose: bool
@@ -894,12 +895,38 @@ def save_signals_isf(filename, signals, curves_list=None, verbose=False):
     if curves_list is None:
         curves_list = list(range(signals.cnt_curves))
 
-    for idx in curves_list:
-        x = signals.get_x(idx)
-        y = signals.get_y(idx)
-        subname = sub_file_name_fmt.format(name=basename, idx=idx)
-        save_as = os.path.join(folder_path, subname)
-        isf.write_isf(x, y, save_as, verbose=verbose)
+    if signals.cnt_curves == 1:
+        save_signals_isf(filename, signals.get_single_curve(0), verbose)
+    else:
+        for idx in curves_list:
+            subname = sub_file_name_fmt.format(name=basename, idx=idx)
+            save_as = os.path.join(folder_path, subname)
+            save_signals_isf(save_as, signals.get_single_curve(idx), verbose)
+
+
+def save_signals_isf(filename, signal_data, verbose=False):
+    """Saves SignalsData to an ISF file in XY format.
+
+    filename  -- the full path
+    signals   -- SignalsData instance
+
+    :param filename: full path to the file to save data to
+    :type filename: str
+    :param signal_data: x data array
+    :type signal_data: SingleCurve
+    :param y: y data array
+    :type y: np.ndarray
+    :param verbose: print information during the process or not
+    :type verbose: bool
+    :return:
+    :rtype:
+    """
+
+    # check filename
+    if len(filename) < 4 or filename[-4:].upper() != ".ISF":
+        filename += ".isf"
+
+    isf.write_isf(signal_data.get_x(), signal_data.get_y(), filename, verbose=verbose)
 
 
 def make_zero_data(columns, rows=10, dtype=np.float64, single_time_column=False):
