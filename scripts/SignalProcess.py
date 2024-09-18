@@ -526,6 +526,8 @@ def full_process(args, shot_idx, num_mask):
         new_delay = do_offset_by_front(data, args, shot_name)
 
     # multiplier and delay
+    if args.delay_per_shot is not None:
+        new_delay = arg_checker.merge_delay_and_delay_per_shot(new_delay, args.delay_per_shot, shot_idx, data.cnt_curves, data_axes=2, dtype=np.float64)
     data = multiplier_and_delay(data, args.multiplier, new_delay)
 
     if args.smooth is not None:

@@ -503,6 +503,45 @@ def check_and_prepare_multiplier_and_delay(options, data_axes=2, dtype=np.float6
         options.multiplier = np.ones(shape=delay.shape, dtype=dtype)
 
 
+def merge_delay_and_delay_per_shot(delay, delays_per_shot_dict, shot_idx, curves_num, data_axes=2, dtype=np.float64):
+    """ Adds delay values from delays_per_shot_dict
+    to the copy of the delay array and returns it.
+
+    :param delay: original delay array [curve][axis]
+    :type delay: np.ndarray
+    :param delays_per_shot_dict: additional delay values for specific shot numbers [curve][shot]
+    :type delays_per_shot_dict: dict
+    :param shot_idx: current shot number
+    :type shot_idx: int
+    :param curves_num: the number of curves in data array
+    :type curves_num: int
+    :param data_axes: the number of axes in data array (2 by default: x and y)
+    :type data_axes: int
+    :param dtype: the type of the delay array to be created
+    :type dtype: np.dtype
+    :return: new delay array
+    :rtype: np.ndarray
+    """
+    time_axis = 0
+    # TODO: add to log
+    # 1. no delays
+    if delay is None:
+        raise NotImplementedError()
+
+    # 2. delays exist
+    entered_shot_num = len(next(iter(delays_per_shot_dict.values())))
+    assert shot_idx < entered_shot_num, f"Shot index ({shot_idx}) is out of range for the delay_per_shot array with the length {entered_shot_num}."
+    assert isinstance(delay, np.ndarray), f"Wrong delay array type. Expected numpy.ndarray, got {type(delay)} instead."
+    assert delay.shape[0] == curves_num, f"Different number of delays ({delay.shape[0]}) and curves ({curves_num})!"
+    new_delay = delay.copy()
+    for curve_idx in range(curves_num):
+        if curve_idx in delays_per_shot_dict.keys():
+            new_delay[curve_idx, time_axis] += delays_per_shot_dict[curve_idx][shot_idx]
+
+    return new_delay
+
+
+
 def check_multiplier(m, curves_count=1):
     """Checks 'multiplier' argument, return it's copy
      or generates a list of ones.
@@ -861,6 +900,30 @@ def data_corr_arg_check(options):
             ("The number of multipliers ({}) is not equal"
              " to the number of delays ({})."
              "".format(len(options.multiplier), len(options.delay)))
+
+    if options.delay_per_shot is not None:
+        delay_per_shot_dict = dict()
+        shot_num_list = []
+        for params in options.delay_per_shot:
+            assert len(params) > 1, \
+                (f"--delay-per-shot ValueError. Expected curve index and time "
+                 f"delay values for each shot. Got curve index only ({params}).")
+            curve = params[0]
+            try:
+                curve = int(curve)
+            except ValueError as e:
+                raise ValueError(f"Bad value for the curve index ({params[0]}) in --delay-per-shot.")
+            params[0] = curve
+            delay_per_shot_dict[params[0]] = params[1:]
+            shot_num_list.append(len(params) - 1)
+        assert len(set(shot_num_list)) == 1, \
+            (f"Different number of shots ({shot_num_list}) "
+             f"entered via different --delay-per-shot flags.")
+        assert not options.sequence, f"--delay-per-shot is not compatible with the --as-log-sequence flag."
+        assert len(options.gr_files) == shot_num_list[0], \
+            (f"Wrong number of delays-per-shot values ({shot_num_list[0]}) "
+             f"for the current number of shots ({len(options.gr_files)})")
+        options.delay_per_shot = delay_per_shot_dict
 
     if options.smooth:
         options.smooth = prepare_params_smooth(options.smooth)

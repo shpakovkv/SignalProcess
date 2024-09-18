@@ -333,6 +333,23 @@ def get_mult_del_args_parser():
              'NOTE: the data is first multiplied by a corresponding \n'
              '      multiplier and then the delay is subtracted \n'
              '      from them.\n\n')
+
+    coeffs_parser.add_argument(
+        '--delay-per-shot',
+        action='append',
+        type=float,
+        metavar=('CURVE_IDX', 'DELAY'),
+        nargs='+',
+        dest='delay_per_shot',
+        default=None,
+        help='Specify additional delays for each shot for one curve \n'
+             'selected by zero-based index.\n'
+             'In each shot, the selected curve will be moved along \n'
+             'the time axis by the specified value.\n'
+             'NOTE: the data is first multiplied by a corresponding \n'
+             '      multiplier and then the delay is subtracted \n'
+             '      from them.\n\n')
+
     return coeffs_parser
 
 
