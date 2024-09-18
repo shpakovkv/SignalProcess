@@ -135,16 +135,19 @@ def group_by_hash(hashes_on_1k, verbose=False):
             try:
                 full_hash = get_hash(filename, first_chunk_only=False)
                 duplicate = files_by_hash.get(full_hash)
-                if duplicate:
-                    files_by_hash[full_hash].append(filename)
-                    if verbose:
-                        print("Duplicate found: {} and {}".format(filename, duplicate))
-                else:
-                    files_by_hash[full_hash].append(filename)
+                files_by_hash[full_hash].append(filename)
+                if duplicate and verbose:
+                    print("Duplicate found: {} and {}".format(filename, duplicate))
             except (OSError,):
                 # the file access might've changed till the exec point got here
                 continue
-    return files_by_hash
+    # delete single files
+    result = dict()
+    for key, val in files_by_hash.items():
+        if len(val) > 1:
+            result[key] = val
+
+    return result
 
 
 def print_duplicates(files_by_hash_dict):
