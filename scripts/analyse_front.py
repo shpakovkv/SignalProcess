@@ -358,4 +358,5 @@ def do_offset_by_front(signals_data, cl_args, shot_name, plot=True):
         for idx in range(0, new_delay.shape[0]):
             new_delay[idx, 0] += front_point.time
         return new_delay
-    return None
+    # nothing to change: return original delay values
+    return cl_args.delay

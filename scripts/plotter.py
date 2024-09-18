@@ -172,13 +172,13 @@ def do_multiplot_single(signals_data, curve_list, cl_args, plot_name,
                    xlim=cl_args.t_bounds,
                    unixtime=cl_args.unixtime,
                    hide=hide)
-    if cl_args.multiplot_dir is not None:
+    if cl_args.plot_dir is not None:
         idx_list = get_curve_indexes_for_name_str(curve_list)
         mplot_name = ("{shot}_cur_"
                       "{idx_list}.mp.png"
                       "".format(shot=plot_name,
                                 idx_list=idx_list))
-        mplot_path = os.path.join(cl_args.multiplot_dir,
+        mplot_path = os.path.join(cl_args.plot_dir,
                                   mplot_name)
         plt.savefig(mplot_path, dpi=400)
         if verbose:
@@ -302,13 +302,13 @@ def do_multicurve_plots(signals_data, cl_args, plot_name,
         # ax.legend()
         # plt.legend()
 
-        if cl_args.multicurve_dir is not None:
+        if cl_args.plot_dir is not None:
             idx_list = get_curve_indexes_for_name_str(curve_list)
             mplot_name = ("{shot}_cur_"
                           "{idx_list}.mc.png"
                           "".format(shot=plot_name,
                                     idx_list=idx_list))
-            mplot_path = os.path.join(cl_args.multicurve_dir,
+            mplot_path = os.path.join(cl_args.plot_dir,
                                       mplot_name)
             plt.savefig(mplot_path, dpi=400)
             if verbose:
@@ -356,13 +356,13 @@ def do_multicurve_plot_single(signals_data, curve_list, cl_args, plot_name,
                         unixtime=cl_args.unixtime,
                         hide=hide)
 
-    if cl_args.multicurve_dir is not None:
+    if cl_args.plot_dir is not None:
         idx_list = get_curve_indexes_for_name_str(curve_list)
         mplot_name = ("{shot}_cur_"
                       "{idx_list}.mc.png"
                       "".format(shot=plot_name,
                                 idx_list=idx_list))
-        mplot_path = os.path.join(cl_args.multicurve_dir,
+        mplot_path = os.path.join(cl_args.plot_dir,
                                   mplot_name)
         plt.savefig(mplot_path, dpi=400)
         if verbose:

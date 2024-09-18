@@ -521,15 +521,12 @@ def full_process(args, shot_idx, num_mask):
         args.delay = update_delays_by_zero_level_offset(data, args)
 
     # check offset_by_voltage parameters (if idx is out of range)
-    new_delay = None
+    new_delay = args.delay
     if args.offset_by_front is not None:
         new_delay = do_offset_by_front(data, args, shot_name)
 
     # multiplier and delay
-    if new_delay is None:
-        data = multiplier_and_delay(data, args.multiplier, args.delay)
-    else:
-        data = multiplier_and_delay(data, args.multiplier, new_delay)
+    data = multiplier_and_delay(data, args.multiplier, new_delay)
 
     if args.smooth is not None:
         do_smooth_curves_and_add(data, args.smooth, shot_name)
