@@ -612,7 +612,8 @@ def file_arg_check(options):
             options.src_dir = [options.src_dir]
         dir_list = list()
         for value in options.src_dir:
-            dir_list.append(value.strip())
+            value = os.path.abspath(value.strip())
+            dir_list.append(value)
             assert os.path.isdir(value), \
                 "Can not find directory {}".format(value)
 
